@@ -1,5 +1,11 @@
 # Edge CDP Broker API
 
+## 隔离查询上下文复用
+
+`isolated-context-reuse-v1` 将上下文绑定到 target、session、主 frame 和 loader，每次读取前重新核对 frame tree，导航、脱离和连接丢失立即作废。缺少 loader 身份时不复用。上下文创建预算为 5 秒，`/info`、`/dom/query`、`/research/snapshot` 的请求预算为 10 秒；真实超时仍隔离该 target，不自动重放。健康信息记录超时命令的实际预算和耗时，便于区分连接中断与单页停顿。
+
+连接核心需要受控重载，不能通过研究配方热加载。已知原页在重载后用 [持久客户端原页接管模式](cdp-session.md#受控重载后接回原页面) 恢复租约，保持原 URL、位置和已用恢复计数。浏览器首次创建上下文的实际停顿原因可能仍未知，单页验收不能证明所有站点永久稳定。
+
 ## X 原图就绪配方
 
 `POST /research/snapshot` 的固定 `generic-posts` 配方在准确的 X 原图路由返回 `page_state.photo_readiness.version=1`。它检查视口内公开 `pbs.twimg.com/media/` IMG、CSS 背景及对应已存在 IMG 的 complete、自然尺寸和显示尺寸，节点预算为 2000。原图可能在 dialog 外，因此以准确路由和公开视口为边界。此能力属于可热加载配方，未扩展 `/dom/query` 的字段或选择器，也不需要重启 broker。加载/解码状态不能替代截图后的实际视觉审阅，客户端要求两次稳定后截图。
@@ -133,7 +139,7 @@ try {
 
 ## 超时与恢复
 
-- 整个 HTTP 请求绝对上限 18 秒；共享连接握手默认 30 秒（`CDP_HANDSHAKE_TIMEOUT_MS`）；元数据 2 秒；固定 DOM 查询 5 秒；导航和截图最多 15 秒。单个请求先返回不取消仍在进行的共享握手，预检显示 connecting 时等待该次连接，不重复发起连接。Broker 不循环重试。
+- 整个 HTTP 请求绝对上限 18 秒；共享连接握手默认 30 秒（`CDP_HANDSHAKE_TIMEOUT_MS`）；元数据命令 2 秒，隔离上下文创建 5 秒，固定 DOM 执行 5 秒，上述三个读取接口总预算 10 秒；导航和截图最多 15 秒。单个请求先返回不取消仍在进行的共享握手，预检显示 connecting 时等待该次连接，不重复发起连接。Broker 不循环重试。
 - `target_detached`、`inspector_detached` 或 session invalid 时，当前命令最多自动 reattach 一次；仍失败就返回结构化错误。
 - 第一次失败后刷新 `/targets`，重新定位页面并只重试一次更小的命令；不要复用页面变化前的 DOM/AX 节点，不要原样连续重试。
 - YouTube、X、Instagram 等重型 SPA 禁止全量 AX tree、全 DOM snapshot、整页 `innerHTML`、`direction=bottom` 或一次大滚动；使用小字段、小批次和增量滚动。

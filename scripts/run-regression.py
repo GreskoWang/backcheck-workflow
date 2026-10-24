@@ -33,7 +33,7 @@ def main():
     commands=[]
     if args.group in ('all','browser'):
         for script in sorted((ROOT/'skills/web-access/scripts').glob('*selftest.mjs')):
-            commands.append(('browser-'+script.stem,[args.node,str(script)],script.parent,120))
+            commands.append(('browser-'+script.stem,[args.node,str(script)],script.parent,240 if script.name=='cdp-session-selftest.mjs' else 120))
     if args.group in ('all','bridge'):
         cwd=ROOT/'tools/feishu-codex-bridge'
         commands.append(('bridge',[args.node,'--test','--test-concurrency=2',*map(str,sorted((cwd/'test').glob('*.test.mjs')))],cwd,180))

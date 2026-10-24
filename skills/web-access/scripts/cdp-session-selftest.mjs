@@ -28,8 +28,15 @@ const server = http.createServer(async (request, response) => {
     if (mode === 'new-lost-once' && requests.filter(x => x.route === '/new').length === 1) return request.socket.destroy();
     return json(newResults.get(key));
   }
+  if (url.pathname === '/acquire') {
+    if (mode === 'resume-lost' && requests.filter(x => x.route === '/acquire').length === 1) return request.socket.destroy();
+    return json({ targetId: 'existing-target', leaseToken: lease });
+  }
   assert.equal(request.headers['x-cdp-lease'], lease);
-  assert.equal(request.headers['x-cdp-manage'], manage);
+  assert.equal(request.headers['x-cdp-manage'], mode.startsWith('resume') ? undefined : manage);
+  if (url.pathname === '/release') return json({ released: true, closed: false });
+  if (url.pathname === '/info' && mode === 'resume-wrong-url') return json({ page: { url: 'https://example.com/changed' } });
+  if (url.pathname === '/info' && mode === 'resume-timeout') return json({ error: { code: 'cdp_timeout' } }, 504);
   if (url.pathname === '/finalize') {
     if (mode === 'close-failed') return json({ closed: false, error: { code: 'close_failed', details: { leaseToken: lease, manageToken: manage } } });
     if (mode === 'close-unknown') return json({ error: { code: 'outcome_unknown', details: { requestId: request.headers['x-cdp-request-id'] } } }, 502);
@@ -43,7 +50,7 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === '/click' && mode === 'click-safe-reason') return json({ error: { code: 'element_not_found', details: { reason: 'text_mismatch', authorization: `Bearer ${fakeBearer}`, leaseToken: lease } } }, 404);
   if (url.pathname === '/click' && mode === 'click-unsafe-reason') return json({ error: { code: 'element_not_found', details: { reason: `Bearer ${fakeBearer}`, leaseToken: lease } } }, 404);
   if (url.pathname === '/dom/query') return json({ found: true, text: '中文正文、Música、🚀', truncated: false });
-  return json({ url: 'https://example.com/', targetId: url.searchParams.get('target'), ready: 'complete' });
+  return json({ page: { url: 'https://example.com/', scrollY: 2800, readyState: 'complete' }, targetId: url.searchParams.get('target') });
 });
 server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -51,8 +58,8 @@ const port = server.address().port;
 fs.writeFileSync(path.join(root, `${port}.token`), fakeBearer);
 
 function reset(nextMode) { mode = nextMode; requests = []; newResults = new Map(); opened = 0; closed = 0; }
-function launch({ timeout = 4000, wrapper } = {}) {
-  const args = ['-NoProfile', '-NonInteractive', '-File', script, '-InitialUrl', 'https://example.com/', '-Owner', 'session-selftest', '-Port', String(port), '-RequestTimeoutMilliseconds', String(timeout)];
+function launch({ timeout = 4000, wrapper, resume = false, used = 1 } = {}) {
+  const args = ['-NoProfile', '-NonInteractive', '-File', script, ...(resume ? ['-ExistingTarget', 'existing-target', '-ExpectedUrl', 'https://example.com/', '-RecoveryAttemptsUsed', String(used)] : ['-InitialUrl', 'https://example.com/']), '-Owner', 'session-selftest', '-Port', String(port), '-RequestTimeoutMilliseconds', String(timeout)];
   if (wrapper) args.push('-RequestScript', wrapper);
   const child = spawn('pwsh', args, { windowsHide: true, env: { ...process.env, CDP_PROXY_TOKEN_DIR: root }, stdio: ['pipe', 'pipe', 'pipe'] });
   let stdout = '', stderr = '', pending = '';
@@ -73,8 +80,10 @@ function launch({ timeout = 4000, wrapper } = {}) {
 }
 
 try {
+  let holder, result;
+  if (!process.argv.includes('--resume-only')) {
   reset('normal');
-  let holder = launch(); holder.end('  \n\n'); let result = await holder.finish();
+  holder = launch(); holder.end('  \n\n'); result = await holder.finish();
   assert.equal(result.code, 0); assert.equal(opened, 0); assert.equal(requests.length, 0); assert.equal(result.lines[0].created, false);
 
   reset('normal');
@@ -129,7 +138,30 @@ try {
     reset(failMode); holder = launch(); holder.end(JSON.stringify({ action: 'info' }) + '\n'); result = await holder.finish();
     assert.equal(result.code, 1); assert.equal(result.lines.at(-1).closed, false); assert.equal(result.lines.at(-1).error.code, 'cleanup_unconfirmed'); assert.equal(requests.filter(x => x.route === '/finalize').length, 1, 'unconfirmed close must not be replayed');
   }
-  console.log('cdp-session self-test passed: empty nonTTY EOF creates nothing; nonTTY commands/blank line/invalid JSON; request errors/timeouts retain owner; outer wait timeout; active disconnect EOF finalizes; screenshot failure preserves file; same-key lost creation; explicit creation failure no retry; cleanup false/unknown never success; Korean input reaches HTTP intact; click error reason allowlist and capability redaction');
+  }
+  for (const resumeMode of ['resume-normal', 'resume-lost', 'resume-wrong-url', 'resume-timeout']) {
+    reset(resumeMode); holder = launch({ resume: true });
+    holder.end(JSON.stringify({ action: 'recover' }) + '\n' + JSON.stringify({ action: 'query', body: { kind: 'text', selector: 'main' } }) + '\n');
+    result = await holder.finish();
+    assert.equal(opened, 0); assert.equal(closed, 0);
+    assert.equal(requests.some(x => ['/new', '/navigate', '/finalize', '/recover'].includes(x.route)), false);
+    assert.equal(requests.filter(x => x.route === '/release').length, 1);
+    assert.equal(result.lines.at(-1).released, true);
+    assert.equal(result.lines.at(-1).recoveryAttemptsUsed, 1);
+    if (resumeMode === 'resume-wrong-url' || resumeMode === 'resume-timeout') {
+      assert.equal(result.code, 1); assert.equal(requests.some(x => x.route === '/dom/query'), false);
+    } else {
+      assert.equal(result.code, 0); assert.equal(result.lines.find(x => x.action === 'recover').error.code, 'recovery_budget_exhausted');
+      assert.equal(result.lines.find(x => x.action === 'query').ok, true);
+    }
+    if (resumeMode === 'resume-lost') {
+      const gets = requests.filter(x => x.route === '/acquire'); assert.equal(gets.length, 2); assert.equal(gets[0].key, gets[1].key);
+    }
+  }
+  reset('resume-normal'); holder = launch({ resume: true, used: 0 });
+  holder.end(JSON.stringify({ action: 'recover' }) + '\n' + JSON.stringify({ action: 'recover' }) + '\n'); result = await holder.finish();
+  assert.equal(requests.filter(x => x.route === '/recover').length, 1); assert.equal(result.lines.at(-1).recoveryAttemptsUsed, 1);
+  console.log('cdp-session PASS (' + (process.argv.includes('--resume-only') ? 'resume only' : 'full') + '): original-target acquire, production info.page contract, exact URL verification, release-only cleanup, lost acquire same-key replay, failure preserves page, recovery budget preserved and enforced.');
 } finally {
   for (const socket of sockets) socket.destroy();
   await new Promise(resolve => server.close(resolve));

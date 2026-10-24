@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { URL } from 'node:url';
 import LoopbackWebSocket from './loopback-websocket.mjs';
+import { createFixedWorldResolver } from './fixed-world.mjs';
 import { validateFrameSelector, wrapVisibleFrame } from './cdp-visible-frame.mjs';
 import { assertResearchRecipe } from './research-dom-recipes.mjs';
 import { getFixedResearchReadFunction } from './research-recipe-loader.mjs';
@@ -36,7 +37,7 @@ const TOKEN_DIR = process.env.CDP_PROXY_TOKEN_DIR
 const TOKEN_FILE = path.join(TOKEN_DIR, `${PORT}.token`);
 const MARKER_KEY_FILE = path.join(TOKEN_DIR, `${PORT}.marker-key`);
 
-const BUDGETS = Object.freeze({ metadata: 2000, dom: 5000, navigation: 15000, screenshot: 15000 });
+const BUDGETS = Object.freeze({ metadata: 2000, context: 5000, read: 10000, dom: 5000, navigation: 15000, screenshot: 15000 });
 const ALLOWED_CDP_METHODS = new Set([
   'Input.dispatchMouseEvent',
   'Browser.getVersion',
@@ -267,6 +268,8 @@ const sessions = new Map();
 const targetsBySession = new Map();
 const eventWaiters = new Set();
 const contextVersions = new Map();
+const fixedWorlds = createFixedWorldResolver({sendCdp, makeError:(...args) => new BrokerError(...args),
+  metadataTimeoutMs:BUDGETS.metadata, worldTimeoutMs:BUDGETS.context});
 let connectionBaselineTargets = new Set();
 const leases = new Map();
 const managedTabs = new Map();
@@ -358,6 +361,7 @@ async function ensureProfileLock(endpoint) {
 }
 
 function clearSessionByTarget(targetId, reason = 'session_invalid', expectedSessionId = null) {
+  fixedWorlds.invalidate(targetId, expectedSessionId);
   const currentSessionId = sessions.get(targetId);
   const sessionId = expectedSessionId || currentSessionId;
   if (sessionId) {
@@ -401,6 +405,7 @@ function handleSocketLoss(socket, reason = 'connection_lost') {
   connectionState = 'disconnected';
   connectionMeta = null;
   lastConnectError = { code: reason, message: 'Edge CDP connection lost or unresponsive.', at: new Date().toISOString() };
+  fixedWorlds.clear();
   sessions.clear();
   targetsBySession.clear();
   rejectAllPending(new BrokerError(reason, '与 Microsoft Edge 的 CDP 连接已断开。', undefined, 502));
@@ -458,9 +463,15 @@ function handleBrowserMessage(socket, raw) {
   } else if (message.method === 'Inspector.detached' && message.sessionId) {
     const targetId = targetsBySession.get(message.sessionId);
     if (targetId) clearSessionByTarget(targetId, 'inspector_detached', message.sessionId);
+  } else if (['Page.frameNavigated', 'Page.frameDetached'].includes(message.method) && message.sessionId) {
+    const targetId = targetsBySession.get(message.sessionId);
+    if (targetId) fixedWorlds.invalidate(targetId, message.sessionId);
+    if (targetId && message.method === 'Page.frameNavigated' && !message.params?.frame?.parentId) {
+      contextVersions.set(targetId, (contextVersions.get(targetId) || 0) + 1);
+    }
   } else if (message.method === 'Runtime.executionContextsCleared' && message.sessionId) {
     const targetId = targetsBySession.get(message.sessionId);
-    if (targetId) contextVersions.set(targetId, (contextVersions.get(targetId) || 0) + 1);
+    if (targetId) { fixedWorlds.invalidate(targetId, message.sessionId); contextVersions.set(targetId, (contextVersions.get(targetId) || 0) + 1); }
   } else if (message.method === 'Page.windowOpen' && message.sessionId) {
     const sourceTargetId = targetsBySession.get(message.sessionId);
     if (sourceTargetId && (leases.has(sourceTargetId) || managedTabs.has(sourceTargetId))) {
@@ -784,6 +795,7 @@ function sendCdp(method, params = {}, options = {}) {
       reject(new BrokerError('connection_lost', 'Edge CDP WebSocket 未连接。', undefined, 502));
       return;
     }
+    const startedAt = Date.now();
     const id = ++commandId;
     const message = { id, method, params };
     if (sessionId) message.sessionId = sessionId;
@@ -815,7 +827,7 @@ function sendCdp(method, params = {}, options = {}) {
       const isolatedManagedClose = method === 'Target.closeTarget' && targetId
         && managedTabs.has(targetId) && closingTargets.has(targetId);
       const retireConnection = !sessionId && !isolatedManagedClose;
-      lastCdpTimeout = { method, targetId:targetId || null, at:new Date().toISOString(), connectionRetired:Boolean(retireConnection) };
+      lastCdpTimeout = { method, targetId:targetId || null, at:new Date().toISOString(), timeoutMs, elapsedMs:Date.now()-startedAt, connectionRetired:Boolean(retireConnection) };
       entry.reject(new BrokerError('cdp_timeout', `CDP 命令 ${method} 超过 ${timeoutMs}ms。`, { method, targetId, timeoutMs, outcomeUnknown: true }, 504));
       if (retireConnection) retireBrowserSocket(commandSocket, 'unresponsive_connection');
     }, timeoutMs);
@@ -1107,7 +1119,7 @@ function requireLease(targetId, owner, leaseToken, { allowQuarantined = false } 
     throw new BrokerError('lease_conflict', '该 Edge target 的 owner 或 lease token 不匹配。', { targetId }, 409);
   }
   if (!allowQuarantined && quarantinedTargets.has(targetId)) {
-    throw new BrokerError('target_quarantined', '该 target 上一条命令超时，必须先 recover 或改用新 target。', {
+    throw new BrokerError('target_quarantined', '该 target 上一条命令超时，已保留隔离状态；先核对原断点和既有恢复额度，不得换页重置失败次数。', {
       targetId,
       quarantine: quarantinedTargets.get(targetId),
     }, 409);
@@ -2341,19 +2353,11 @@ async function callFixedFunctionUnlocked(targetId, functionDeclaration, args, { 
     let sessionId = null;
     try {
       sessionId = await ensureSession(targetId, deadline);
-      const tree = await sendCdp('Page.getFrameTree', {}, { sessionId, targetId, timeoutMs: BUDGETS.metadata, deadline });
-      const frameId = tree.frameTree?.frame?.id;
-      if (!frameId) throw new BrokerError('main_frame_unavailable', '无法定位页面主 frame。', { targetId }, 502);
-      const world = await sendCdp('Page.createIsolatedWorld', {
-        frameId,
-        worldName: 'codex-background-check-broker',
-        grantUniveralAccess: false,
-      }, { sessionId, targetId, timeoutMs: BUDGETS.metadata, deadline });
-      if (!world.executionContextId) throw new BrokerError('isolated_world_unavailable', '无法创建隔离 DOM 查询上下文。', { targetId }, 502);
+      const executionContextId = await fixedWorlds.resolve(targetId, sessionId, deadline);
       const protocolTimeout = Math.max(100, Math.min(timeoutMs - 100, deadline.remaining('Runtime.callFunctionOn')));
       return await sendCdp('Runtime.callFunctionOn', {
         functionDeclaration,
-        executionContextId: world.executionContextId,
+        executionContextId,
         arguments: args.map((value) => ({ value })),
         returnByValue: true,
         awaitPromise: false,
@@ -2361,7 +2365,7 @@ async function callFixedFunctionUnlocked(targetId, functionDeclaration, args, { 
         timeout: protocolTimeout,
       }, { sessionId, targetId, timeoutMs, deadline });
     } catch (error) {
-      const contextInvalid = /Cannot find context|Execution context.*destroyed|Inspected target navigated/iu.test(String(error?.message || ''));
+      const contextInvalid = error?.code === 'isolated_context_changed' || /Cannot find context|Execution context.*destroyed|Inspected target navigated/iu.test(String(error?.message || ''));
       if (sideEffect && (isOutcomeUnknownError(error) || contextInvalid)) {
         await quarantineTimedOutTarget(targetId, sessionId, error);
         throw new BrokerError('outcome_unknown', '页面动作可能已生效但执行上下文或响应已丢失；已隔离 target，禁止自动重放。', { targetId, cause: error?.code || null }, 409);
@@ -2370,7 +2374,11 @@ async function callFixedFunctionUnlocked(targetId, functionDeclaration, args, { 
         await quarantineTimedOutTarget(targetId, sessionId, error);
         throw error;
       }
-      if (retrySession && attempt === 0 && (isSessionInvalidError(error) || contextInvalid)) {
+      if (retrySession && attempt === 0 && contextInvalid) {
+        fixedWorlds.invalidate(targetId, sessionId);
+        continue; // Same session; do not leak an attached session on a document change.
+      }
+      if (retrySession && attempt === 0 && isSessionInvalidError(error)) {
         if (sessionId) clearSessionByTarget(targetId, 'session_invalid', sessionId);
         continue;
       }
@@ -2795,7 +2803,8 @@ async function recoverTargetUnlocked(targetId, owner, leaseToken, deadline) {
 }
 
 function routeBudget(pathname) {
-  if (['/targets', '/info', '/activate', '/acquire', '/release'].includes(pathname)) return BUDGETS.metadata;
+  if (['/info', '/dom/query', '/research/snapshot'].includes(pathname)) return BUDGETS.read;
+  if (['/targets', '/activate', '/acquire', '/release'].includes(pathname)) return BUDGETS.metadata;
   if (['/new', '/navigate', '/back', '/screenshot', '/close', '/finalize', '/recover'].includes(pathname)) return BUDGETS.navigation;
   return BUDGETS.dom;
 }
@@ -2836,7 +2845,7 @@ async function handleHttpRequest(request, response) {
     if (pathname === '/health') {
       ok(response, {
         service: SERVICE_NAME,
-        capabilities: ['research-recipe-reload-v1', 'bilibili-body-container-v3', 'bilibili-attribution-v2', 'research-dom-window-v2', 'element-text-completeness-v1', 'visible-same-origin-frame-v1', 'scroll-selector-v1', 'iframe-center-wheel-v1', 'click-popup-urls-v1', 'leased-page-activate-v1', 'visible-open-shadow-v1', 'public-xhs-route-ids-v1', 'public-route-query-ids-v1', 'research-dom-snapshot-v1'],
+        capabilities: ['isolated-context-reuse-v1', 'research-recipe-reload-v1', 'bilibili-body-container-v3', 'bilibili-attribution-v2', 'research-dom-window-v2', 'element-text-completeness-v1', 'visible-same-origin-frame-v1', 'scroll-selector-v1', 'iframe-center-wheel-v1', 'click-popup-urls-v1', 'leased-page-activate-v1', 'visible-open-shadow-v1', 'public-xhs-route-ids-v1', 'public-route-query-ids-v1', 'research-dom-snapshot-v1'],
         connection: { state: connectionState, approvalRequired: lastConnectError?.code === 'approval_required', lastErrorCode: lastConnectError?.code || null, lastCommandTimeout:lastCdpTimeout },
         leases: leases.size,
         sessions: sessions.size,

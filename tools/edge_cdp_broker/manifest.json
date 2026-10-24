@@ -36,11 +36,13 @@
     ]
   },
   "timeouts": {
-    "handshake_ms": 5000,
+    "handshake_ms": 30000,
     "metadata_ms": 2000,
+    "isolated_context_creation_ms": 5000,
+    "read_envelope_ms": 10000,
     "dom_ms": 5000,
     "navigation_and_screenshot_ms": 15000,
-    "retry": "one session reattach only"
+    "retry": "One bounded read-only invalid-context/session retry; no automatic replay after command timeout. Existing-page resume preserves the explicit recovery count and only releases its lease."
   },
   "research_profiles": {
     "three_hour_targeted_v1": "allowed_browser_control",

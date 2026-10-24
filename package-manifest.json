@@ -59,8 +59,8 @@
     },
     {
       "path": "docs/TOOL-AUDIT.md",
-      "bytes": 3800,
-      "sha256": "f6a04aef6f8f58b741a6b1dda3d34d4255489c54ad81266eadb0121a6d7b35c7"
+      "bytes": 4479,
+      "sha256": "2d6422938951b25fceced7555e14252e599d1ddcbca0bf7705b4fc1c0bc50056"
     },
     {
       "path": "docs/WORKFLOW.md",
@@ -169,8 +169,8 @@
     },
     {
       "path": "reports/regression-summary.json",
-      "bytes": 10028,
-      "sha256": "d72f53c78d490c8051ed406b76f6dc1984fd4407c1ec98b9c8b9c1531ef91f45"
+      "bytes": 12215,
+      "sha256": "b5a7d93b9cf02334d3e36577818ceed371efb51ea3e90346d6d7b4b569cf1d9d"
     },
     {
       "path": "reports/source-provenance.json",
@@ -194,8 +194,8 @@
     },
     {
       "path": "scripts/run-regression.py",
-      "bytes": 5913,
-      "sha256": "4bf31e825307188442f9b4f0dff72c4f771b2252bf67381a64ba0b428963651a"
+      "bytes": 5965,
+      "sha256": "5309978da21c64fa14bc1b568a546f7b126e504dffac739e4b432c4a9906fb44"
     },
     {
       "path": "skills/background-check-research/SKILL.md",
@@ -424,13 +424,13 @@
     },
     {
       "path": "skills/web-access/references/cdp-api.md",
-      "bytes": 30565,
-      "sha256": "ad27790f69e217d3d183ae04e50282947bd038e10490efd65187773a1906e175"
+      "bytes": 31512,
+      "sha256": "2565c62577fb26068352014c60ea71c95f2dc8de0a82bf4d768b276811092ada"
     },
     {
       "path": "skills/web-access/references/cdp-session.md",
-      "bytes": 5435,
-      "sha256": "db408a8bf2bc39cf44c4c29e1e9e79d012d47c3103826a2181c241ea485b5dad"
+      "bytes": 6940,
+      "sha256": "68cfb2403f42c568ae21f9599b2c599cd460488ba3e2cf412cac289b093d698b"
     },
     {
       "path": "skills/web-access/references/research-batch.md",
@@ -484,8 +484,8 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-integration-selftest.mjs",
-      "bytes": 129412,
-      "sha256": "cbb52d6e67cee6b049cc975cc1d08cc161fb1a9cdb14a8cb9fcaf747815583df"
+      "bytes": 130843,
+      "sha256": "6cf8e03846bb3f61b6f881018078207eb707f6ba29948ebb0c7b8b89c1f49a1b"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-selftest.mjs",
@@ -494,8 +494,8 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy.mjs",
-      "bytes": 170283,
-      "sha256": "583df52bb1978631afe5a2a11560ee2207aaeefabd1d86be6194437e49bdf745"
+      "bytes": 170979,
+      "sha256": "3d47994957ffccc2ee6ccd4a85ffee68e57a9de34ef881d83eae93e6b9a363d1"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy.ps1",
@@ -524,13 +524,13 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-session-selftest.mjs",
-      "bytes": 11913,
-      "sha256": "c90301ef76237e8cd6f44e56876bd159bcc741b946bd86eed84a44e6c7e8aa45"
+      "bytes": 14318,
+      "sha256": "ae644d10a642eef99d6dc9a668bca5a45afc8cc286aab97bb5e431ae923cb132"
     },
     {
       "path": "skills/web-access/scripts/cdp-session.ps1",
-      "bytes": 11604,
-      "sha256": "4f248562cf217de9e6d757d08ebed89918d84bc06016f91f68774ccf40a9858d"
+      "bytes": 14073,
+      "sha256": "0b402dd9c58b415c86492509fcf381c1ba0e6e19fb2591406dfae8e35cbb0445"
     },
     {
       "path": "skills/web-access/scripts/cdp-shadow-selftest.mjs",
@@ -566,6 +566,16 @@
       "path": "skills/web-access/scripts/find-url.ps1",
       "bytes": 232,
       "sha256": "901b682d337c251e4ce0b2687d953558e5d02b6d739ff0a681ad39fd39a9eaf1"
+    },
+    {
+      "path": "skills/web-access/scripts/fixed-world-selftest.mjs",
+      "bytes": 3577,
+      "sha256": "13128351cd72775abb23614d6330520728200bed03e0984ec42ed705511f5ea7"
+    },
+    {
+      "path": "skills/web-access/scripts/fixed-world.mjs",
+      "bytes": 2355,
+      "sha256": "f5df475d2f1e172107d74f812c45637215df5db29ad49a6d5e2d8a4a6603a35d"
     },
     {
       "path": "skills/web-access/scripts/loopback-websocket.mjs",
@@ -659,8 +669,8 @@
     },
     {
       "path": "tools/edge_cdp_broker/manifest.json",
-      "bytes": 3209,
-      "sha256": "94abe3ce573390b2a961e037eaa6573b35b8d8adefb2b76d2eace9047961abec"
+      "bytes": 3443,
+      "sha256": "c051ed1ba0a88f79b780070012385ffbeaee71f06f4cc5efabca05349ccc86eb"
     },
     {
       "path": "tools/feishu-codex-bridge/.gitignore",

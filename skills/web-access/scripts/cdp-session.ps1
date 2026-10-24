@@ -1,6 +1,9 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'New')]
 param(
-  [Parameter(Mandatory = $true)][string]$InitialUrl,
+  [Parameter(Mandatory = $true, ParameterSetName = 'New')][string]$InitialUrl,
+  [Parameter(Mandatory = $true, ParameterSetName = 'Resume')][ValidatePattern('^[A-Za-z0-9_-]{1,100}$')][string]$ExistingTarget,
+  [Parameter(Mandatory = $true, ParameterSetName = 'Resume')][string]$ExpectedUrl,
+  [Parameter(Mandatory = $true, ParameterSetName = 'Resume')][ValidateRange(0, 1)][int]$RecoveryAttemptsUsed = 0,
   [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._:@-]{1,120}$')][string]$Owner,
   [ValidateRange(1, 65535)][int]$Port = $(if ($env:CDP_PROXY_PORT) { [int]$env:CDP_PROXY_PORT } else { 3456 }),
   [ValidateRange(100, 60000)][int]$RequestTimeoutMilliseconds = 25000,
@@ -14,6 +17,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
 $script:Target = $null
 $script:OwnsPage = $false
+$script:HasLease = $false
 $script:CreationUnknown = $false
 $script:SessionExitCode = 0
 $script:StopReason = 'eof'
@@ -92,6 +96,14 @@ function Read-SessionCommand {
 
 function Invoke-SessionCommand {
   param($Command)
+  if ($Command.action -eq 'recover') {
+    if ($RecoveryAttemptsUsed -ge 1) {
+      Write-Public @{ ok = $false; action = 'recover'; targetId = $script:Target; sessionAlive = $true; error = @{ code = 'recovery_budget_exhausted' }; recoveryAttemptsUsed = $RecoveryAttemptsUsed }
+      return
+    }
+    # An attempted or unknown recovery consumes the budget too.
+    $script:RecoveryAttemptsUsed++
+  }
   $path = $null; $method = 'POST'; $body = ''; $outputFile = $null
   switch ($Command.action) {
     'query' {
@@ -148,7 +160,8 @@ function Invoke-SessionCommand {
 
 try {
   $initial = $null
-  if (![uri]::TryCreate($InitialUrl, [UriKind]::Absolute, [ref]$initial) -or
+  $startUrl = if ($ExistingTarget) { $ExpectedUrl } else { $InitialUrl }
+  if (![uri]::TryCreate($startUrl, [UriKind]::Absolute, [ref]$initial) -or
       $initial.Scheme -notin @('http', 'https') -or $initial.UserInfo) { throw 'public initial URL required' }
   if (!(Test-Path -LiteralPath $RequestScript -PathType Leaf)) { throw 'request wrapper missing' }
   Remove-Item Env:CDP_LEASE, Env:CDP_MANAGE, Env:CDP_REQUEST_ID -ErrorAction SilentlyContinue
@@ -161,13 +174,14 @@ try {
     [void](Read-SessionCommand $firstLine)
   }
   $env:CDP_REQUEST_ID = [guid]::NewGuid().ToString('N')
-  $createPath = '/new?activate=true&url=' + [uri]::EscapeDataString($InitialUrl)
+  $createPath = if ($ExistingTarget) { '/acquire?target=' + $ExistingTarget } else { '/new?activate=true&url=' + [uri]::EscapeDataString($InitialUrl) }
   $created = $null
   for ($attempt = 0; $attempt -lt 2; $attempt++) {
     $result = Invoke-SessionRequest -Method POST -Path $createPath
-    if ($result.ok -and $result.data.ready -eq $true -and $result.data.targetId -and
-        $result.data.leaseToken -and $result.data.manageToken) { $created = $result.data; break }
-    $script:CreationUnknown = $result.unknown -or ($result.ok -and $null -eq $result.data.ready)
+    $validExisting = $ExistingTarget -and $result.data.targetId -eq $ExistingTarget -and $result.data.leaseToken
+    $validNew = !$ExistingTarget -and $result.data.ready -eq $true -and $result.data.targetId -and $result.data.leaseToken -and $result.data.manageToken
+    if ($result.ok -and ($validExisting -or $validNew)) { $created = $result.data; break }
+    $script:CreationUnknown = $result.unknown -or ($result.ok -and !$validExisting -and !$validNew)
     # Only an unknown response receives one recovery. Identical key and route.
     if (!$script:CreationUnknown) { break }
   }
@@ -177,11 +191,20 @@ try {
       error = @{ code = $(if ($script:CreationUnknown) { 'creation_unconfirmed' } else { 'creation_failed' }) } }
   } else {
     $env:CDP_LEASE = [string]$created.leaseToken
-    $env:CDP_MANAGE = [string]$created.manageToken
+    if (!$ExistingTarget) { $env:CDP_MANAGE = [string]$created.manageToken }
     $script:Target = [string]$created.targetId
-    $script:OwnsPage = $true
+    $script:HasLease = $true
+    $script:OwnsPage = !$ExistingTarget
     $created = $null; $result = $null
-    Write-Public @{ type = 'ready'; ready = $true; owner = $Owner; targetId = $script:Target; pid = $PID }
+    if ($ExistingTarget) {
+      $verified = Invoke-SessionRequest -Method GET -Path "/info?target=$script:Target"
+      if (!$verified.ok -or $verified.data.page.url -cne $ExpectedUrl) {
+        Write-Public @{ type = 'resume_verification_failed'; ok = $false; targetId = $script:Target; recoveryAttemptsUsed = $RecoveryAttemptsUsed; error = @{ code = $(if (!$verified.ok) { $verified.code } else { 'resume_url_mismatch' }) } }
+        throw 'existing target URL not verified'
+      }
+      Write-Public @{ type = 'resume_verified'; targetId = $script:Target; data = $verified.data; recoveryAttemptsUsed = $RecoveryAttemptsUsed }
+    }
+    Write-Public @{ type = 'ready'; ready = $true; owner = $Owner; targetId = $script:Target; pid = $PID; existingTarget = [bool]$ExistingTarget; recoveryAttemptsUsed = $RecoveryAttemptsUsed }
     :commandLoop while ($true) {
       $line = if ($null -ne $firstLine) { $firstLine } else { [Console]::ReadLine() }
       $firstLine = $null
@@ -210,6 +233,12 @@ try {
       if (!$closed) { $script:SessionExitCode = 1 }
       Write-Public @{ type = 'cleanup'; targetId = $script:Target; reason = $script:StopReason; closed = [bool]$closed;
         error = $(if ($closed) { $null } else { @{ code = 'cleanup_unconfirmed' } }) }
+    } elseif ($script:HasLease) {
+      $cleanup = Invoke-SessionRequest -Method POST -Path "/release?target=$script:Target"
+      $released = $cleanup.ok -and $cleanup.data.released -eq $true
+      if (!$released) { $script:SessionExitCode = 1 }
+      Write-Public @{ type = 'cleanup'; targetId = $script:Target; reason = $script:StopReason; released = [bool]$released; closed = $false; recoveryAttemptsUsed = $RecoveryAttemptsUsed;
+        error = $(if ($released) { $null } else { @{ code = 'cleanup_unconfirmed' } }) }
     } elseif ($script:CreationUnknown) {
       Write-Public @{ type = 'cleanup'; closed = $false; reason = 'creation_unconfirmed'; error = @{ code = 'cleanup_unconfirmed' } }
     }

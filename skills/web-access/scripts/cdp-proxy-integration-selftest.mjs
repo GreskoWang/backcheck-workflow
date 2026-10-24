@@ -359,10 +359,12 @@ async function startFakeCdp({ browserVersion = null } = {}) {
       case 'Page.getFrameTree': {
         const targetId = sessionTarget(message.sessionId);
         const target = state.targets.get(targetId);
-        result = { frameTree: { frame: { id: `frame-${targetId || 'unknown'}`, url: target?.url || 'about:blank' } } };
+        result = { frameTree: { frame: { id: `frame-${targetId || 'unknown'}`, url: target?.url || 'about:blank',
+          ...(state.testLoaderGeneration ? {loaderId:`loader-${targetId}-${state.testLoaderGeneration}`} : {}) } } };
         break;
       }
       case 'Page.createIsolatedWorld':
+        if (state.delayWorldOnce) { const ms=state.delayWorldOnce; state.delayWorldOnce=0; await sleep(ms); }
         result = { executionContextId: 101 };
         break;
       case 'Runtime.callFunctionOn':
@@ -1154,6 +1156,21 @@ try {
   const lease = acquired.value.leaseToken;
   assert.match(lease, /^[A-Za-z0-9_-]{24,128}$/u);
 
+  // The same slow renderer response that exceeds the old 2s metadata budget
+  // is accepted once; subsequent reads reuse only this document's world.
+  fakeCdp.state.testLoaderGeneration = 1;
+  fakeCdp.state.delayWorldOnce = 2200;
+  const worldCountBefore = fakeCdp.state.methodCounts.get('Page.createIsolatedWorld') || 0;
+  for (let i=0;i<3;i++) {
+    const read=await brokerRequest(baseUrl, `/info?target=${TARGET_ID}`, {token,lease});
+    assert.equal(read.status,200,read.text);
+  }
+  assert.equal((fakeCdp.state.methodCounts.get('Page.createIsolatedWorld')||0)-worldCountBefore,1);
+  fakeCdp.state.testLoaderGeneration = 2;
+  assert.equal((await brokerRequest(baseUrl, `/info?target=${TARGET_ID}`, {token,lease})).status,200);
+  assert.equal((fakeCdp.state.methodCounts.get('Page.createIsolatedWorld')||0)-worldCountBefore,2);
+  fakeCdp.state.testLoaderGeneration = 0;
+
   const closesBeforePreexistingChildChecks = fakeCdp.state.methodCounts.get('Target.closeTarget') || 0;
   const targetsWithPreexistingChild = await brokerRequest(baseUrl, '/targets', { token });
   assert.equal(
@@ -1858,7 +1875,12 @@ try {
   const stalledInfo = await brokerRequest(baseUrl, `/info?target=${stalledTargetId}`, {
     token, lease: stalledAcquire.value.leaseToken,
   });
-  expectError(stalledInfo, 504, 'target_lane_stalled');
+  // The enlarged read envelope now leaves room for bounded detach cleanup;
+  // it must report the original method timeout and keep the page quarantined.
+  expectError(stalledInfo, 504, 'cdp_timeout');
+  expectError(await brokerRequest(baseUrl, `/info?target=${stalledTargetId}`, {
+    token, lease:stalledAcquire.value.leaseToken,
+  }), 409, 'target_quarantined');
   const stalledRelease = await brokerRequest(baseUrl, `/release?target=${stalledTargetId}`, {
     method: 'POST', token, lease: stalledAcquire.value.leaseToken,
   });

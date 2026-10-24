@@ -47,6 +47,20 @@ pwsh -NoProfile -File "$env:BACKCHECK_SKILLS_ROOT\web-access\scripts\cdp-session
 
 ## 回归验证
 
+### 受控重载后接回原页面
+
+只有所有使用者已空闲、保存断点且本次重载已获授权时，才重载连接核心。重载不重启 Edge，不关闭页面。旧 owner 的 capability 不能跨 broker 进程复用，不再向旧 owner 发送命令。
+
+根据已保存的准确 target 和 URL，启动原页接管模式：
+
+```powershell
+pwsh -NoProfile -File "$env:BACKCHECK_SKILLS_ROOT\web-access\scripts\cdp-session.ps1" -ExistingTarget 'KNOWN_TARGET_ID' -ExpectedUrl 'https://example.com/original' -RecoveryAttemptsUsed 1 -Owner 'original-task-owner'
+```
+
+该模式只通过 `/acquire` 获取已知页租约，先用 `/info` 严格核对完整 URL，再报告 ready。不会新建、导航或重放滚动。`RecoveryAttemptsUsed` 必须明确传入断点中的已用次数，不能因重载归零；为 1 时拒绝 recover，为 0 时最多尝试一次。尝试失败或结果未知也消耗额度。原页模式在 finish、EOF、启动核对失败或异常退出时只 `/release`，永不 finalize。失败保留原页和断点，不能换页重置预算。
+
+隔离查询上下文只在 target、session、主 frame 和 loader 身份全部匹配时复用，每次先读取 frame tree；导航、脱离或连接变化立即作废。首次上下文创建预算为 5 秒，读取总预算为 10 秒，真实超时仍隔离原 target，不自动重试。`/health` 的 `isolated-context-reuse-v1` 表明已加载该版本，连接成功本身仍不等于页面可读。
+
 ```powershell
 node "$env:BACKCHECK_SKILLS_ROOT\web-access\scripts\cdp-session-selftest.mjs"
 node "$env:BACKCHECK_SKILLS_ROOT\web-access\scripts\cdp-request-selftest.mjs"

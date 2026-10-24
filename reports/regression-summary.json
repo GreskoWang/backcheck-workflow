@@ -6,8 +6,8 @@
     {
       "environment": "staging",
       "status": "PASS",
-      "groups": 28,
-      "method": "Unchanged non-browser baseline reused; final browser implementation rerun in full. Removed experimental broker image field is not part of this release.",
+      "groups": 29,
+      "method": "Unchanged non-browser baseline reused; all 19 browser groups rerun. Staging session group rerun after correcting info.page response contract.",
       "checks": [
         {
           "test": "bridge",
@@ -67,95 +67,100 @@
         {
           "test": "browser-cdp-dom-completeness-selftest",
           "exit_code": 0,
-          "seconds": 0.09
+          "seconds": 0.14
         },
         {
           "test": "browser-cdp-managed-close-timeout-selftest",
           "exit_code": 0,
-          "seconds": 0.27
+          "seconds": 0.19
         },
         {
           "test": "browser-cdp-proxy-http-selftest",
           "exit_code": 0,
-          "seconds": 1.34
+          "seconds": 1.31
         },
         {
           "test": "browser-cdp-proxy-integration-selftest",
           "exit_code": 0,
-          "seconds": 53.83
+          "seconds": 60.25
         },
         {
           "test": "browser-cdp-proxy-selftest",
           "exit_code": 0,
-          "seconds": 0.53
+          "seconds": 0.61
         },
         {
           "test": "browser-cdp-request-selftest",
           "exit_code": 0,
-          "seconds": 6.12
+          "seconds": 16.67
         },
         {
           "test": "browser-cdp-scroll-selftest",
           "exit_code": 0,
-          "seconds": 0.11
+          "seconds": 0.41
         },
         {
           "test": "browser-cdp-session-cleanup-selftest",
           "exit_code": 0,
-          "seconds": 0.06
+          "seconds": 0.17
         },
         {
           "test": "browser-cdp-session-selftest",
           "exit_code": 0,
-          "seconds": 55.45
+          "seconds": 103.25
         },
         {
           "test": "browser-cdp-shadow-selftest",
           "exit_code": 0,
-          "seconds": 0.53
+          "seconds": 0.39
         },
         {
           "test": "browser-cdp-visible-frame-selftest",
           "exit_code": 0,
-          "seconds": 0.19
+          "seconds": 0.2
+        },
+        {
+          "test": "browser-fixed-world-selftest",
+          "exit_code": 0,
+          "seconds": 4.38
         },
         {
           "test": "browser-research-batch-selftest",
           "exit_code": 0,
-          "seconds": 10.52
+          "seconds": 12.56
         },
         {
           "test": "browser-research-detail-selftest",
           "exit_code": 0,
-          "seconds": 1.09
+          "seconds": 2.33
         },
         {
           "test": "browser-research-dom-recipes-selftest",
           "exit_code": 0,
-          "seconds": 0.53
+          "seconds": 0.95
         },
         {
           "test": "browser-research-recipe-loader-selftest",
           "exit_code": 0,
-          "seconds": 0.09
+          "seconds": 0.2
         },
         {
           "test": "x-readiness",
           "exit_code": 0,
-          "seconds": 0.92
+          "seconds": 1.59
         },
         {
           "test": "x-bulk",
           "exit_code": 0,
-          "seconds": 7.59
+          "seconds": 7.42
         }
       ]
     },
     {
       "environment": "same-host-fresh-path",
       "status": "PASS",
-      "groups": 28,
-      "method": "Unchanged non-browser baseline reused; final browser implementation rerun in full. Removed experimental broker image field is not part of this release.",
+      "groups": 29,
+      "method": "Unchanged non-browser baseline reused; all 19 browser groups rerun. Staging session group rerun after correcting info.page response contract.",
       "checks": [
         {
           "test": "bridge",
@@ -210,57 +215,57 @@
         {
           "test": "browser-cdp-click-selftest",
           "exit_code": 0,
-          "seconds": 0.14
+          "seconds": 0.12
         },
         {
           "test": "browser-cdp-dom-completeness-selftest",
           "exit_code": 0,
-          "seconds": 0.16
+          "seconds": 0.11
         },
         {
           "test": "browser-cdp-managed-close-timeout-selftest",
           "exit_code": 0,
-          "seconds": 0.23
+          "seconds": 0.2
         },
         {
           "test": "browser-cdp-proxy-http-selftest",
           "exit_code": 0,
-          "seconds": 1.48
+          "seconds": 1.36
         },
         {
           "test": "browser-cdp-proxy-integration-selftest",
           "exit_code": 0,
-          "seconds": 58.55
+          "seconds": 64.78
         },
         {
           "test": "browser-cdp-proxy-selftest",
           "exit_code": 0,
-          "seconds": 0.52
+          "seconds": 0.62
         },
         {
           "test": "browser-cdp-request-selftest",
           "exit_code": 0,
-          "seconds": 6.25
+          "seconds": 10.69
         },
         {
           "test": "browser-cdp-scroll-selftest",
           "exit_code": 0,
-          "seconds": 0.11
+          "seconds": 0.2
         },
         {
           "test": "browser-cdp-session-cleanup-selftest",
           "exit_code": 0,
-          "seconds": 0.06
+          "seconds": 0.14
         },
         {
           "test": "browser-cdp-session-selftest",
           "exit_code": 0,
-          "seconds": 48.17
+          "seconds": 95.36
         },
         {
           "test": "browser-cdp-shadow-selftest",
           "exit_code": 0,
-          "seconds": 0.2
+          "seconds": 0.22
         },
         {
           "test": "browser-cdp-visible-frame-selftest",
@@ -268,19 +273,24 @@
           "seconds": 0.12
         },
         {
+          "test": "browser-fixed-world-selftest",
+          "exit_code": 0,
+          "seconds": 4.33
+        },
+        {
           "test": "browser-research-batch-selftest",
           "exit_code": 0,
-          "seconds": 9.48
+          "seconds": 10.38
         },
         {
           "test": "browser-research-detail-selftest",
           "exit_code": 0,
-          "seconds": 0.83
+          "seconds": 1.17
         },
         {
           "test": "browser-research-dom-recipes-selftest",
           "exit_code": 0,
-          "seconds": 0.45
+          "seconds": 0.48
         },
         {
           "test": "browser-research-recipe-loader-selftest",
@@ -290,12 +300,12 @@
         {
           "test": "x-readiness",
           "exit_code": 0,
-          "seconds": 0.84
+          "seconds": 0.88
         },
         {
           "test": "x-bulk",
           "exit_code": 0,
-          "seconds": 7.03
+          "seconds": 7.02
         }
       ]
     }
@@ -308,7 +318,8 @@
     "payload_targeted_checks": 63,
     "research_dom_recipe_cases": 31,
     "x_readiness_cases": 6,
-    "x_bulk_cases": 3
+    "x_bulk_cases": 3,
+    "fixed_world_resolver_cases": 11
   },
   "cold_install": {
     "node_dependencies": 253,
@@ -329,7 +340,8 @@
   "limits": [
     "Not tested on a second physical machine or different account.",
     "Isolated X/Facebook screenshot timeouts have an unknown browser-level cause. Stops and recovery budgets are preserved; successful current single-post acceptance does not prove all sites or future screenshots.",
-    "Bilibili three-window acceptance does not close the retained historical timeline gap."
+    "Bilibili three-window acceptance does not close the retained historical timeline gap.",
+    "The earlier Zhihu renderer stall root cause remains unknown. A later different Feishu target also reported Page.getFrameTree timeout; this release proves original Zhihu-page recovery, not elimination of all browser stalls. Feishu business workflow retains its API route."
   ],
   "live_new_x_acceptance": {
     "date": "2026-10-24",
@@ -356,5 +368,44 @@
   "publication_target": {
     "repository": "GreskoWang/backcheck-workflow",
     "visibility": "private"
+  },
+  "isolated_world_fix": {
+    "status": "PASS_ORIGINAL_PAGE",
+    "date": "2026-10-24",
+    "scope": "one original Zhihu answer target after one approved controlled broker reload",
+    "same_edge_process": true,
+    "same_target_and_url": true,
+    "preserved_scroll_y": 3500,
+    "original_recovery_attempts_used": 1,
+    "additional_recover_calls": 0,
+    "additional_page_creations": 0,
+    "body_chars": 666,
+    "body_truncated": false,
+    "viewport_image_links": 2,
+    "screenshot_saved_and_visually_reviewed": true,
+    "acceptance_lease_released_without_closing": true,
+    "world_resolver_cases": 11,
+    "old_2000ms_budget_fails_synthetic_2200ms_response": true,
+    "new_5000ms_budget_passes_synthetic_2200ms_response": true,
+    "context_creation_for_21_matching_reads": 1,
+    "hanging_fixture_remains_bounded": true,
+    "resume_client_cases": "Exact production info.page.url verification; mismatch/timeout release only; unknown acquire same-key replay; preserved recovery budget; secret redaction",
+    "initial_client_contract_error_corrected": true,
+    "live_code_hashes": [
+      {
+        "name": "cdp-proxy.mjs",
+        "sha256": "3d47994957ffccc2ee6ccd4a85ffee68e57a9de34ef881d83eae93e6b9a363d1"
+      },
+      {
+        "name": "fixed-world.mjs",
+        "sha256": "f5df475d2f1e172107d74f812c45637215df5db29ad49a6d5e2d8a4a6603a35d"
+      },
+      {
+        "name": "cdp-session.ps1",
+        "sha256": "0b402dd9c58b415c86492509fcf381c1ba0e6e19fb2591406dfae8e35cbb0445"
+      }
+    ],
+    "renderer_root_cause_known": false,
+    "research_scope_completed": false
   }
 }
