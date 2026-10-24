@@ -1,0 +1,4 @@
+interface:
+  display_name: "飞书背调交付"
+  short_description: "批量回填十四平台结论，并用确定性优先的差量终审交付"
+  default_prompt: "使用 $deliver-feishu-background-check，从当前任务或调查结论.md读取已完成的逐平台结论，只用飞书 OpenAPI／MCP批量增量回填并回读；完整遵守在线模板和十四平台各自的固定模块、顺序、措辞、编号、链接与截图位置。终审先全量确定性比对文字、链接和结构，仅在布局变化时做最小视觉检查；不要重复调查、反复截整页或为形式独立等待代理。"

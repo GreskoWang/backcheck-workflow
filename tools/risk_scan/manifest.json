@@ -1,0 +1,10 @@
+{
+  "schema_version": "edge-tool-manifest-1.0",
+  "platform": "cross_platform",
+  "mode": "supplemental_offline_only",
+  "supplemental_entrypoints": [
+    {"name": "risk_text_scan", "path": "run.ps1", "scope": "offline keyword scan of already collected CSV, JSONL or text input"}
+  ],
+  "surface_completion": false,
+  "boundary": "Keyword hits require context review and are not conclusions. This offline scanner cannot open, traverse or complete any platform surface."
+}

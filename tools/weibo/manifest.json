@@ -1,0 +1,28 @@
+{
+  "schema_version": "edge-tool-manifest-1.0",
+  "platform": "weibo",
+  "mode": "batch_text_collection",
+  "collection_entrypoints": [
+    {"name": "edge_dom_batch", "path": "edge_dom_batch.mjs", "mode": "batch_text_collection", "scope": "微博主页全部公开文字的可选批量采集组件；仅在执行者的浏览器编排层已经自主建立并核实兼容 Edge 任务页连接时使用，连接 endpoint 与 target 由执行者内部取得，不向用户索要。组件允许前台或后台 hidden 状态读取正常加载的微博 DOM 正文并正常滚动，原样记录可见性，不强制聚焦或伪装可见；组件本身不启动浏览器、不导出凭证、不直接请求内部接口。只有多批次去重后到达真实自然终点，并核对正文展开、作者归属、条数、日期范围、停止原因，且全部必需文字完成完整风险词表／规则扫描、所有命中回原内容页面复核后，才能作为主页全文字完成证据的一部分。", "surface_completion": false}
+  ],
+  "prohibited_legacy_entrypoints": [
+    {"name": "static_probe", "path": "static_social_probe.py", "reason": "直接 HTTP 抓取社交网页 HTML，源入口已 fail-closed"}
+  ],
+  "prohibited_legacy_files": [
+    "run.ps1", "social_cdp_visible_scroll.py", "collect_profile_api.py", "run_profile_api.ps1",
+    "collect_mobile_profile_api.py", "run_mobile_profile_api.ps1", "crawl4weibo_collect.py",
+    "run_crawl4weibo.ps1", "run_troray_login.ps1", "run_troray_full.ps1",
+    "run_troray_daily_range.ps1", "run_scraper_test.ps1", "direct_request_test.py",
+    "test_crawl4weibo.py", "test_weibo_scraper.py", "static_social_probe.py"
+  ],
+  "prohibited_legacy_subtrees": [
+    "troray_upstream/**",
+    "troray_runtime/**"
+  ],
+  "research_profiles": {
+    "three_hour_targeted_v1": {"edge_dom_batch": "allowed_within_target_scope", "static_probe": "prohibited"},
+    "exhaustive_audit": {"edge_dom_batch": "allowed_within_audit_scope", "static_probe": "prohibited"}
+  },
+  "surface_completion": false,
+  "boundary": "用户发起任务后，执行者自主启动、创建、选择和导航带持久用户配置的桌面 Microsoft Edge 任务页，无需用户预开 Edge、指定页签或提供连接地址；平台调查禁用 Codex 内置／in-app 和临时 hosted／headless 浏览器。仅当用户明确指定，或已确认另一系统桌面浏览器具有所需持久配置／登录态时才可改用。edge_dom_batch 仅是已有兼容 Edge 连接时的可选主页全文批量组件，工具输出本身不自动完成平台核查；必须多批次去重后到达自然终点，全部必需文字完成完整风险词表／规则扫描，所有命中与媒体画面另行回原内容页面复核。static_social_probe 直接 HTTP 路线、troray_upstream 与 troray_runtime 全部子树在默认 three_hour_targeted_v1 和 legacy exhaustive_audit 中均禁止执行，穷尽审计不能突破凭证与访问控制边界。另行登记且具备适用授权的公开官方 API 或批准导出，只有在授权范围覆盖目标、全部分页／游标耗尽并完成同等文字扫描与命中复核时才能支持该路线完成。"
+}

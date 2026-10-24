@@ -1,0 +1,11 @@
+{
+  "name": "backcheck-feishu-mcp-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "dependencies": {
+    "@larksuiteoapi/lark-mcp": "0.5.1",
+    "@modelcontextprotocol/sdk": "1.30.0"
+  }
+}

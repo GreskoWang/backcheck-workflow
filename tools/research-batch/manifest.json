@@ -1,0 +1,63 @@
+{
+  "schema_version": "research-tool-manifest-1.0",
+  "platform": "cross_platform",
+  "mode": "fixed_visible_dom_batch",
+  "collection_entrypoints": [
+    {
+      "name": "research_detail",
+      "path": "%USERPROFILE%\\.codex\\skills\\web-access\\scripts\\research-detail.mjs",
+      "scope": "复用本任务已租用的详情页，以固定客户端配方核对来源、主体、正文与有限全文展开；与后台采集共享目标互斥锁。未知布局、引用归因和媒体缺口保留未完成，不开放任意脚本或私有接口。",
+      "surface_completion": false
+    },
+    {
+      "name": "research_batch",
+      "path": "%USERPROFILE%\\.codex\\skills\\web-access\\scripts\\research-batch.mjs",
+      "scope": "复用当前任务已获租约的持久桌面 Edge 和单一 broker，以固定只读 DOM 配方后台推进当前起点之后的公开正文；保存断点，允许取消及同任务恢复。旧 broker 兼容模式明确保留来源、截断与终点待核，不能声明完整。",
+      "surface_completion": false
+    }
+  ],
+  "supplemental_entrypoints": [
+    {
+      "name": "research_prepare",
+      "path": "pipeline\\prepare.py",
+      "mode": "supplemental_offline_default",
+      "scope": "把采集结束后的缓存自动接续为版本化正文批次、媒体清单和审阅待办；默认离线，显式fetch-public才下载公开图片。准备事件与实际阅读、风险判断和飞书终审分别记录，不自动确认完成。",
+      "surface_completion": false
+    },
+    {
+      "name": "media_manifest_export",
+      "path": "media\\export_manifest.py",
+      "mode": "supplemental_offline_only",
+      "scope": "离线将 research-batch 的媒体字段转换为下载及编图清单，自动保留逐媒体与原帖映射、缺口及不可下载占位；不访问网络、不扩散认证参数、不确认已读。",
+      "surface_completion": false
+    },
+    {
+      "name": "coverage_validate",
+      "path": "coverage\\validate.py",
+      "mode": "supplemental_offline_only",
+      "scope": "离线导出不截断的阅读批次，并校验缓存、实际阅读确认和规定媒体范围是否一致；不替代阅读、归因或风险判断。",
+      "surface_completion": false
+    },
+    {
+      "name": "media_sheet",
+      "path": "media\\media.py",
+      "mode": "supplemental_offline_only",
+      "scope": "将已有本地图片或视频快照及元数据编为分页接触图，保留媒体与原帖映射和失败占位；采样画面不证明音频、字幕或评论已查。",
+      "surface_completion": false
+    },
+    {
+      "name": "public_image_fetch",
+      "path": "media\\fetch_assets.py",
+      "mode": "public_media_download",
+      "scope": "仅下载 manifest 中无需认证的公开 HTTP(S) 图片；不请求网页 HTML、私有接口或浏览器凭证，不接受认证查询参数；限制并发、大小、跳转并保留失败项。",
+      "surface_completion": false
+    }
+  ],
+  "research_profiles": {
+    "three_hour_targeted_v1": "allowed_with_profile_scope",
+    "exhaustive_audit": "allowed_with_profile_scope"
+  },
+  "surface_completion": false,
+  "boundary": "工具仅加速取数与整理。十四平台页面必访、纳入主页完整公开文字、规定图片及重点视频、风险命中原帖语境核验和飞书终审继续适用。不得把默认上限、停滞、兼容缓存、列表摘要或未审阅媒体改写为完整或无问题。",
+  "documentation": "%USERPROFILE%\\.codex\\skills\\web-access\\references\\research-batch.md"
+}

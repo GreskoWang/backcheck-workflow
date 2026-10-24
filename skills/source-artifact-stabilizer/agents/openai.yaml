@@ -1,0 +1,4 @@
+interface:
+  display_name: "Source Artifact Stabilizer"
+  short_description: "Stabilize messy source files before analysis or delivery."
+  default_prompt: "Use this skill to normalize messy source files, avoid Windows encoding issues, extract machine-friendly intermediates, patch Markdown safely, and verify DOCX outputs."

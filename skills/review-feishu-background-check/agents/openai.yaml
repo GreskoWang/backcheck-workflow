@@ -1,0 +1,4 @@
+interface:
+  display_name: "审阅飞书背调成品"
+  short_description: "全量确定性比对文字，必要时只做差量视觉检查"
+  default_prompt: "使用 $review-feishu-background-check 快速只读审阅这份飞书背调成品：先全量确定性比对文字、链接和结构，只对API无法证明或布局变化的项目做最小视觉检查，并返回 PASS、FAIL 或 BLOCKED。"

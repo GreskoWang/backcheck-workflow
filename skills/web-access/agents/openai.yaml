@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web Access"
+  short_description: "Research the web and control Chrome through Codex-ready CDP"
+  default_prompt: "Use $web-access to research and verify this topic with the right web access path."

@@ -1,0 +1,22 @@
+{
+  "name": "feishu-codex-background-check-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Receive scoped Feishu background-check requests and run them with local Codex.",
+  "scripts": {
+    "start": "node src/bridge.mjs",
+    "check": "node src/check.mjs",
+    "check:dispatch": "node src/check-dispatch.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.74.0",
+    "@openai/codex": "0.158.0",
+    "@openai/codex-sdk": "0.158.0",
+    "node-pty": "1.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

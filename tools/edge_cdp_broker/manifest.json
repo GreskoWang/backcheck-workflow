@@ -1,0 +1,51 @@
+{
+  "schema_version": "edge-tool-manifest-1.0",
+  "platform": "cross_platform",
+  "mode": "persistent_browser_control",
+  "control_entrypoints": [
+    {
+      "name": "edge_cdp_broker_preflight",
+      "path": "%USERPROFILE%\\.codex\\skills\\web-access\\scripts\\check-deps.ps1",
+      "scope": "自主启动或复用单一 loopback Edge CDP broker，自动读取当前可见持久 Microsoft Edge 的 DevToolsActivePort；以操作系统级端点互斥锁拒绝第二个 broker，不向用户索要端口或 target。"
+    },
+    {
+      "name": "edge_cdp_broker_request",
+      "path": "%USERPROFILE%\\.codex\\skills\\web-access\\scripts\\cdp-request.ps1",
+      "scope": "以 bearer、稳定随机 request id 和随机 per-target lease capability 执行有界导航、固定只读 DOM 查询、小步滚动、点击、截图、恢复、释放或显式关闭 broker 自建任务页；new 只在复读确认内部 HMAC 标记已消失后发布 lease，new/acquire 支持响应丢失后的幂等恢复，token、request id 和 lease 不进入日志。"
+    },
+    {
+      "name": "edge_cdp_broker_selftest",
+      "path": "%USERPROFILE%\\.codex\\skills\\web-access\\scripts\\cdp-proxy-selftest.mjs",
+      "scope": "仅离线验证 loopback、CDP 正向白名单、安全 selector/DOM schema、URL 脱敏、随机租约能力和同 target 串行队列。"
+    }
+  ],
+  "browser_family": "microsoft_edge",
+  "profile_requirement": "visible_persistent_user_profile",
+  "parallelism": "OS-enforced one broker per running Edge debugging endpoint even across different broker ports; different targets may run concurrently; one owner and serialized commands per target",
+  "security": {
+    "listen": "127.0.0.1 only",
+    "authentication": "per-process random bearer in a fail-closed current-user token file plus idempotent lease creation and random per-target lease capability; orphan markers use a port-scoped persistent HMAC key restricted to the current user and SYSTEM; leases expire after six idle hours without closing pages",
+    "forbidden": [
+      "Cookie or credential database access",
+      "token, localStorage, or sessionStorage extraction",
+      "private web API credential replay",
+      "arbitrary JavaScript or arbitrary CDP method execution",
+      "server-side screenshot path writes",
+      "Codex in-app, hosted, headless, or temporary profile control",
+      "closing existing user tabs"
+    ]
+  },
+  "timeouts": {
+    "handshake_ms": 5000,
+    "metadata_ms": 2000,
+    "dom_ms": 5000,
+    "navigation_and_screenshot_ms": 15000,
+    "retry": "one session reattach only"
+  },
+  "research_profiles": {
+    "three_hour_targeted_v1": "allowed_browser_control",
+    "exhaustive_audit": "allowed_browser_control"
+  },
+  "surface_completion": false,
+  "boundary": "Broker 只提供对符合 access-policy 的持久桌面 Edge 页面进行控制的通道；它本身不证明平台范围、主页自然终点、风险扫描或媒体复核完成。禁止与 Codex 浏览器扩展同时控制同一页面。首次出现扩展 CDP 超时、Debugger unattached 或 tab lease 冲突时保存 checkpoint 并切换 broker，不连续重试 30 秒。"
+}

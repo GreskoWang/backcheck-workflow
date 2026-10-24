@@ -1,0 +1,2 @@
+# Keep manifest hashes stable across Git for Windows autocrlf settings.
+* -text

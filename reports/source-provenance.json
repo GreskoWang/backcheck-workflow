@@ -1,0 +1,1156 @@
+{
+  "date": "2026-10-24",
+  "source": "authorized local workflow assets; machine paths omitted",
+  "files": [
+    {
+      "path": "skills/background-check-research/SKILL.md",
+      "source_sha256": "4d528d258a334ccfd960c13bb0f7483e2a5a317581b63bad42c89d15b2033f3c",
+      "unchanged": false
+    },
+    {
+      "path": "skills/background-check-research/agents/openai.yaml",
+      "source_sha256": "0e215650e0751bd853e1b3a96eb254d95adfe3389c63e2a7c56a8ef0a846f246",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/references/access-policy.md",
+      "source_sha256": "f15c6b1b9800c2ff335ec1eeb53632f3092332496f43bc7aa2f60e112db8b4a9",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/references/maigret.md",
+      "source_sha256": "c41224c323c3735cd334a5f2651db927166c49fd4819a93c286285db8f718244",
+      "unchanged": false
+    },
+    {
+      "path": "skills/background-check-research/references/methods.md",
+      "source_sha256": "089c73040bfb772632c058b4dd0c49a600e1d884a9d0744e2a496d8cc9403f93",
+      "unchanged": false
+    },
+    {
+      "path": "skills/background-check-research/references/platform-runbook.md",
+      "source_sha256": "b4cd00361b6688354aaa3d224bc96f146bba618206a7c3cfaca8be69b35f4f86",
+      "unchanged": false
+    },
+    {
+      "path": "skills/background-check-research/scripts/audit_handoff_prose.py",
+      "source_sha256": "60834a211be10dae6385da154990b2331d775c65b50418f68814a7dc03d9d35f",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/scripts/maigret_to_account_map.py",
+      "source_sha256": "8a6f794d356c09e34a89aef20af08a92e8cf14676c65f11a2de66ff813c14709",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/scripts/network_preflight.py",
+      "source_sha256": "523abc4c4f4112ffc5ed62c7ee87d670633d6e8c6481cc8b6f51f31d176f74da",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/scripts/test_audit_handoff_prose.py",
+      "source_sha256": "3cc0b01a488ba8a19906cf2dbb42b3eb08933ed277a79a65f41e2fe4419b0d56",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/scripts/platform_collectors/risk_text_scan.py",
+      "source_sha256": "3147de9db55395262e21d3461b8ae8a41588524946bc8a40b03d74ff9cabe728",
+      "unchanged": true
+    },
+    {
+      "path": "skills/background-check-research/scripts/platform_collectors/tiktok_static_profile.py",
+      "source_sha256": "1615272596620b8ad305af142c53425d51d138e033bee0504c2b8ba774cc30d3",
+      "unchanged": true
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/SKILL.md",
+      "source_sha256": "24b44217c5d295180ec8e0e07fadfa8e51b28ddbcc40fd7b05b0abd5ed607662",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/agents/openai.yaml",
+      "source_sha256": "e384486f7e13a4753de546544bdc698f1c64ee9c2e3413aff508d52876e28a74",
+      "unchanged": true
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/references/feishu-operations.md",
+      "source_sha256": "1d40da158715d06d68cae0bba69cddc55ed6adb1fb60cc85f8479ab661087f80",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/references/feishu-style-guide.md",
+      "source_sha256": "857d8cf43e9594bfdccf48e06abbc58495af502488bc44cef63903b239535c6b",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/references/handoff-contract.md",
+      "source_sha256": "ef3365ec4d0e1ff8a56e1c0e13039e12921c9f2598f436ef0cd65a0e6f2b07d1",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/references/handoff-targeted-contract.md",
+      "source_sha256": "202e7ab1a905684f35e41574d0e9f05183214585d1679a6d0a20aa63b778dbc1",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/references/platform-format.md",
+      "source_sha256": "4e6ddd8002f4b3cee80f10c1f3c0c6183e5b65da8f30b17dcd83cd04d07f77d5",
+      "unchanged": true
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/review_proofs.py",
+      "source_sha256": "81cbe9c589907a6d02817a776a1eeca327da458ccc2e4737ccc051057741ef92",
+      "unchanged": true
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/test_delivery_gate.py",
+      "source_sha256": "404cd4ca6a9f502c5df790533bdae3b468607152a3a868f62c25e845d6d12f4d",
+      "unchanged": true
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/test_review_proofs.py",
+      "source_sha256": "bd2ef927634ffcbce8e23676b3721c0ccc549519627334b1f2dec104cac0625f",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/test_targeted_payload.py",
+      "source_sha256": "b94d0bb8ca96546465fcc20b3a34d6f1ae2044be4f5e115a2b6d80e476f01ccd",
+      "unchanged": true
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/validate-identity-contract.ps1",
+      "source_sha256": "dc48894b18f00308256cff33aacc42903be64a1c6d973383007685f25aac77dc",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/validate_feishu_document.py",
+      "source_sha256": "0a49ba64d75962cf2e6ded0e8719e062659c8ebb5aceea2f6ce18dba7533d8d1",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/validate_research_payload.py",
+      "source_sha256": "313565d66cf69584b4e03eff2d170cf8ee18dcd5dd25169890abc1cedd16b4fe",
+      "unchanged": false
+    },
+    {
+      "path": "skills/deliver-feishu-background-check/scripts/validate_targeted_payload.py",
+      "source_sha256": "b44e6c56793fa145e21b81064d0c4b1192ee141366d349ec10f0014f81bd253f",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/SKILL.md",
+      "source_sha256": "772bc86348601c2ace4598d0147b8ffc989f70b5515fd4b5679a2398ce1ab0e1",
+      "unchanged": false
+    },
+    {
+      "path": "skills/review-feishu-background-check/agents/openai.yaml",
+      "source_sha256": "3558575393fde515e4002f7b19dcd1f9ae9dc9fbd4863c30137152b4b50007d1",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/references/review-checklist.md",
+      "source_sha256": "6d8b7d943ed8b9b50b530c96710c051457d046b1da0e587902175bed82c744c3",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/references/review-context-schema.md",
+      "source_sha256": "9f2d4765455a543c90df8670892d12d7ca566736a3a190cca3bac3044cae1f6e",
+      "unchanged": false
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/audit_feishu_snapshot.py",
+      "source_sha256": "fa585e567bf0a2a90e1259ad6ed3094f0af0ad9587f464d4d460373275a8b488",
+      "unchanged": false
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/business_risk_gate.py",
+      "source_sha256": "d8597fff6c628c7795adbbe8277a0aa6659568ff26044bb7f42704c208d62e61",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/disclaimer_gate.py",
+      "source_sha256": "de0d1da0bd1b3295766ca6494818c8a35029bab4715632ebd48b16a5c4e81e32",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/team_merge_audit.py",
+      "source_sha256": "25c79ff5309f0ddaed16a6b49444dc5b5d3df7fc629cc5fb4c56d859f4a8a798",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/test_business_risk_gate.py",
+      "source_sha256": "99869f14ed81871c4915f80739e907b2e192c44137b69fedfb643ff577594853",
+      "unchanged": true
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/test_risk_highlight_links.py",
+      "source_sha256": "c5de5f3379f4f970e513ce505cbffb7795262c1ac9d6c178e8af050f21d36969",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/SKILL.md",
+      "source_sha256": "344b88661b8a0e99abe8c35f303e99dc68428d80353da58e0a03d909a4b62deb",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/agents/openai.yaml",
+      "source_sha256": "af978f36657657d5679d1a8c4bd2677d156c09281c772a9d7d59f56bbab856cf",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/references/cdp-api.md",
+      "source_sha256": "454478ba5f4f3176c2b1e01537e2de2085a39d2f197dd9938d5dcff092c34a2a",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/references/cdp-session.md",
+      "source_sha256": "04b391a95c059ea8cc67ec521ca83c7d952a28c9aa26580c9136dcf7ebeb8dd7",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/references/research-batch.md",
+      "source_sha256": "967f38582ede559d53205c0d1576bee31cf5dd835d68db82f4e27248317ea5c1",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/references/research-detail.md",
+      "source_sha256": "884d49bc6657b009391adc3a75167e3bde90a4242c316a10bb9725f2a1bfe19b",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/references/site-patterns/bilibili.com.md",
+      "source_sha256": "65579eef475c2a9fabb9b90abd6ee7d1c8de8c3421c643fe18ec9c20471817ba",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/references/site-patterns/douyin.com.md",
+      "source_sha256": "9a811cee3f37d1a8e45dc662dd7c3d13d1cd6dd8553bd4376c38adacf85083d1",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/references/site-patterns/instagram.com.md",
+      "source_sha256": "a21ba013c2400c2a0b949fc5abfa38d646d045fed83276ab6dbb0adf99b87ce4",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/references/site-patterns/youtube.com.md",
+      "source_sha256": "ad5c9cda675c7630f46dd1b780e5787bdfb21b72c10b6525acffeb03dd4b8533",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-click-selftest.mjs",
+      "source_sha256": "b26b9888ff77850d78920bfbfa01af93973170ddb90c9926dc645d2e2950e611",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-dom-completeness-selftest.mjs",
+      "source_sha256": "c019fe1a239151a539b14ac8f74d1aa46512563e39d4590de3430dd996ef8013",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-managed-close-timeout-selftest.mjs",
+      "source_sha256": "0a08d38666b14418dc00a565b13a169a5ad1888a8fa2222a4311b11b55c04992",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-proxy-http-selftest.mjs",
+      "source_sha256": "72f6b81715b32b2e3a58e91b0c71df4643b4bf6bc34a342a457466b17e3f69fd",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-proxy-integration-selftest.mjs",
+      "source_sha256": "889efd0f0ddc20b3bfa05028066531a551671aa6fab6b5ec247cbfd079067ac7",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-proxy-selftest.mjs",
+      "source_sha256": "4a4c95cc0245200a30ddcd497f649a2601c0849a948f195626778335e39355de",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-proxy.mjs",
+      "source_sha256": "583df52bb1978631afe5a2a11560ee2207aaeefabd1d86be6194437e49bdf745",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-proxy.ps1",
+      "source_sha256": "e7a26771b6f2319649029fe7748ee89ad122c202a2c0043d3845eecb43bc51a4",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-request-selftest.mjs",
+      "source_sha256": "5773256b3e5f0339b1db7a44481b9c138bc1843c48be8bd54a6d7f25d70442b2",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-request.ps1",
+      "source_sha256": "1e33f3777d98df4780dd04c1339a7897e986aaaf5149b738090310bec24fe1c6",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-scroll-selftest.mjs",
+      "source_sha256": "0f2d4c3c77aa61fffbe85dd556ba2d10cc68faa6c16922b6cba10bd8e67ef515",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-session-cleanup-selftest.mjs",
+      "source_sha256": "33e2b089e9d7299db5f870cf0bd31e712fe03963648bf339058a68144b0eaead",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-session-selftest.mjs",
+      "source_sha256": "c90301ef76237e8cd6f44e56876bd159bcc741b946bd86eed84a44e6c7e8aa45",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-session.ps1",
+      "source_sha256": "4f248562cf217de9e6d757d08ebed89918d84bc06016f91f68774ccf40a9858d",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-shadow-selftest.mjs",
+      "source_sha256": "127169f01109667db490ac74b1d3eb5c1513c21022bd10407f158a6e7d9e92ec",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-visible-frame-selftest.mjs",
+      "source_sha256": "0216b0c93181dd901280d378daaf27285c37f2c51f9bac089386a2a1872d09ee",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/cdp-visible-frame.mjs",
+      "source_sha256": "d77fc2fb8138b665ab13f2007d8e435f8f445ff73b8c275b6c3329ae89c2dd10",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/check-deps.mjs",
+      "source_sha256": "12232c48bac4942aea560b54a65614d43fec54bdcd23d69c0f1a96b4b7bab4fb",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/check-deps.ps1",
+      "source_sha256": "5a2499a66e33c133cb4829132932edcce9e626edaa17f4f919d3966be4ff437f",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/find-url.mjs",
+      "source_sha256": "3ebaec3cc90710f895b27a8aa2209aa4528c27c349ac197abdcd6b79bea29bd8",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/find-url.ps1",
+      "source_sha256": "901b682d337c251e4ce0b2687d953558e5d02b6d739ff0a681ad39fd39a9eaf1",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/loopback-websocket.mjs",
+      "source_sha256": "378568677f6dfecb4735f384e6dcc8051dd94905d388cf7b471f375321dfd179",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/match-site.mjs",
+      "source_sha256": "afa955642645661981ba6ed323a8bd4e0a222974c56ae06318bbf4e459283c70",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/match-site.ps1",
+      "source_sha256": "a1b5d82b221b4768c62e36906b9bcf40e3bb963415e1b8f0a8eb35ed546ef949",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-batch-runtime.mjs",
+      "source_sha256": "c99855938c304db78659400366267f2cddad7d7067fbf2bc5ed4d1d219749916",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-batch-selftest.mjs",
+      "source_sha256": "92a6ef53a7ed0784bc7ca1f79cb2a5738f0dddf496abfb421f190b7f220b445f",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-batch.mjs",
+      "source_sha256": "1bf1e04deb8bbc0ee931651a17bf55f607f7191fa43f14015608fb7afa90d3e3",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-detail-selftest.mjs",
+      "source_sha256": "fc412f8075470aac0a12b0135aeea840a6d84fb348bb97efbff26549c36c40c2",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-detail.mjs",
+      "source_sha256": "a63d679b8d633295b51df8654778477a76ac80d6bb26294d13f4343878fbfbf6",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-dom-recipes-selftest.mjs",
+      "source_sha256": "986925a9096bc9ebf6bbd67c4a09e51bf37f08884cb152f16bd7c67be9d30f4c",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/scripts/research-dom-recipes.mjs",
+      "source_sha256": "7725eb70bd8dcc397ffd704640082d42add67b63c226af19c8206ccee551cbb5",
+      "unchanged": false
+    },
+    {
+      "path": "skills/web-access/scripts/research-recipe-loader-selftest.mjs",
+      "source_sha256": "48faa583c6afa22a0c588d506952b1c90650fc12a763241e159c39ac7d4bebe6",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/research-recipe-loader.mjs",
+      "source_sha256": "cee6fe5701e6a951fffd47bbf4eacbaa7fca6f300fbedd9754c4f86a095e9cfd",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/run-node.ps1",
+      "source_sha256": "d80bb9a678b61e61330615c4d03e6d3039a23cad06e1eefd7e61d6920eb70809",
+      "unchanged": true
+    },
+    {
+      "path": "skills/web-access/scripts/sqlite-query.py",
+      "source_sha256": "7ac4c169a3292a8604ddb63f3d495f3fe7c0e55532a6686cd828a152b11b370c",
+      "unchanged": true
+    },
+    {
+      "path": "skills/source-artifact-stabilizer/SKILL.md",
+      "source_sha256": "073cbf79398043b399655bd84576d1b5b959ed2aca788ec1786c436fcf5212f2",
+      "unchanged": false
+    },
+    {
+      "path": "skills/source-artifact-stabilizer/agents/openai.yaml",
+      "source_sha256": "81cf4c1c54d82b93d58fb5a06e27b7bf06d3f11c6364e9762a0d19d39c6600f3",
+      "unchanged": true
+    },
+    {
+      "path": "skills/source-artifact-stabilizer/references/artifact-workflows.md",
+      "source_sha256": "21c50b590a4c09015a624da943d4882b8d48eea74eee95fbd3b64f88dce9ccb1",
+      "unchanged": true
+    },
+    {
+      "path": "skills/source-artifact-stabilizer/references/extraction-and-patching.md",
+      "source_sha256": "726a98e9405dad2fb48bb08e89c883ad0ce42ae2357352374ec8626d474a6d67",
+      "unchanged": true
+    },
+    {
+      "path": "skills/source-artifact-stabilizer/references/windows-encoding.md",
+      "source_sha256": "6602bbe8723a00f7ba8fbfb28f68e3c9f8baf4fcf09633a38b7efbe605bd05d6",
+      "unchanged": false
+    },
+    {
+      "path": "skills/source-artifact-stabilizer/scripts/probe_artifact.py",
+      "source_sha256": "00a134bb84c94f4ff09982aad718c812300020101ccc0a9ea9f2ba954a755883",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/.gitignore",
+      "source_sha256": "0a00e3aafb24f84dd931075225364c5f39cc62c2e4658597f9307fe3c2debea1",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/README.md",
+      "source_sha256": "a6cea812e77396eaf7650abbf9d5e6d1e9979376ef48cdd3d4f8f1998cec5230",
+      "unchanged": false
+    },
+    {
+      "path": "tools/feishu-codex-bridge/package-lock.json",
+      "source_sha256": "adbb21fae02eccb4e69a35364f085a1fe4502a716f938b945764f42aebdab39c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/package.json",
+      "source_sha256": "e3cb03ee2e68b7a188dc8232f80b57406213187255c947b9e0a3482697a33555",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/team_merge_audit.py",
+      "source_sha256": "25c79ff5309f0ddaed16a6b49444dc5b5d3df7fc629cc5fb4c56d859f4a8a798",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/bind-user-alert.mjs",
+      "source_sha256": "ad0937481ac781680eeed02a91edc40bf6a79db81ae478b219589bb273e53a57",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/bridge-process-identity.ps1",
+      "source_sha256": "60197082bb07115593dccf6b17789ece3ff1af7a9c8144354882732b649a818c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/diagnostic-json.ps1",
+      "source_sha256": "6c59ac756d4fa4117113dae813d155d518a2e28848e5f53bdbaf32f897c1794f",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/initialize-new-only-state.ps1",
+      "source_sha256": "7d247a40d40f1dfd018d38726e2bf15e5f0aeb7c70491d1be39a9dfaa4b574d2",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/install-autostart.ps1",
+      "source_sha256": "1b415c5b8456c1c06e247bc615046da12313e47ae6441ef876b43a38810ec315",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/pause-job.mjs",
+      "source_sha256": "0997df81acf6d72e495b251805bb6b24854390822cda20e8ddfe9f45edfd69eb",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/recover-native-handoff-once.mjs",
+      "source_sha256": "378c4b1aa4a28913a446cd23a06af7c713b559ce8a199906911ba5cd2fd6ab77",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/repair-completed-job.mjs",
+      "source_sha256": "ee601cec768ad727753e9d4f198fac92e735b26c065de5cbe1db6e583e551008",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/request-shutdown.mjs",
+      "source_sha256": "5863decbad7c2ddec62039be4a87ff9aa0d5401799200bee352c66937293bee4",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/retry-authorized-preflight-once.mjs",
+      "source_sha256": "e574c93ed1ab33c9b65800d9e3409c7fe61734a26c78d6d1ea65063690f78ff6",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/start.ps1",
+      "source_sha256": "01208b1008e9039641095a1be34997d634a7aba22eda86c20c33e31ecc2f120b",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/status.ps1",
+      "source_sha256": "0834ec7c6a20c09b388d0432f5f6818f888311cd3d9ec301763e508f2e51a068",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/stop.ps1",
+      "source_sha256": "e4d3968d0160f50f7f44f8ef792f2fd4b3842fa6816fe1d9ce93f58fe96f819c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/submit-codex-desktop-prompt.ps1",
+      "source_sha256": "7b6c9fb502bd66202c373c85093e232e33ea9e3ee891206be275a71baf248c54",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/uninstall-autostart.ps1",
+      "source_sha256": "b3c3ca29abb8eb2375aa91e39aee1ead01ceb47eff8885aea8d59b1a6843de7c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/validate-authorized-preflight.mjs",
+      "source_sha256": "a2eea8ca23de82485c7e1f8b53f068fa97967075a6469d381c5a5fd20894df59",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/acceptance-receipt.mjs",
+      "source_sha256": "3d6705367938d4971e159f5bfe02fb732d268085b8d2a6b10cbe78bffffc88b2",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/accounting-client.mjs",
+      "source_sha256": "4bb739be8f69ec5b94b8786b1c8deae28e79d3c182f6d428908b6f7d04ec7266",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/accounting-ledger.mjs",
+      "source_sha256": "20f369fd90c124b7fbc245f5b8a06c50456e1bb69b216cfe2b53056148a45ff1",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/accounting-reconciliation.mjs",
+      "source_sha256": "d2e02d86f8eec997ddf4e244c119d9ba43f76f19b2c8317e00c66f18ffea41b6",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/activation-boundary.mjs",
+      "source_sha256": "5ef49739d49c41120931977a1ae54144ff9c65fd2e88b92491c9a4821fcbbfc6",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/bridge.mjs",
+      "source_sha256": "9677922010c33cccd8356c5385179ff751d60a687188781df383d2e31b6f7e56",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/check-dispatch.mjs",
+      "source_sha256": "6fded442484858d029ea41e383a3eb806da4423ea96043d6c3c1210977b3c9c8",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/check.mjs",
+      "source_sha256": "e86cfae077202c497026f466bcab867880eb8a15f6b220f40910b02877dae5e3",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/cli-thread-execution.mjs",
+      "source_sha256": "7f8c07fd6ac0e7fcca4caa2b0fae6ecc490f6b0a61da2c519ca0e34b08186fe2",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/codex-client.mjs",
+      "source_sha256": "afdc54a6295c6c6778c95a1da5285729f05d5b6c447d8684fb5ab3eb480a7736",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/codex-runner.mjs",
+      "source_sha256": "33a5af3af2282c2cbd2a9b025fc487a8caa108b17b178d500aba0072aefea98b",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/commands.mjs",
+      "source_sha256": "a44e0d412a04830d02d158cb7fdb6c7686c988c9b5febabe6dd1eb1ee8825376",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/completion-repair.mjs",
+      "source_sha256": "6509793eaa50b71d8838750cb35cb0817937258cd2c6747c50a3979225427933",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/config.mjs",
+      "source_sha256": "c25ce9f4f2b7a5cd9f84943bb90367fbf1bb9de7deb50f58288874b8e9eae25b",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/credentials.mjs",
+      "source_sha256": "08ae662530d5e10692ed4a506c80405e2f084a7f2d0d77624f69b6c885882d88",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/delivery-review.mjs",
+      "source_sha256": "ff84ab770405f03368c0321b31fa5a8fd4df73f965ea8380f04cbd77f4767096",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/desktop-native-dispatch.mjs",
+      "source_sha256": "5850c1fe8d2ded73d5e7cf1e24dd639c16ee8ebbbdc0e75b617c17fa9a7526cd",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/dispatch-scope.mjs",
+      "source_sha256": "92d22546111746bda921441190bff4f63c2d54edc87076cb40aaed5ec2f4a4f4",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/feishu-poller.mjs",
+      "source_sha256": "2d164b864c91aedf8bee12b3b08a4ae895087996bf00fb7fdc70fde264b20b46",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/instance-lock.mjs",
+      "source_sha256": "ff7945f9e540f65cf528381ba3c8d3f33df96501d3caf03b74fed8cea7cf9afe",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/intake-accounting-gate.mjs",
+      "source_sha256": "ca672d95688ab1fb183fd815f0c0860c24027b4ec520d2fc4e6960ae98b53d66",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/job-pause.mjs",
+      "source_sha256": "5ed4ed52683c7b7aea14f6e00e33fbb765cca7d2fa0d7f203dfe6a4b55bd79b9",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/job-queue.mjs",
+      "source_sha256": "714f74d665b8586a637d4cba83e601dfac94a66d8099d0c1a0c483609082426d",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/log.mjs",
+      "source_sha256": "22fa1d60b6300888b1f79f3ed52ddefba64a5c50826d95cd4de75735d1631f24",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/preflight-failure.mjs",
+      "source_sha256": "b57c74d48d779361143f5d866d41c739c6296f7d3a2eda438dc1e740f5a2ac41",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/preflight-model.mjs",
+      "source_sha256": "5c4aa6a7b0c6a40d105714d61a71c6ff3449f87e74f48bd206a5e449db0531b5",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/preflight-retry.mjs",
+      "source_sha256": "1e58d5b38867b5a279e32bdd020cb38bf3e04cb2e88e052d485eb5482209340a",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/quiet-feishu-client.mjs",
+      "source_sha256": "40ea8527a0078fa08399546370673d9d23b9f88eaa6ac24e4cb9d54bbd65fdd7",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/redact.mjs",
+      "source_sha256": "9a552557147901995a8b24181249f36bd7f3556e453ee3c56eecc96c662e9326",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/reply-policy.mjs",
+      "source_sha256": "433fd1b3a7ac8d2c97972527ad95611874ed864b8e4b1c5f22b20b9e7ed813d8",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/research-handoff.mjs",
+      "source_sha256": "51c03bf11d966a22ab90e76dfd86591b7e465724d1f463a8109491a2cce3ab8c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/shutdown-control.mjs",
+      "source_sha256": "6bcba4df9ffd310171f40582a8f9b1a2354caf23fd142254a33756516a97c00d",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/store.mjs",
+      "source_sha256": "f0d0bb5220150725ec58b183e29da22ebd84c2a0bf523d2c586a49b7bab29c0a",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/terminal-observer.mjs",
+      "source_sha256": "80c70712f932197917e64d9578fe894cc9000dbdf96c8c0737c6d7e28d03eb20",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/user-alert-inbox.mjs",
+      "source_sha256": "d713ba9873c45cc263fcdb516fb0985752be6b0f5ca285550620f568e531d863",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/user-alert-verification.mjs",
+      "source_sha256": "1153ca0a65af05b91be60150e60a05dc0721cbcdb8b31f66453b02869bea9cbb",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/user-alert.mjs",
+      "source_sha256": "794244ee41a9ef704b9f19ba18ce40b94afe64765cdd4770c36d24e72ec6ea1e",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/visible-thread-bootstrap.mjs",
+      "source_sha256": "b7f7d637a4ce8ef525bccc73857bba021525399675f54fc16599e8b334bd0626",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/acceptance-receipt.test.mjs",
+      "source_sha256": "b379358aa1d1857622cbcadf0b50bcd12a9d2112b1b0c3a8df445f8788f8e62e",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/accounting-client.test.mjs",
+      "source_sha256": "b4bbf21f88a6756faacd52f9bc5e7c2579a4fc5985755e810c100a115ffd4106",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/accounting-ledger.test.mjs",
+      "source_sha256": "41411c6989890af4eb4ca03ae8ce7f10f0c731df6745d1142d5bd29b4af4659b",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/accounting-month.test.mjs",
+      "source_sha256": "6446a1b6a0af413cec233b75f5eb4df9ad7f3845ae893488310f1a64d83d2046",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/activation-boundary.test.mjs",
+      "source_sha256": "f294909072d3b7bd20265535ac7b578e75dac55011bec6357c0ee2337daf325c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/bridge-process-identity.test.mjs",
+      "source_sha256": "6f8d1773b84dd6ae1ebf9e1153f3db971d3cc4e722926a18bab0c258226b5872",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/cli-thread-execution.test.mjs",
+      "source_sha256": "bcf409dcb182f23a4c0a635351f6f118cb196f2c09e183da8a23c67316d5525f",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/codex-client.test.mjs",
+      "source_sha256": "ec28a170490c6daa73ef21bdfc9688c1d790b1340f414c0355d18fc682278ead",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/codex-runner.test.mjs",
+      "source_sha256": "29b953f258df6d7a827b3d87fa8330266b028941dcda41de33c11524ee453418",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/commands.test.mjs",
+      "source_sha256": "c02fee4a95fbfe54a67105e37b91ead93eddbab1b5c92feb211be340085f1b97",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/completion-repair.test.mjs",
+      "source_sha256": "51be7387734edaa3b9e1d7fc0f4d4b1a33ecd1c6c07909d88b872d5931fee5af",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/delivery-review.test.mjs",
+      "source_sha256": "12667cd771868beef12fafd9bdbe1ed46c77e1eedb786e3369b64104f030dbcd",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/desktop-native-dispatch.test.mjs",
+      "source_sha256": "f5d1657ad7a4b2a78f5e025be6bc43b1a1788866b6e9be3ceb265e59a2ba2763",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/diagnostic-json-windows.ps1",
+      "source_sha256": "77b6a67562db9043117e391f5ef2dd521afdc0fc6d12c0c9d032d4a566fcafc1",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/diagnostic-json-windows.test.mjs",
+      "source_sha256": "2bf947420daef1096571a1e36c6dcc5c5da570df7c180a40d4ea05c6d3ce4422",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/dispatch-scope.test.mjs",
+      "source_sha256": "1e4a02fd2530a2267ca786823b8988bd3e2264566171788a95f86f8c01e07eb7",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/feishu-poller.test.mjs",
+      "source_sha256": "fe4999d78030d7992d1e4664b049c2d05cc4b6efb839b8c4dbef4562199f4616",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/instance-lock.test.mjs",
+      "source_sha256": "036ffb59b1ed36b1093d94ce47d21b1660409c468cd5793147a5c404d3340cf6",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/intake-accounting-gate.test.mjs",
+      "source_sha256": "d053f72b9f4f3d883bb94bf0ea417d24e27514e07567df5f01c54f2b8e6cd1d1",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/job-pause.test.mjs",
+      "source_sha256": "2d7022250407f1d7b6fd99d82763e662782170f5d02c680dfd25e4c491d62597",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/preflight-model.test.mjs",
+      "source_sha256": "f49960d04ed63b7f51269c083436ea5f75774a507faf0cf8144818e5b5f7feb3",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/quiet-feishu-client.test.mjs",
+      "source_sha256": "8e4b0b44aeecd7e894d7907466a3391a77bc2bc6d3b4965d79eb4efda9482089",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/reply-policy.test.mjs",
+      "source_sha256": "be92efa825c850327d09a1bee0f1afe9ac13e6a97c93774367eeafdf19f23b1b",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/research-handoff-junction.test.mjs",
+      "source_sha256": "eb46c29034319b7a64f1bcae354282aa1eb444cb16c85960e98132a813d05d5c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/research-handoff.test.mjs",
+      "source_sha256": "6fb7a7206d135bb3f07e7f74f3558ce70584bd712867cf054982eaa38cfa84f6",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/shutdown-control.test.mjs",
+      "source_sha256": "2859bab17b0a9c69ba0951f7f7e4fcb48b3ea5440a4c3cbbf47b44f5e579d983",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/shutdown-integration.test.mjs",
+      "source_sha256": "2fbbbcc72f0a23c748688c29af859ba8114dc4ac27a0df7a16f6a68ff964ad14",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/store.test.mjs",
+      "source_sha256": "a59c5c3704d9301d5f65c4084f2103bd8ae37b629e14dd4b55af1e77a2bf1f12",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/terminal-observer.test.mjs",
+      "source_sha256": "0f6ece48c82260a00ae319f52b7dd193f5931a30c298dbafabdf91214a668378",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/user-alert-inbox.test.mjs",
+      "source_sha256": "cd8fd566431b806a52b1a6d88fb7367ef8d8d00e9284373543fd1c2d8cce3d31",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/user-alert.test.mjs",
+      "source_sha256": "fb2d14b44002d90e57deb34ed97b56a49543c2024b77b2009c49447a352fba3e",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/visible-thread-bootstrap.test.mjs",
+      "source_sha256": "b68047b9add3f95526e0b25338eeab41c0f0d7d13c4e61a177e56fe6f2783092",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/fixtures/argv-digest-child.mjs",
+      "source_sha256": "70432e7bf9482ef7938af3ce7ffd30ea5f89b5b3088904324aa3a25219a0d9fa",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/fixtures/legacy-bridge-child.mjs",
+      "source_sha256": "b6e80d924cbeacb71784b6f68efc361cd2b505a8e941526c9d9383a41d3141c5",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/fixtures/sample-dispatch.txt",
+      "source_sha256": "b0808d99a8bca245ba7c374f55e7bbfb1f018b4ffe720487072c6959bedf441b",
+      "unchanged": true
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/fixtures/shutdown-bridge-child.mjs",
+      "source_sha256": "641485f6b8e7d0618bc5d5c7f2b3889e100822af0826060cea86bda92be9de90",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/README.md",
+      "source_sha256": "3e151d2fdaaf659469a09f2dca8c9110e7358b67edfef3df09142ff7598f0b05",
+      "unchanged": false
+    },
+    {
+      "path": "tools/research-batch/manifest.json",
+      "source_sha256": "aaf1c71e63d0cf64967b4328563c8bb959177c8fbe940775c0b6bcf600ffda0e",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/coverage/README.md",
+      "source_sha256": "51437bcc9524402d2df56e0262f9199d761aa1d51827c3c7e181b81d8bbc660f",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/coverage/validate.py",
+      "source_sha256": "bfe346704d1832767f355ce899118c3a5751fd317e75f63b408c339c6b97dc0e",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/media/README.md",
+      "source_sha256": "8ebd067dd7a502568398ea3b05388af452f8c8b433a0ec122473f2792a8c1069",
+      "unchanged": false
+    },
+    {
+      "path": "tools/research-batch/media/export_manifest.py",
+      "source_sha256": "ed5db02627c48d160b67e00311dfe20bfc2b4fd3d13e9cf6f6aa9b0b504ae565",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/media/fetch_assets.py",
+      "source_sha256": "c9ee12f52521976943a2bdc4995d30482496c5a4817e77def10168510a6e8d34",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/media/media.py",
+      "source_sha256": "3ab432f4cb77a81feae6567bf29bb9b84e4ff471471524abe40673853b98a245",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/pipeline/README.md",
+      "source_sha256": "8251df2ecd9072961573b0104c5f45c5a5208e69e3c707b755f7554b2e7d8ea1",
+      "unchanged": false
+    },
+    {
+      "path": "tools/research-batch/pipeline/prepare.py",
+      "source_sha256": "55677f973504623b4ce451d32418a10d4f4db8ae16dd6835562891bffa4876ce",
+      "unchanged": false
+    },
+    {
+      "path": "tools/research-batch/test/coverage/test_validate.py",
+      "source_sha256": "d0bccae5eee5d34529e10652e73cbb450f5a6cbad61c9cd9f4b985addfbe3fdb",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/test/media/test_export_manifest.py",
+      "source_sha256": "c7ab51c8c6f66af5a972247bc17c3b352fc43e4e6312a40102ee5a9bf4b2ecda",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/test/media/test_fetch_assets.py",
+      "source_sha256": "3519caf9470bc722fec7d47a042083c39ec342efc86cd5a65dc8578e6a519e2a",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/test/media/test_media.py",
+      "source_sha256": "53f8facfd7e6f1d3d7d5fc74ca94c945b74976bf639ed659e0f4f318cf5f728c",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/test/media/test_media_attribution.py",
+      "source_sha256": "5f3dea1fd6cd16030214baa17aad17111b165ac560f74f7089d192e05009dc29",
+      "unchanged": true
+    },
+    {
+      "path": "tools/research-batch/test/pipeline/test_prepare.py",
+      "source_sha256": "015524f25ed6a1c74040c66f16464ddbdfd231a093f76be058c79cefc756a2e8",
+      "unchanged": true
+    },
+    {
+      "path": "tools/risk_scan/README.md",
+      "source_sha256": "af9a09ffb39df32c3cc1c523ce25f314c9ffda02e81224770aad3f472572e5d7",
+      "unchanged": true
+    },
+    {
+      "path": "tools/risk_scan/manifest.json",
+      "source_sha256": "01252b5a057c2c746f8b468eac95c49145f6edc391adadd7ead299575cfa79a2",
+      "unchanged": true
+    },
+    {
+      "path": "tools/risk_scan/risk_text_scan.py",
+      "source_sha256": "1121ef56a3b132d76d744003f533709201b30a13c6bfcd52ca453b1b29e06013",
+      "unchanged": true
+    },
+    {
+      "path": "tools/risk_scan/run.ps1",
+      "source_sha256": "89f3be7aa1c2f5f8c4d16b1e16560fd5ea3021904ab6a327aaba4af0b76d6afb",
+      "unchanged": true
+    },
+    {
+      "path": "tools/weibo/edge_dom_batch.mjs",
+      "source_sha256": "2aced62707bb53654d98160179e7fc4968b1fe88757dc8b4f88d0a7eed7b6785",
+      "unchanged": true
+    },
+    {
+      "path": "tools/weibo/manifest.json",
+      "source_sha256": "9687a236fc292de076501534a05386768262af368cdc14965e037fd01797a55d",
+      "unchanged": true
+    },
+    {
+      "path": "tools/edge_cdp_broker/manifest.json",
+      "source_sha256": "94abe3ce573390b2a961e037eaa6573b35b8d8adefb2b76d2eace9047961abec",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/.gitignore",
+      "source_sha256": "20715b1913fb5c5c4f7c634e8ca9a39cf78ecb49d279e78b5b3e8d5cff1cf9d0",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/README.md",
+      "source_sha256": "99ab6a87f62a223f886c94bdf72c3b2059fe71bec10a57f1414fc0cabffcb94e",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/common.ps1",
+      "source_sha256": "6b11766e993809817522a1426faf799800d99bc92587caf44fb254122dc98c54",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/configure-credentials.ps1",
+      "source_sha256": "0fecaf46ab1d9871451c13a6c3ab7241c5f1864f6b9eed538571cac7a1acaaeb",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/ensure-feishu-uat.ps1",
+      "source_sha256": "767e2d5e4438610c262e53f50e386f20ef803aec93c12880f53a5973ae73b439",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/scripts/login-feishu.ps1",
+      "source_sha256": "2025920b5f0625ad3384407ff5acb4ac69068c3ded674339ad6e9e57a1305077",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/scripts/read-credential.ps1",
+      "source_sha256": "6a971465d753fb2dd1ddfa831537243ef08800ed531fff550c111c4cebb16223",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/scripts/refresh-feishu-uat.mjs",
+      "source_sha256": "73112c49f0b3a85b88465f3356ddb23535e98667a749b2047035c1588974c3b5",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/refresh-feishu-uat.ps1",
+      "source_sha256": "0621ab981e6eea8b01bd78c69289b765a5c8089cff10e27007d70c19ddbf44ff",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/scripts/secure-launcher.mjs",
+      "source_sha256": "3f881a98d8152086b1680e075afe29cc57ef08197a2d3cb98b067f2f1e8be81d",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/test-uat-recovery.ps1",
+      "source_sha256": "03a9aceece03a469cca623f304c5c3125462eb24fb9e00657e44415cb6eb6652",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/scripts/uat-recovery.psm1",
+      "source_sha256": "d6e61799afb455c2cb2ffc490ef39caf80341a8ec9addee2e14103848f79e513",
+      "unchanged": true
+    },
+    {
+      "path": "external/feishu-mcp/scripts/upload-image.mjs",
+      "source_sha256": "26fb8b96b32c4b63de9b1c78ee448b14edd3ece7f062fc445c17a87231f3dd39",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/verify-live.mjs",
+      "source_sha256": "f2aab88823563c7816d1d414e6bdcdf6c206e5117f0ead5d260135b7cbca61f8",
+      "unchanged": false
+    },
+    {
+      "path": "external/feishu-mcp/scripts/verify-mcp.mjs",
+      "source_sha256": "7c8e4bc5d3e56bd84371b6d1f8f19caa59a6d0fd7008ec0c33486668fbb9e980",
+      "unchanged": false
+    },
+    {
+      "path": "AGENTS.md",
+      "source_sha256": "1d0cb21476b59a7161a602aeb4da94309bfd0d7d936da89e73dcc6f91c5d22f3",
+      "unchanged": false
+    },
+    {
+      "path": "backcheck.ps1",
+      "source_sha256": "59db9d69b29ebbf3a54f2f90573401f1f9e26072526a86323483271abec446d8",
+      "unchanged": true
+    },
+    {
+      "path": "recovery-session-env.ps1",
+      "source_sha256": "c04e744d8dac91864b711318f39cca628586f4c35761bbaf59153d4f224c93f1",
+      "unchanged": true
+    },
+    {
+      "path": "背调风险提示.md",
+      "source_sha256": "5b5ba0de8072dc45cec830cad11dc759d6920447cf0549a59b47cbb01660ca17",
+      "unchanged": true
+    },
+    {
+      "path": "背调风险提示.xlsx",
+      "source_sha256": "9d7fe5e1a27d3f5af773c8425cb7d573b45bdfea396e2b30071d0df20bd07714",
+      "unchanged": true
+    },
+    {
+      "path": "模板.docx",
+      "source_sha256": "d7b639c3184fe9b0deb387f7d202e125486c0effd64d0f6cb0c0f64887471f69",
+      "unchanged": true
+    },
+    {
+      "path": "config/backcheck-config.mjs",
+      "source_sha256": "bd667b2f83632aabd6d6f70ed2385cce7c2b6e91dcd4459881b4f03b8b6a7eba",
+      "unchanged": true
+    },
+    {
+      "path": "config/feishu-readiness.mjs",
+      "source_sha256": "447ec4a826fcc6cb5de4bec6a21d60f43ae002b66d8a7df3282e63198bd35b57",
+      "unchanged": false
+    },
+    {
+      "path": "config/listener-preflight.mjs",
+      "source_sha256": "63abeb32d4e069ac263d99c592d912f54ffd89ee1aacd5d0b70654f7c3e3bcb1",
+      "unchanged": true
+    }
+  ]
+}
