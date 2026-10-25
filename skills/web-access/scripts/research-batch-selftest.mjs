@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { normalizeSnapshot, mergeItem, collectBatch, replayItems } from './research-batch-runtime.mjs';
+import { normalizeSnapshot, mergeItem, collectBatch, replayItems, loadItems } from './research-batch-runtime.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(HERE, 'research-batch.mjs');
@@ -38,6 +38,28 @@ function state(extra = {}) {
     max_seconds: 60, max_steps: 100, interval_ms: 0, plateau_steps: 2,
     compatibility: false, starting_position: 'current_page', iterations: 0, ...extra };
 }
+
+test('compact collector stores one cache and resumes without a journal', async () => inRuntime(async directory => {
+  const initial = state({storage_mode: 'single_snapshot_v2', max_steps: 3, recovery_used: 1});
+  await collectBatch({state: initial, directory, snapshot: async () => snapshot([item()]),
+    advance: async () => {}, recover: async () => {}, cancelled: () => false, wait: async () => {}});
+  assert.equal(fs.existsSync(path.join(directory, 'items.ndjson')), false);
+  assert.equal(loadItems(directory, initial).size, 1);
+  initial.max_steps = 4;
+  const result = await collectBatch({state: initial, directory, snapshot: async () => snapshot([item(), item('post-2')]),
+    advance: async () => {}, recover: async () => {}, cancelled: () => false, wait: async () => {}});
+  assert.equal(result.items.length, 2);
+  assert.equal(initial.recovery_used, 1);
+  assert.equal(fs.existsSync(path.join(directory, 'items.ndjson')), false);
+}));
+
+test('compact missing or mismatched cache preserves checkpoint and rejects resume', async () => inRuntime(async directory => {
+  const checkpoint = state({storage_mode: 'single_snapshot_v2', item_count: 2});
+  assert.throws(() => loadItems(directory, checkpoint), /missing/);
+  fs.writeFileSync(path.join(directory, 'result.json'), JSON.stringify({job: {id: 'wrong-job'}, items: []}));
+  assert.throws(() => loadItems(directory, checkpoint), /identity mismatch/);
+  assert.equal(checkpoint.item_count, 2);
+}));
 async function inRuntime(callback) {
   const directory = temporary();
   try { return await callback(directory); } finally { cleanup(directory); }

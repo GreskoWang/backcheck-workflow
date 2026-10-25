@@ -47,7 +47,7 @@ Do not use CDP for every web task. CDP is powerful but intrusive; use it when lo
 Codex does not provide `CLAUDE_SKILL_DIR`. Resolve paths relative to this `SKILL.md`; in this installation the default is:
 
 ```powershell
-$skill = Join-Path $env:BACKCHECK_SKILLS_ROOT "web-access"
+$skill = "$env:USERPROFILE\.codex\skills\web-access"
 ```
 
 On Windows, use the PowerShell wrappers. They prefer Codex's bundled Node runtime at:
@@ -72,7 +72,11 @@ The launcher reads Edge's `DevToolsActivePort`, starts or reuses one broker, and
 edge://inspect/#remote-debugging
 ```
 
-and enable **Allow remote debugging for this browser instance**. A missing `DevToolsActivePort` means only that the live endpoint is not ready; it does not prove the switch is off. On Windows, inspect `Local State` at `devtools.remote_debugging.user-enabled`: when it is `true`, ensure the ordinary visible Edge using the default user-data directory is running, wait for the endpoint file and listener, then retry once without asking the user to toggle the switch. Edge may show one browser security confirmation for each new Edge process; only an actually visible prompt justifies asking the user to confirm it. A user's request to perform the browser task authorizes routine opening, navigation, reading, scrolling, clicking, and screenshots within that task, so do not ask them to pre-open Edge, choose a tab, provide an endpoint, or reconfirm every ordinary action. Authentication credentials, CAPTCHA, 2FA, new OAuth scopes, paid access, and an actually displayed Edge remote-debugging prompt still belong to the user.
+and enable **Allow remote debugging for this browser instance** only within the authorization rules below. A missing `DevToolsActivePort` means only that the live endpoint is not ready; it does not prove the switch is off. On Windows, inspect `Local State` at `devtools.remote_debugging.user-enabled`: when it is `true`, ensure the ordinary visible Edge using the default user-data directory is running, wait for the endpoint file and listener, then retry once without asking the user to toggle the switch. Edge may display a browser security confirmation when a debugging connection is established; a timeout alone does not prove that a prompt exists. A user's request to perform the browser task authorizes routine opening, navigation, reading, scrolling, clicking, and screenshots within that task, so do not ask them to pre-open Edge, choose a tab, provide an endpoint, or reconfirm every ordinary action. Authentication credentials, CAPTCHA, 2FA, new OAuth scopes, and paid access remain subject to their applicable user-confirmation rules. Handle Edge remote-debugging prompts as follows:
+
+用户已明确授权代点 Edge 远程调试“允许”时，对既有本机 Edge 与本地 broker 在当前任务范围内发起的预期连接提示，由代理使用当前获准的电脑控制工具主动点击，不再固定交给用户，也不重复索取同一授权。点击前实际读取可见提示，核对 Edge 窗口、连接上下文及权限范围，确认是预期的“是否允许远程调试？”提示，再点击一次“允许”。未看到提示不盲点，不以超时推断用户未授权；来源或权限范围不明时先核实。首次启用调试或实质扩大访问权限时，遵守当前工具的操作时确认要求，不能将这条代点授权扩展为任意安全提示的通行许可。
+
+点击后核对连接状态及原任务页的 URL、可读性，保留原断点和已用恢复次数；不为测试代点能力重载 broker、重启 Edge 或制造新提示。若电脑控制工具因网址识别、权限校验等原因明确拒绝操作，遵守其停止要求，不用其他通道或脚本绕过，也不把修改技能当作原生故障已修复。
 
 连接与页面可读性分别核对：`/health` 与 `/targets` 成功只证明 broker 能连接并列页。在本路线持有租约的目标上，继续用 `/info` 核对实际 URL，再做小范围可见正文查询；需要看图时才截图。能建页、能列页或 activated=true 都不证明正文已加载。扩展/CUA 的 debugger 生命周期与平台服务端限制不属于本目录可修的代码；本地测试通过后仍须验证原失败页面，未现场复验只能称本地修复完成。
 
@@ -119,9 +123,9 @@ The adapted finder uses `sqlite3` when available and falls back to Codex's bundl
 
 ## Browser Tactics
 
-重复主页读取优先使用[可恢复批量缓存](references/research-batch.md)：固定DOM配方与本地后台worker复用本任务已有租约，自动滚动／分页、保存完整可见文字和来源，再分批交模型阅读。先核对账号、范围和起点；后台取数不等于已读。前台操作同页前先cancel并确认停止；不同域名和已导出正文可并行。运行broker未加载新能力时使用明确标记不完整的兼容路线，不中断其他owner。媒体批读、截断、终点与恢复命令统一放引用，不重复增加流程门槛。
+重复主页读取优先使用[可恢复批量缓存](references/research-batch.md)：固定DOM配方与本地后台worker复用本任务已有租约，自动滚动／分页。新任务只保存一份当前正文缓存，按需返回阅读批次，只确认实际读完的批次；不另导出整套正文、无问题材料档案或逐帖审阅回执。先核对账号、范围和起点；后台取数不等于已读。前台操作同页前先cancel并确认停止。旧目录继续兼容，不迁移、删除或重置原断点；不为精简加载重启broker或干扰其他owner。媒体批读、截断、终点与恢复命令统一放引用。
 
-折叠正文或详情缺口使用[详情客户端](references/research-detail.md)，沿用现有租约并核对帖子与主体，不把整卡UI或列表摘要当本人正文。采集启动后可挂接 `tools/research-batch/pipeline/prepare.py watch`，仅观察本地状态，终态后自动导出阅读批次和媒体待办并输出阶段事件；模型接着实际阅读与核实。该接续不监听派单，不自动确认风险或写飞书。
+折叠正文或详情缺口使用[详情客户端](references/research-detail.md)，沿用现有租约并核对帖子与主体，不把整卡UI或列表摘要当本人正文。采集启动后可挂接 `tools/research-batch/pipeline/prepare.py watch`，仅观察本地状态，终态后准备单份阅读断点和媒体待办；使用 `read` 取一批、`confirm` 确认实际阅读，同内容不重复导出。该接续不监听派单，不自动确认风险或写飞书。
 
 Use `/dom/query` as bounded, read-only eyes and the dedicated click/scroll/navigation endpoints as hands. Arbitrary JavaScript execution is unavailable:
 

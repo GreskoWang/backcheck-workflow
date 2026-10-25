@@ -21,7 +21,7 @@
       "name": "research_prepare",
       "path": "pipeline\\prepare.py",
       "mode": "supplemental_offline_default",
-      "scope": "把采集结束后的缓存自动接续为版本化正文批次、媒体清单和审阅待办；默认离线，显式fetch-public才下载公开图片。准备事件与实际阅读、风险判断和飞书终审分别记录，不自动确认完成。",
+      "scope": "新普通任务引用单份原阅读缓存，按需返回正文批次，以一个状态保存阅读游标及媒体进度，不重复导出全文或逐帖无问题回执；旧目录兼容。显式fetch-public下载公开图片，任务内复用图片实体并保留来源映射，不自动确认完成。",
       "surface_completion": false
     },
     {

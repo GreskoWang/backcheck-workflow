@@ -5,7 +5,7 @@ import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { collectBatch, replayItems, buildResult, saveJson } from './research-batch-runtime.mjs';
+import { collectBatch, replayItems, loadItems, buildResult, saveJson } from './research-batch-runtime.mjs';
 import { assertResearchRecipe } from './research-dom-recipes.mjs';
 
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -59,7 +59,7 @@ function recoverKnownJobLocks(directory, state) {
 }
 function readCurrentCache(directory) {
   for (let attempt = 0; ; attempt += 1) {
-    try { return replayItems(path.join(directory, 'items.ndjson')); }
+    try { return loadItems(directory, readJson(path.join(directory, 'job.json'))); }
     catch (error) {
       let active = false;
       try { process.kill(readJson(path.join(directory, 'worker.lock')).pid, 0); active = true; } catch {}
@@ -186,8 +186,10 @@ async function main() {
   const stateFile = path.join(directory, 'job.json');
   if (opts.command === 'status') { const value = readJson(stateFile); delete value.target; console.log(JSON.stringify(value)); return; }
   if (opts.command === 'read') {
-    const value = buildResult(readJson(stateFile), readCurrentCache(directory));
-    saveJson(path.join(directory, 'result.json'), value);
+    const state = readJson(stateFile);
+    const value = state.storage_mode === 'single_snapshot_v2'
+      ? readJson(path.join(directory, 'result.json')) : buildResult(state, readCurrentCache(directory));
+    if (state.storage_mode !== 'single_snapshot_v2') saveJson(path.join(directory, 'result.json'), value);
     console.log(JSON.stringify({ file: path.join(directory, 'result.json'), items: value.items.length, coverage: value.coverage, conclusion: value.conclusion }));
     return;
   }
@@ -208,7 +210,7 @@ async function main() {
     if (fs.existsSync(directory)) throw new Error('Output directory already exists; use resume for the same task');
     fs.mkdirSync(path.dirname(directory), { recursive: true });
     fs.mkdirSync(directory);
-    saveJson(stateFile, { schema_version: 1, id: randomUUID(), state: 'created', recipe: opts.recipe,
+    saveJson(stateFile, { schema_version: 1, storage_mode: 'single_snapshot_v2', id: randomUUID(), state: 'created', recipe: opts.recipe,
       owner: opts.owner, target: opts.target, target_url: targetUrl, port,
       max_seconds: integer(opts['max-seconds'], 900, 1, 3600), max_steps: integer(opts['max-steps'], 2000, 1, 10000),
       interval_ms: integer(opts['interval-ms'], 2000, 750, 10000), plateau_steps: integer(opts['plateau-steps'], 4, 2, 20),
@@ -230,7 +232,7 @@ async function main() {
       catch (error) { if (error.code !== 'ESRCH') throw error; }
     }
     createClient(current);
-    replayItems(path.join(directory, 'items.ndjson'));
+    loadItems(directory, current);
     if (opts['max-steps'] !== undefined) current.max_steps = integer(opts['max-steps'], current.max_steps, current.iterations + 1, 10000);
     if (opts['max-seconds'] !== undefined) current.max_seconds = integer(opts['max-seconds'], current.max_seconds, 1, 3600);
     saveJson(stateFile, current);

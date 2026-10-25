@@ -35,7 +35,7 @@ $runner = "$env:USERPROFILE\.codex\skills\web-access\scripts\research-batch.mjs"
 
 `start` 确认独占 worker 后返回，后台继续；`status/read` 读取本地缓存。无需模型逐屏续命，也不轮询每个动作。默认每次观察间隔2秒、单次最多15分钟；这些是可配置的采集预算，不是整个平台或阅读时限。只有实际新内容才算进展。原平台有更长等待／公开限速时按其要求设置 `--interval-ms`，不得用更短间隔规避验证或限流。
 
-任务目录保存 `job.json`、追加缓存 `items.ndjson`、`result.json` 和错误日志，不保存 lease、Cookie 或 token。自动去重、分离本人／引用文字、保留媒体来源。当前页变化、验证码、登录墙、超时或限额会保存已取得内容并停止本路线，不阻其他工作。
+新建任务的 `job.json.storage_mode=single_snapshot_v2`：只用 `result.json` 保存当前去重阅读缓存，不再同时追加 `items.ndjson`。`job.json` 只承担采集控制和恢复参数；正文、引用及媒体来源留在阅读缓存，不保存 lease、Cookie 或 token。重复观察不追加新的正文版本。旧 job 缺少此模式字段时仍按原 journal 续作，不迁移旧文件。当前页变化、验证码、登录墙、超时或限额会保存已取得内容并停止本路线，不阻其他工作。
 
 ```powershell
 & $node $runner cancel --out "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-batch"
@@ -56,7 +56,7 @@ broker的 `/health.capabilities` 包含 `research-dom-snapshot-v1` 时使用固�
 
 原页小幅上滚再下滚恢复一次后仍不增长，记 `stall` 或 `empty_response`，不当历史终点。只有已登记独立终点控件／已确认分页末页且无加载框架才标当前起点之后的可见终点；该标记不证明全文展开、媒体已看或绝对历史完整。公开边界或用户时间窗需按真实依据确认，不追平不可枚举累计数，也不允许54/77一类未核实差额被改写成全部看完。
 
-## 整批阅读与媒体
+## 普通任务的按需阅读与媒体
 
 优先在启动采集后运行统一接续入口，避免逐项手接命令：
 
@@ -64,19 +64,25 @@ broker的 `/health.capabilities` 包含 `research-dom-snapshot-v1` 时使用固�
 & $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\pipeline\prepare.py" watch "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-batch" --out "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-prepared" --max-wait 1800
 ```
 
-用当前执行工具的后台进程包装器等待阶段事件。watch只观察本地job/result，状态不变静默；终态后自动导出文字、媒体清单和覆盖待办。默认离线，已授权任务需要公开图片时直接加 `--fetch-public`，继续下载和编图，不另设用户确认；媒体失败不撤销文字成果。输出 `next_action:model_review_required` 后继续实际阅读、原帖核实及飞书流程。它不自行唤醒新模型回合或发送消息，不能把本地prepared当研究完成。取消、恢复、版本及事件契约见[接续说明](../../../tools/research-batch/pipeline/README.md)。
+用当前执行工具的后台进程包装器等待阶段事件。watch只观察本地job/result，状态不变静默。新输出目录默认精简模式：准备一份 `state.json`，引用原 `result.json`，不复制源缓存、不导出整套文本、不建立 revisions 或事件日志。等待超时或取消不会覆盖已有阅读断点。默认离线，需要公开配图时加 `--fetch-public`，继续下载和编图；媒体失败不撤销正文进度。它不自行唤醒模型回合、确认完成或写飞书。
 
-列表摘要、折叠和正文混入界面文字时，先停止同页worker，再用[详情客户端](research-detail.md)核对原帖与作者、展开正文；未知布局保留缺口，不能用整页文字替代本人正文。以下底层命令仍可用于单独导出或诊断：
+接到 `model_review_required` 后顺序读取，命令中的 batch ID 使用本次 read 实际返回值：
 
 ```powershell
-& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\coverage\validate.py" "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-batch\result.json" --export-text "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-read-1" --max-chars 6000
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\pipeline\prepare.py" read --out "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-prepared"
+# 实际读完整批且工具输出未截断后才确认；不逐帖写“无问题”。
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\pipeline\prepare.py" confirm --out "$env:BACKGROUND_CHECK_WORKSPACE\YYYY-MM-DD\对象\process\weibo-prepared" --batch '<read返回的batch_id>' --reviewer root
 ```
 
-工具通用默认最多45000个字符；本机终端示例先设为6000，避免大批中文超过输出上限。标题、正文和引用分开映射；超长单帖跨批续读，不是取正文前N字。阅读工具若仍截断，缩小 `--max-chars` 后使用新的输出目录继续。阅读者只确认确实读完的批次，映射自动生成，不手写逐帖阅读账。关键词只作第二道补漏。pipeline仅在同任务、同主体、同范围及同来源映射下，复用逐字未变且旧记录已完整确认的字段，并绑定新缓存；新增或改变字段继续未读。单独的coverage导出仍全部未读，不能直接套旧指纹。
+默认每批6000字符，标题、正文和引用顺序阅读，长帖跨批续读。反复read返回同一未确认批次，不推进游标、不生成文本文件；confirm更新同一状态，重复确认不推进两次。来源缓存只追加新内容时保留已读前缀；已读正文或归属变化会保留断点并报冲突，不把旧确认套给新内容。输出若截断不得确认，先用 `discard-pending` 放弃未确认批次，再在同一目录用更小的 `--max-chars` prepare，已确认进度不变。风险与具体缺口才单独记录事实和来源。缓存的指纹、游标、媒体映射由工具维护，不手工抄写。
 
-先用 `media/export_manifest.py result.json NEW-manifest.json` 从采集缓存自动生成媒体清单，不逐张手抄来源；无媒体时跳过下载与编图。公开配图再用 `$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\fetch_assets.py` 下载，用 `media.py sheet` 生成分页接触图；已有本地雪碧图与真实时间戳元数据用 `media.py videoshot`。输入输出契约见[媒体说明](../../../tools/research-batch/media/README.md)与[覆盖说明](../../../tools/research-batch/coverage/README.md)。每格保留原帖、媒体ID和日期；缺图、损坏、签名访问失败保留记录，疑点回原图／原帖。视频快照只证明采样画面，不代表音频、字幕或评论已经查看。
+媒体在同一 prepared 目录按新增映射分批生成接触图；同批重复prepare不重新下载或编图，同一公开图片通过任务内缓存复用，来源映射仍分别保留。实际看完某批全部有效画面后可用confirm确认其 `media-XXXX`，占位或失败批次不能确认。无需无问题图片的逐张回执，疑点回原图／原帖，风险截图独立保留。视频快照仍不能证明音频、字幕或评论已读。失败媒体只定向修复，成功图片不重新下载。
 
-`coverage/validate.py result.json --review read-dir/review.json --require-complete` 只核对批次、范围和确认是否一致，不代替阅读与判断。仅此批量路线使用这个轻量缓存格式，不要求普通既有报告补造研究包、逐帖哈希或取证材料。四态结论与采集、阅读、媒体状态保持独立；格式通过、程序结束、拼图生成均不等于背调完成。
+`text_read_complete`只表示当前缓存正文读完。平台完成仍要确认实际范围、配图、重点视频／互动与搜索，四态结论由执行者在任务的唯一当前状态中维护。不要为交付补造无问题材料台账，风险证据保留事实、归属、必要截图和原链接。平台交付核对后，原任务可回收不再用于阅读、恢复或风险证据的临时缓存；维护任务不清理他人的现存缓存。
+
+## 旧任务兼容
+
+已有 `revisions` 或旧版state的prepared目录自动沿用旧格式，已有全文分片和review确认继续有效；不为精简重新导出、重采或重置恢复次数。旧阅读记录才使用 `coverage/validate.py --review ... --require-complete`，它不成为新精简模式或普通既有报告的额外门槛。显式旧格式诊断可用 `--layout legacy`。列表摘要、折叠或正文混入界面文字时，先停止同页worker，再用[详情客户端](research-detail.md)核对原帖；未知布局仍保留具体缺口。详见[接续说明](../../../tools/research-batch/pipeline/README.md)。
 
 ## 持续加载提示与已加载帖子（2026-10-24）
 

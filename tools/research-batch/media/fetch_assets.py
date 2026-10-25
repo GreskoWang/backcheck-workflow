@@ -21,6 +21,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
+import hashlib
+import os
+import threading
+from uuid import uuid4
 
 from PIL import Image
 
@@ -111,6 +115,62 @@ class TransportResponse:
     effective_url: str
     redirect_chain: list[str] = field(default_factory=list)
     request_count: int | None = None
+    cache_path: str | None = None
+
+
+class PublicImageCache:
+    """Task-local public assets, one blob per content, retaining each source map."""
+    def __init__(self, directory, transport):
+        self.directory = Path(directory).resolve()
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self.transport = transport
+        self.lock, self.key_locks = threading.Lock(), {}
+        self.index_file = self.directory / "index.json"
+        self.index = json.loads(self.index_file.read_text(encoding="utf-8")) if self.index_file.exists() else {}
+
+    def fetch(self, url, *, headers, timeout, max_bytes):
+        validated_url(url)
+        key = hashlib.sha256(json.dumps([url, headers], sort_keys=True).encode()).hexdigest()
+        with self.lock:
+            guard = self.key_locks.setdefault(key, threading.Lock())
+        with guard:
+            entry = self.index.get(key)
+            if entry:
+                sha = entry["sha256"]
+                if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
+                    raise AssetError("cache_invalid", "Invalid public image cache")
+                blob = self.directory / sha
+                if not blob.is_file() or blob.stat().st_size > max_bytes:
+                    raise AssetError("cache_invalid", "Cached image missing or over budget")
+                body = blob.read_bytes()
+                if hashlib.sha256(body).hexdigest() != sha:
+                    raise AssetError("cache_invalid", "Cached image changed; preserve for inspection")
+                return TransportResponse(200, entry["content_type"], body, entry["effective_url"],
+                                         entry["redirect_chain"], 0, str(blob))
+            response = self.transport.fetch(url, headers=headers, timeout=timeout, max_bytes=max_bytes)
+            if response.status != 200:
+                return response
+            validated_url(response.effective_url)
+            for redirect in response.redirect_chain:
+                validated_url(redirect)
+            checked_image(response.body, response.content_type, max_bytes, media.MAX_INPUT_PIXELS)
+            sha = hashlib.sha256(response.body).hexdigest()
+            blob = self.directory / sha
+            with self.lock:
+                if blob.exists():
+                    if blob.read_bytes() != response.body:
+                        raise AssetError("cache_invalid", "Cached content mismatch")
+                else:
+                    temporary = self.directory / (uuid4().hex + ".tmp")
+                    temporary.write_bytes(response.body)
+                    os.replace(temporary, blob)
+                self.index[key] = {"sha256": sha, "content_type": response.content_type,
+                                   "effective_url": response.effective_url, "redirect_chain": response.redirect_chain}
+                temporary = self.directory / (uuid4().hex + ".tmp")
+                temporary.write_text(json.dumps(self.index, ensure_ascii=False), encoding="utf-8")
+                os.replace(temporary, self.index_file)
+            response.cache_path = str(blob)
+            return response
 
 
 class RequestCounter(urllib.request.BaseHandler):
@@ -257,8 +317,9 @@ def download_one(index: int, item: dict, stage: Path, transport, *, timeout: flo
         if response.status != 200:
             raise AssetError("http_error", f"HTTP {response.status}; no automatic retry or authentication fallback")
         details = checked_image(response.body, response.content_type, max_bytes, max_pixels)
-        local_file = f"assets/item_{index + 1:06d}{EXTENSIONS[details['format']]}"
-        (stage / local_file).write_bytes(response.body)
+        local_file = response.cache_path or f"assets/item_{index + 1:06d}{EXTENSIONS[details['format']]}"
+        if not response.cache_path:
+            (stage / local_file).write_bytes(response.body)
         record.update(details, local_path=local_file, status="downloaded")
     except AssetError as exc:
         if record["attempted"] and hasattr(exc, "redirect_chain"):
@@ -272,7 +333,7 @@ def download_one(index: int, item: dict, stage: Path, transport, *, timeout: flo
 
 def download_batch(manifest_path: Path, output: Path, *, concurrency: int = 3, timeout: float = 20,
                    max_bytes: int = 10 * 1024 * 1024, max_pixels: int = media.MAX_INPUT_PIXELS,
-                   transport=None) -> dict:
+                   transport=None, cache_directory=None) -> dict:
     if not 1 <= concurrency <= 3 or not 0 < timeout <= 120 or not 0 < max_bytes <= 50 * 1024 * 1024 or not 0 < max_pixels <= media.MAX_INPUT_PIXELS:
         raise media.ManifestError("concurrency must be 1..3, timeout 0..120 seconds, bytes <=50MiB, pixels <=40000000")
     manifest_path = media.local_path(str(manifest_path), Path.cwd())
@@ -285,6 +346,8 @@ def download_batch(manifest_path: Path, output: Path, *, concurrency: int = 3, t
     stage = Path(tempfile.mkdtemp(prefix=f".{output.name}.pending-", dir=output.parent))
     (stage / "assets").mkdir()
     transport = transport if transport is not None else UrllibTransport()
+    if cache_directory is not None:
+        transport = PublicImageCache(cache_directory, transport)
     records = [None] * len(manifest["items"])
     blocked_hosts, pending = set(), list(enumerate(manifest["items"]))
     try:
@@ -335,10 +398,11 @@ def download_batch(manifest_path: Path, output: Path, *, concurrency: int = 3, t
         media.write_json(stage / "summary.json", summary)
         fields = ["sequence", *media.MAPPING_FIELDS, *media.MEDIA_STATE_FIELDS, "url", "effective_url", "status", "attempted", "request_count",
                   "http_status", "content_type", "format", "bytes", "width", "height", "local_path", "error_code", "error"]
-        with (stage / "download-index.csv").open("w", encoding="utf-8-sig", newline="") as file:
-            writer = csv.DictWriter(file, fieldnames=fields, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(records)
+        if cache_directory is None:  # Legacy exports remain byte/format compatible.
+            with (stage / "download-index.csv").open("w", encoding="utf-8-sig", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=fields, extrasaction="ignore")
+                writer.writeheader()
+                writer.writerows(records)
         stage.rename(output)
         return summary
     except Exception as exc:

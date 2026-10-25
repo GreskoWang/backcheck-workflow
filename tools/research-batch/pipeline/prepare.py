@@ -15,6 +15,7 @@ import sys
 import time
 from typing import Callable
 from uuid import uuid4
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -27,6 +28,29 @@ _spec = importlib.util.spec_from_file_location("research_batch_coverage", ROOT /
 coverage = importlib.util.module_from_spec(_spec)
 assert _spec and _spec.loader
 _spec.loader.exec_module(coverage)
+_compact_spec = importlib.util.spec_from_file_location("research_compact", HERE / "compact.py")
+compact = importlib.util.module_from_spec(_compact_spec)
+_compact_spec.loader.exec_module(compact)
+
+
+def compact_layout(output: Path, layout: str) -> bool:
+    if layout not in {"auto", "compact", "legacy"}:
+        raise PipelineError("layout_invalid", "Unknown preparation layout")
+    file = output / "state.json"
+    existing = read_json(file) if file.exists() else {}
+    if existing.get("layout") == compact.LAYOUT:
+        if layout == "legacy":
+            raise PipelineError("layout_conflict", "Existing compact checkpoint must not be overwritten")
+        return True
+    if (output / "revisions").exists() or existing:
+        if layout == "compact":
+            raise PipelineError("legacy_checkpoint_preserved", "Resume the original layout; no automatic migration")
+        return False
+    return layout != "legacy"
+
+
+def compact_api():
+    return SimpleNamespace(**globals())
 
 
 class PipelineError(ValueError):
@@ -59,20 +83,13 @@ def safe_reason(value) -> str:
 
 def atomic_json(file: Path, value: object) -> None:
     temporary = file.with_name(f".{file.name}.{os.getpid()}.{uuid4().hex}.tmp")
-    # The temporary name is longer than the final artifact. On Windows it may
-    # cross MAX_PATH even when the destination directory and final file work.
-    def io_path(value: Path) -> str:
-        absolute = str(value.absolute())
-        if os.name != "nt" or absolute.startswith("\\\\?\\"):
-            return absolute
-        return "\\\\?\\UNC\\" + absolute[2:] if absolute.startswith("\\\\") else "\\\\?\\" + absolute
-    with open(io_path(temporary), "xb") as handle:
+    with temporary.open("xb") as handle:
         handle.write(encoded(value))
         handle.flush()
         os.fsync(handle.fileno())
     for attempt in range(8):
         try:
-            os.replace(io_path(temporary), io_path(file))
+            os.replace(temporary, file)
             return
         except PermissionError:
             if attempt == 7:
@@ -428,9 +445,14 @@ def sheet_arguments() -> argparse.Namespace:
 def prepare_result(source: Path, output: Path, *, max_chars: int = 6000, fetch_public: bool = False,
                    resume: bool = False, retry_media: bool = False, concurrency: int = 3,
                    timeout: float = 20, transport=None, render_fn=None, on_event=None,
-                   cancelled: Callable[[], bool] | None = None, _lock_held: bool = False) -> dict:
+                   cancelled: Callable[[], bool] | None = None, _lock_held: bool = False,
+                   layout: str = "legacy") -> dict:
     source = media.local_path(str(source), Path.cwd())
     output = media.local_path(str(output), Path.cwd())
+    if compact_layout(output, layout):
+        return compact.prepare(compact_api(), source, output, max_chars=max_chars, fetch_public=fetch_public,
+            resume=resume, retry_media=retry_media, concurrency=concurrency, timeout=timeout,
+            transport=transport, render_fn=render_fn, on_event=on_event, cancelled=cancelled, _lock_held=_lock_held)
     if type(max_chars) is not int or not 128 <= max_chars <= 45000:
         raise PipelineError("max_chars_invalid", "max-chars must be an integer in 128..45000")
     if retry_media and not fetch_public:
@@ -627,6 +649,10 @@ def watch_job(job_directory: Path, output: Path, *, max_wait: float = 1800, poll
         raise PipelineError("watch_budget_invalid", "max-wait must be 0..14400 seconds and poll-interval 0.05..5")
     job_directory = media.local_path(str(job_directory), Path.cwd())
     output = media.local_path(str(output), Path.cwd())
+    layout = prepare_options.pop("layout", "legacy")
+    if compact_layout(output, layout):
+        return compact.watch(compact_api(), job_directory, output, max_wait=max_wait, poll_interval=poll_interval,
+                             on_event=on_event, cancelled=cancelled, **prepare_options)
     if not job_directory.is_dir():
         raise PipelineError("job_directory_missing", "Collection job directory does not exist")
     output.mkdir(parents=True, exist_ok=True)
@@ -737,21 +763,31 @@ def main(argv=None) -> int:
         prepare.add_argument("--retry-media", action="store_true")
         prepare.add_argument("--concurrency", type=int, default=3)
         prepare.add_argument("--timeout", type=float, default=20)
+        prepare.add_argument("--layout", choices=("auto", "compact", "legacy"), default="auto")
         if name == "watch":
             prepare.add_argument("--max-wait", type=float, default=1800)
             prepare.add_argument("--poll-interval", type=float, default=0.5)
-    for command in ("status", "cancel"):
+    for command in ("status", "cancel", "read", "confirm", "discard-pending"):
         child = sub.add_parser(command)
         child.add_argument("--out", type=Path, required=True)
+        if command == "confirm":
+            child.add_argument("--batch", required=True)
+            child.add_argument("--reviewer", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "cancel":
             result = cancel(args.out)
         elif args.command == "status":
             result = read_json(media.local_path(str(args.out), Path.cwd()) / "state.json")
+        elif args.command == "read":
+            result = compact.read_next(compact_api(), args.out)
+        elif args.command == "confirm":
+            result = compact.confirm(compact_api(), args.out, args.batch, args.reviewer)
+        elif args.command == "discard-pending":
+            result = compact.discard_pending(compact_api(), args.out)
         else:
             kwargs = dict(max_chars=args.max_chars, fetch_public=args.fetch_public, resume=args.resume,
-                          retry_media=args.retry_media, concurrency=args.concurrency, timeout=args.timeout)
+                          retry_media=args.retry_media, concurrency=args.concurrency, timeout=args.timeout, layout=args.layout)
             if args.command == "watch":
                 result = watch_job(args.job_directory, args.out, max_wait=args.max_wait, poll_interval=args.poll_interval,
                     on_event=lambda event: print(json.dumps(event, ensure_ascii=False), flush=True), **kwargs)

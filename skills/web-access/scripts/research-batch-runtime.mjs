@@ -37,6 +37,24 @@ export function replayItems(file) {
   return items;
 }
 
+// New jobs keep one current reading cache. Legacy journals are never migrated.
+export function loadItems(directory, state) {
+  if (state.storage_mode !== 'single_snapshot_v2') return replayItems(path.join(directory, 'items.ndjson'));
+  const file = path.join(directory, 'result.json');
+  if (!fs.existsSync(file)) {
+    if (state.item_count) throw new Error('Reading cache missing; preserve checkpoint');
+    return new Map();
+  }
+  const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (data.job?.id !== state.id || !Array.isArray(data.items)) throw new Error('Reading cache identity mismatch');
+  const items = new Map();
+  for (const item of data.items) {
+    if (typeof item.source_id !== 'string' || items.has(item.source_id)) throw new Error('Invalid reading cache identity');
+    items.set(item.source_id, item);
+  }
+  return items;
+}
+
 function unique(values) { return [...new Set(values.filter(Boolean))]; }
 
 export function normalizeSnapshot(raw, { compatibility = false, sequence = 0 } = {}) {
@@ -144,7 +162,8 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
   wait = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   const journal = path.join(directory, 'items.ndjson');
   const statusFile = path.join(directory, 'job.json');
-  const items = replayItems(journal);
+  const compact = state.storage_mode === 'single_snapshot_v2';
+  const items = loadItems(directory, state);
   const seenSnapshots = new Set([...items.values()].filter(item => item.source_id.startsWith('viewport-')).map(item => item.text));
   let idle = 0;
   let recoveryAttempted = false;
@@ -157,6 +176,9 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
   const checkpoint = () => {
     state.updated_at = new Date(now()).toISOString();
     state.item_count = items.size;
+    // Cache first: a crash may leave the small job checkpoint behind, never
+    // a checkpoint claiming content which has not been persisted.
+    if (compact) saveJson(path.join(directory, 'result.json'), buildResult(state, items));
     saveJson(statusFile, state);
   };
   const stop = (status, reason) => { state.state = status; state.stop_reason = reason; };
@@ -199,7 +221,7 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
         const combined = mergeItem(previous, item);
         if (!previous || JSON.stringify(previous) !== JSON.stringify(combined)) {
           items.set(item.source_id, combined);
-          fs.appendFileSync(journal, JSON.stringify(combined) + '\n', 'utf8');
+          if (!compact) fs.appendFileSync(journal, JSON.stringify(combined) + '\n', 'utf8');
           progress += 1;
         }
       }
@@ -209,7 +231,8 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
       const unboundEmpty = observed.some(item => item.observation_identity === 'unresolved_occurrence'
         && !item.text.trim() && !item.quoted_text.trim());
       if (unboundEmpty) { stop('needs_review', 'unattributed_empty_card'); break; }
-      if (items.size > 100_000 || (fs.existsSync(journal) && fs.statSync(journal).size > 200 * 1024 * 1024)) {
+      const cacheBytes = compact ? Buffer.byteLength(JSON.stringify([...items.values()])) : (fs.existsSync(journal) ? fs.statSync(journal).size : 0);
+      if (items.size > 100_000 || cacheBytes > 200 * 1024 * 1024) {
         stop('needs_review', 'cache_limit'); break;
       }
       idle = progress ? 0 : idle + 1;
@@ -245,7 +268,7 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
     state.error = { code: error.code || error.name || 'collection_error', message: String(error.message || error).slice(0, 500) };
   } finally {
     checkpoint();
-    saveJson(path.join(directory, 'result.json'), buildResult(state, items));
+    if (!compact) saveJson(path.join(directory, 'result.json'), buildResult(state, items));
   }
   return buildResult(state, items);
 }

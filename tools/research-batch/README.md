@@ -4,9 +4,9 @@
 
 默认入口与命令见 [批量阅读说明](../../skills/web-access/references/research-batch.md)。后台 worker 位于 web-access Skill，复用既有 Edge broker 和本任务租约；不另外直连 CDP。
 
-- [coverage](coverage/README.md)：按字符导出全部文字及自动续读映射；校验实际批次确认与覆盖缺口。
+- [coverage](coverage/README.md)：旧格式兼容和显式离线诊断；新普通任务不要求逐项阅读账。
 - [media](media/README.md)：公开图片下载、本地图片分页编图、已有视频快照与时间戳编图。
-- [pipeline](pipeline/README.md)：静默等待本地采集终态，自动接续文字、媒体与审阅待办；保留旧阅读确认和媒体失败。
+- [pipeline](pipeline/README.md)：新任务按需读取正文，用单份状态维护最小断点，复用媒体；旧阅读确认原样兼容。
 - [详情客户端](../../skills/web-access/references/research-detail.md)：核对主体及原帖、读取正文和有限展开；不要求服务重载，未知布局不假通过。
 
 所有入口的 `surface_completion` 均为 false。采集、导出、关键词扫描或编图成功都不证明已阅读，也不能自动生成“无问题”。普通任务不增加逐帖手工台账或取证包。
