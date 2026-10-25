@@ -1,15 +1,5 @@
 # Edge CDP Broker API
 
-## 隔离查询上下文复用
-
-`isolated-context-reuse-v1` 将上下文绑定到 target、session、主 frame 和 loader，每次读取前重新核对 frame tree，导航、脱离和连接丢失立即作废。缺少 loader 身份时不复用。上下文创建预算为 5 秒，`/info`、`/dom/query`、`/research/snapshot` 的请求预算为 10 秒；真实超时仍隔离该 target，不自动重放。健康信息记录超时命令的实际预算和耗时，便于区分连接中断与单页停顿。
-
-连接核心需要受控重载，不能通过研究配方热加载。已知原页在重载后用 [持久客户端原页接管模式](cdp-session.md#受控重载后接回原页面) 恢复租约，保持原 URL、位置和已用恢复计数。浏览器首次创建上下文的实际停顿原因可能仍未知，单页验收不能证明所有站点永久稳定。
-
-## X 原图就绪配方
-
-`POST /research/snapshot` 的固定 `generic-posts` 配方在准确的 X 原图路由返回 `page_state.photo_readiness.version=1`。它检查视口内公开 `pbs.twimg.com/media/` IMG、CSS 背景及对应已存在 IMG 的 complete、自然尺寸和显示尺寸，节点预算为 2000。原图可能在 dialog 外，因此以准确路由和公开视口为边界。此能力属于可热加载配方，未扩展 `/dom/query` 的字段或选择器，也不需要重启 broker。加载/解码状态不能替代截图后的实际视觉审阅，客户端要求两次稳定后截图。
-
 ## 元素文字完整性（2026-10-24）
 
 `/health.capabilities` 含 `element-text-completeness-v1` 时，elements 查询中每个请求了 text 的元素额外返回 `text_truncated`。每项仍最多 1000 字符、200 个文本节点，任何一项截断都会传播到外层 `truncated=true`。这是完整性修复，不是解除大小限制。需全文时先用 elements 定位，再对唯一明确的公开内容节点使用 kind=text，检查其独立截断标记；不得把短卡片摘要当全文。旧运行实例没有该能力时，外层 `truncated=false` 不能证明各元素的文字完整。该变更也适用于已批准的开放 shadow 与同源可见 iframe 中的元素查询。
@@ -32,7 +22,7 @@ $skill = "$env:USERPROFILE\.codex\skills\web-access"
 pwsh -NoProfile -File "$skill\scripts\check-deps.ps1"
 ```
 
-预检会启动或复用隐藏运行的 broker。已运行实例通常在数秒内返回；首次启动需要创建并验证仅当前用户与 SYSTEM 可读的 token 及持久 HMAC key ACL，在内存紧张的 Windows 机器上最慢允许 45 秒，不能因一次性安全初始化较慢误判为启动失败。`cdp_handshake_timeout` 只表示端点已发现但当前握手预算（默认 30 秒）内没有完成连接；只有 Edge 确实显示安全提示时才请用户选择“允许”，否则等待普通可见 Edge 启动完成并只重试一次。若显示 `remote_debugging_unavailable`，先读取默认 Edge `Local State` 的 `devtools.remote_debugging.user-enabled`；值为 `true` 时只等待实时端点就绪，不要求用户切换开关，值不为 `true` 时才导航到 `edge://inspect/#remote-debugging` 启用该选项。不向用户索要端口或 target id。
+预检会启动或复用隐藏运行的 broker。已运行实例通常在数秒内返回；首次启动需要创建并验证仅当前用户与 SYSTEM 可读的 token 及持久 HMAC key ACL，在内存紧张的 Windows 机器上最慢允许 45 秒，不能因一次性安全初始化较慢误判为启动失败。`cdp_handshake_timeout` 只表示端点已发现但当前握手预算（默认 30 秒）内没有完成连接；Edge 确实显示预期安全提示时，按[主 Skill 的 Edge 提示规则](../SKILL.md#cdp-mode)处理：已有明确代点授权且权限范围未扩大时，由代理通过获准的电脑控制工具点击一次“允许”；没有提示时等待普通可见 Edge 启动完成并只重试一次。若显示 `remote_debugging_unavailable`，先读取默认 Edge `Local State` 的 `devtools.remote_debugging.user-enabled`；值为 `true` 时只等待实时端点就绪，不要求用户切换开关，值不为 `true` 时才导航到 `edge://inspect/#remote-debugging` 启用该选项。不向用户索要端口或 target id。
 
 ## 请求包装器
 
@@ -139,7 +129,7 @@ try {
 
 ## 超时与恢复
 
-- 整个 HTTP 请求绝对上限 18 秒；共享连接握手默认 30 秒（`CDP_HANDSHAKE_TIMEOUT_MS`）；元数据命令 2 秒，隔离上下文创建 5 秒，固定 DOM 执行 5 秒，上述三个读取接口总预算 10 秒；导航和截图最多 15 秒。单个请求先返回不取消仍在进行的共享握手，预检显示 connecting 时等待该次连接，不重复发起连接。Broker 不循环重试。
+- 整个 HTTP 请求绝对上限 18 秒；共享连接握手默认 30 秒（`CDP_HANDSHAKE_TIMEOUT_MS`）；元数据 2 秒；固定 DOM 查询 5 秒；导航和截图最多 15 秒。单个请求先返回不取消仍在进行的共享握手，预检显示 connecting 时等待该次连接，不重复发起连接。Broker 不循环重试。
 - `target_detached`、`inspector_detached` 或 session invalid 时，当前命令最多自动 reattach 一次；仍失败就返回结构化错误。
 - 第一次失败后刷新 `/targets`，重新定位页面并只重试一次更小的命令；不要复用页面变化前的 DOM/AX 节点，不要原样连续重试。
 - YouTube、X、Instagram 等重型 SPA 禁止全量 AX tree、全 DOM snapshot、整页 `innerHTML`、`direction=bottom` 或一次大滚动；使用小字段、小批次和增量滚动。
@@ -148,7 +138,7 @@ try {
 
 | 错误码 | 含义 | 处理 |
 | --- | --- | --- |
-| `cdp_handshake_timeout` | Edge 端点已发现，但当前握手预算（默认 30 秒）内未完成连接 | 有实际安全提示时由用户点一次“允许”；否则等待启动完成并只重试一次 |
+| `cdp_handshake_timeout` | Edge 端点已发现，但当前握手预算（默认 30 秒）内未完成连接 | 有实际预期提示时按[主 Skill 的 Edge 提示规则](../SKILL.md#cdp-mode)由已获授权的代理点击一次“允许”；否则等待启动完成并只重试一次 |
 | `remote_debugging_unavailable` | 未发现有效的 Edge `DevToolsActivePort` 与实时监听 | `Local State` 已启用时等待普通可见 Edge 就绪；否则才打开设置页启用 |
 | `edge_profile_in_use` | 同一 Edge 调试实例已有 broker 持有 OS 级互斥锁 | 复用已有 broker；不得换控制面端口启动第二套 lease 域 |
 | `lease_conflict` | target 已由另一条路线占用 | 使用本路线自己的 target；不得抢占 |
@@ -162,14 +152,18 @@ try {
 | `task_page_limit_reached` | 已打开、持有或等待创建的任务页合计达到 5 个 | 既有用户页先 `release`；broker 自建页必须 `finalize` 关闭后才释放额度；仅明确带受控 `openerId` 的派生弹窗由 broker 自动关闭 |
 | `orphan_marker_unresolved` | 上次中断遗留的认证创建标记页尚未确认关闭 | 不另建页；等待 broker 再次清理，或确认该页已由 Edge／用户关闭后重试 |
 | `derived_target_unresolved` | 受控页产生的无 lease 派生页尚未确认关闭 | 不继续新建、租用或点击；等待 broker 重试关闭或确认 target 已消失 |
-| `outcome_unknown` | 点击、滚动或导航可能已生效，但响应丢失 | 不自动重放；先 `/recover` 并核对页面状态 |
-| `cdp_timeout` / `request_timeout` | 命令或整次请求超出短预算 | 刷新 target，缩小命令后重试一次 |
-| `target_quarantined` | 上一条命令超时，当前 session 不再复用 | 调用一次 `/recover`；失败则 checkpoint 或换新 target |
+| `outcome_unknown` | 点击、滚动或导航可能已生效，但响应丢失 | 不自动重放；核对断点中的已用恢复次数，只有尚有额度才允许一次 `/recover` |
+| `cdp_timeout` / `request_timeout` | 命令或整次请求超出短预算 | 保存原 target、URL、位置及失败阶段；恢复额度为 0 时才允许一次缩小恢复，已用 1 次则停止该页操作 |
+| `target_quarantined` | 上一条命令超时，当前 session 不再复用 | 沿用同一故障额度，失败或额度已用完则保留断点，禁止换页、换 owner 或重载归零 |
 | `screenshot_invalid_response` | 客户端未收到格式匹配的PNG/JPEG | 目的文件未改；核对返回内容与target状态，不把旧图当本次截图 |
 | `target_detached` / `inspector_detached` | 会话失效 | Broker 自动 reattach 一次；失败则 checkpoint |
 | `heavy_page_requires_incremental_scroll` | 重页面滚动过大或直达底部 | 改为每次 300—800px |
 | `unsafe_selector` / `invalid_element_fields` | 查询可能探测隐藏值或请求非公开字段 | 改用简单 tag/class/id 选择器、公开存在性属性和字段白名单 |
 | `close_not_allowed` | 尝试关闭用户既有页 | 改用 release |
+
+2026-10-25 修复：当 `/health.capabilities` 包含 `target-quarantine-lifetime-v1` 时，release、租约过期和迟到清理均保留页面隔离，只有显式恢复成功或确认 target 消失才清除。`/targets` 的 `lease=available` 仍只表示没有租约，`quarantined=null` 仍是通用清单的固定脱敏值，不能代替实际页面核验。恢复次数继续沿用任务断点，不能通过换 owner、重新 acquire 或重载归零。真实公共测试页已验证：截图执行中取消请求后，release/acquire 仍拒绝普通读取，一次显式 recover 后原测试页恢复可读和可截图。这不是原历史 X 页的恢复证明。
+
+截图仍使用 15 秒预算，30 秒设置只用于连接握手。新版固定捕获当前视口，CDP 超时、外层请求超时和客户端取消均保留隔离，禁止自动重发。`/health.screenshot` 提供预算以及最近一次截图的状态、耗时、格式、字节数或失败阶段，不含正文或图片数据。`edge_response` 表示截图命令已进入等待 Edge 响应阶段；成功一次不证明旧页面卡顿根因已消除。PNG/JPEG 保存及真实请求取消后的隔离/恢复已现场通过。
 
 ## 安全边界
 
@@ -209,3 +203,13 @@ try {
 示例是本地验收页的组件名称，不是 B站内部选择器。B站应先从公开 DOM 查询发现当前结构，核对作者、正文和展开文字，再定位该楼层；每次展开或续载后重新获取位置。点击仍检查宿主可见性、实际遮挡、租约和弹窗额度，closed 根与不可验证命中一律停止。clicked=true 只表示点击完成，须复读新增回复和截图确认结果。
 
 相关返回原因包括 shadow_host_not_found、shadow_root_unavailable、traversal_limit、text_mismatch、not_visible_or_changed；点击继续通过现有 element_not_found 错误的 reason 字段返回定位原因。
+
+## 隔离查询上下文复用
+
+`isolated-context-reuse-v1` 将上下文绑定到 target、session、主 frame 和 loader，每次读取前重新核对 frame tree，导航、脱离和连接丢失立即作废。缺少 loader 身份时不复用。上下文创建预算为 5 秒，`/info`、`/dom/query`、`/research/snapshot` 的请求预算为 10 秒；真实超时仍隔离该 target，不自动重放。健康信息记录超时命令的实际预算和耗时，便于区分连接中断与单页停顿。
+
+连接核心需要受控重载，不能通过研究配方热加载。已知原页在重载后用 [持久客户端原页接管模式](cdp-session.md#受控重载后接回原页面) 恢复租约，保持原 URL、位置和已用恢复计数。浏览器首次创建上下文的实际停顿原因可能仍未知，单页验收不能证明所有站点永久稳定。
+
+
+### 公开媒体与社区帖定位（2026-10-25）
+公开 URL 登记新增 HTTPS YouTube `/post/Ug…` 内容 ID，以及 `pbs.twimg.com/media/…` 的图片格式和尺寸参数。仅保留已限定的 `format`（jpg/jpeg/png/webp）与 `name`（标准尺寸名或数字尺寸），认证、签名、未知参数和相似伪域名仍按原规则移除。DOM 查询与研究快照使用同一登记规则。本地代理自测已通过；原页重新采集后，实际公开图片 URL 的一次 GET 已成功解码。旧缓存里已被删去的参数不可猜补，需从页面重新取得。此验收不证明 YouTube 页面上的链接已现场复验，也不证明媒体内容已经审阅。

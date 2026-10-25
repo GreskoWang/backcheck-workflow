@@ -27,7 +27,7 @@ function checkNode() {
 function checkMemory() {
   const freeGiB = os.freemem() / 1024 / 1024 / 1024;
   console.log(`memory: ${freeGiB.toFixed(2)} GiB free`);
-  if (freeGiB < 3) console.log('memory: warn — 可用内存低于 3 GiB；不要再启动浏览器控制子线程，完成当前检查后重启 Codex 以清理旧 CUA runtime。');
+  if (freeGiB < 3) console.log('memory: warn — 可用内存低于 3 GiB；减少同时打开的任务页和批量大小，不因内存提示重启共享 Edge、broker 或 Codex。');
 }
 
 function checkPort(port, timeoutMs = 1000) {
@@ -139,6 +139,15 @@ async function ensureProxy() {
   const connection = await verifyConnection();
   if (connection.ok) {
     console.log(`broker: ready (${connection.count} Edge page target(s))`);
+    const sessionClient = path.join(ROOT, 'scripts', 'cdp-session.ps1');
+    const requestClient = path.join(ROOT, 'scripts', 'cdp-request.ps1');
+    if (fs.existsSync(sessionClient) && fs.existsSync(requestClient)) {
+      console.log(`control-entry: PowerShell CDP client available (${sessionClient}); no Computer Use, Browser or Node REPL prerequisite`);
+      console.log('page-read: not_checked — 在本任务租约页用 info 和小范围 query 验证；连接成功不等于已读取页面。');
+    } else {
+      console.log('control-entry: client_files_missing — 补齐本技能的 cdp-session.ps1 / cdp-request.ps1，不能仅凭 broker ready 认定可执行。');
+      return false;
+    }
     return true;
   }
 

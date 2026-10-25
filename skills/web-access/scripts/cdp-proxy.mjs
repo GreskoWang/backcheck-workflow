@@ -37,7 +37,7 @@ const TOKEN_DIR = process.env.CDP_PROXY_TOKEN_DIR
 const TOKEN_FILE = path.join(TOKEN_DIR, `${PORT}.token`);
 const MARKER_KEY_FILE = path.join(TOKEN_DIR, `${PORT}.marker-key`);
 
-const BUDGETS = Object.freeze({ metadata: 2000, context: 5000, read: 10000, dom: 5000, navigation: 15000, screenshot: 15000 });
+const BUDGETS = Object.freeze({ metadata: 2000, context: 5000, read: 15000, dom: 5000, navigation: 15000, screenshot: 15000 });
 const ALLOWED_CDP_METHODS = new Set([
   'Input.dispatchMouseEvent',
   'Browser.getVersion',
@@ -269,7 +269,7 @@ const targetsBySession = new Map();
 const eventWaiters = new Set();
 const contextVersions = new Map();
 const fixedWorlds = createFixedWorldResolver({sendCdp, makeError:(...args) => new BrokerError(...args),
-  metadataTimeoutMs:BUDGETS.metadata, worldTimeoutMs:BUDGETS.context});
+  frameTimeoutMs:BUDGETS.dom, worldTimeoutMs:BUDGETS.context});
 let connectionBaselineTargets = new Set();
 const leases = new Map();
 const managedTabs = new Map();
@@ -877,7 +877,7 @@ async function ensureSession(targetId, deadline) {
     await sendCdp('Page.enable', {}, {
       sessionId: result.sessionId,
       targetId,
-      timeoutMs: BUDGETS.metadata,
+      timeoutMs: BUDGETS.dom,
       deadline,
     });
   } catch (error) {
@@ -962,7 +962,10 @@ function queueForTarget(targetId, deadline, operation) {
         lane.current = null;
         if (targetQueues.get(targetId) === lane) targetQueues.delete(targetId);
       };
-      try { activeTimer = setTimeout(poison, next.deadline.remaining('active target operation') + 250); }
+      // A timed-out renderer request may need up to 700ms to detach its own
+      // session. Do not retire every owner's connection before that bounded
+      // cleanup can finish. 15s operation + 1.5s grace stays inside HTTP's 18s.
+      try { activeTimer = setTimeout(poison, next.deadline.remaining('active target operation') + 1500); }
       catch (error) { next.settled = true; next.reject(error); lane.active = false; lane.current = null; pump(); return; }
       Promise.resolve()
         .then(() => { next.deadline.remaining('target queue'); return next.operation(); })
@@ -997,7 +1000,7 @@ async function quarantineTimedOutTarget(targetId, sessionId, error) {
   if (!expectedLease || destroyedTargets.has(targetId)) {
     if (sessionId) await detachSessionOrRetire(targetId, sessionId, deadlineAfter(1500), 700);
     clearSessionByTarget(targetId, 'target_destroyed_or_unleased', sessionId || null);
-    quarantinedTargets.delete(targetId);
+    if (destroyedTargets.has(targetId)) quarantinedTargets.delete(targetId);
     return;
   }
   quarantinedTargets.set(targetId, {
@@ -1008,7 +1011,7 @@ async function quarantineTimedOutTarget(targetId, sessionId, error) {
   const cleanupDeadline = deadlineAfter(1500);
   if (sessionId) await detachSessionOrRetire(targetId, sessionId, cleanupDeadline, 700);
   clearSessionByTarget(targetId, 'session_quarantined', sessionId || null);
-  if (destroyedTargets.has(targetId) || leases.get(targetId) !== expectedLease) quarantinedTargets.delete(targetId);
+  if (destroyedTargets.has(targetId)) quarantinedTargets.delete(targetId);
 }
 
 async function targetCommandUnlocked(targetId, method, params, { deadline, timeoutMs, retrySession = true, sideEffect = false } = {}) {
@@ -1021,7 +1024,7 @@ async function targetCommandUnlocked(targetId, method, params, { deadline, timeo
       await quarantineTimedOutTarget(targetId, sessionId, error);
       throw new BrokerError('outcome_unknown', `${method} 可能已生效但响应丢失；已隔离 target，禁止自动重放。`, { targetId, method, cause: error?.code || null }, 409);
     }
-    if (error?.code === 'cdp_timeout') {
+    if (['cdp_timeout', 'request_timeout', 'request_aborted'].includes(error?.code)) {
       await quarantineTimedOutTarget(targetId, sessionId, error);
       throw error;
     }
@@ -1035,7 +1038,7 @@ async function targetCommandUnlocked(targetId, method, params, { deadline, timeo
         await quarantineTimedOutTarget(targetId, sessionId, retryError);
         throw new BrokerError('outcome_unknown', `${method} 可能已生效但响应丢失；已隔离 target，禁止自动重放。`, { targetId, method, cause: retryError?.code || null }, 409);
       }
-      if (retryError?.code === 'cdp_timeout') await quarantineTimedOutTarget(targetId, sessionId, retryError);
+      if (['cdp_timeout', 'request_timeout', 'request_aborted'].includes(retryError?.code)) await quarantineTimedOutTarget(targetId, sessionId, retryError);
       throw retryError;
     }
   }
@@ -1237,7 +1240,7 @@ async function sweepOrphanCreationTargets(deadline, limit = 16) {
   if (!isOpen(browserSocket)) return 0;
   const result = await sendCdp('Target.getTargets', {}, { timeoutMs: BUDGETS.metadata, deadline });
   const liveTargetIds = new Set((result.targetInfos || []).map((target) => target?.targetId).filter(Boolean));
-  for (const targetId of new Set([...leases.keys(), ...managedTabs.keys(), ...orphanCreationTargets.keys()])) {
+  for (const targetId of new Set([...leases.keys(), ...managedTabs.keys(), ...orphanCreationTargets.keys(), ...quarantinedTargets.keys()])) {
     if (!liveTargetIds.has(targetId)) forgetDestroyedTargetState(targetId, 'target_destroyed');
   }
   // Reserve every authenticated orphan before the first close await. This
@@ -1480,7 +1483,7 @@ async function cleanupExpiredLeases(parentDeadline, limit = 1) {
         // A broker-created page remains open after lease expiry. Keep its
         // managed record so it still occupies a slot and a caller holding its
         // management capability can reacquire and finalize it later.
-        quarantinedTargets.delete(targetId);
+        // Lease expiry also preserves page failure state.
         contextVersions.delete(targetId);
         stalledTargets.delete(targetId);
         invalidateTargetIdempotency(targetId, { keepManagedNew: true });
@@ -1576,10 +1579,11 @@ function hardenAndVerifyWindowsAcl(filePath, isDirectory, sid) {
     '[pscustomobject]@{Protected=$check.AreAccessRulesProtected;Rules=$rules}|ConvertTo-Json -Compress -Depth 4',
   ].join(';');
   const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
+  const aclCheckStarted = Date.now();
   const result = spawnSync(windowsPowerShellPath(), ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCommand], {
-    encoding: 'utf8', windowsHide: true, timeout: 7000, maxBuffer: 256 * 1024,
+    encoding: 'utf8', windowsHide: true, timeout: 15000, maxBuffer: 256 * 1024,
   });
-  if (result.status !== 0) throw new BrokerError('acl_hardening_failed', String(result.stderr || result.stdout || 'Set-Acl failed').trim());
+  if (result.status !== 0) throw new BrokerError('acl_hardening_failed', String(result.stderr || result.stdout || `ACL verification helper failed after ${Date.now()-aclCheckStarted}ms (error=${result.error?.code || 'none'}, status=${result.status}, signal=${result.signal || 'none'})`).trim());
   let check;
   try { check = JSON.parse(String(result.stdout || '').trim()); } catch { throw new BrokerError('acl_verification_failed', '无法解析 token ACL 验证结果。'); }
   const rules = Array.isArray(check.Rules) ? check.Rules : check.Rules ? [check.Rules] : [];
@@ -1992,8 +1996,13 @@ function fixedOpenShadowClick(spec, activate, shadow) {
 // the ordinary high-entropy filtering below, including every query parameter.
 function registeredPublicPathSegment(parsed, index) {
   if (index < 2 || index > 4) return false;
-  if (parsed.protocol !== 'https:' || parsed.port || !['xiaohongshu.com', 'www.xiaohongshu.com'].includes(parsed.hostname.toLowerCase())) return false;
+  if (parsed.protocol !== 'https:' || parsed.port) return false;
+  const host = parsed.hostname.toLowerCase();
   const parts = parsed.pathname.split('/');
+  if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(host)) {
+    return index === 2 && parts.length === 3 && parts[1] === 'post' && /^Ug[A-Za-z0-9_-]{16,70}$/u.test(parts[2]);
+  }
+  if (!['xiaohongshu.com', 'www.xiaohongshu.com'].includes(host)) return false;
   const publicId = value => /^[a-f0-9]{24}$/iu.test(value || '');
   if (parts.length === 3 && parts[1] === 'explore' && publicId(parts[2])) return index === 2;
   if (parts.length === 4 && parts[1] === 'discovery' && parts[2] === 'item' && publicId(parts[3])) return index === 3;
@@ -2012,6 +2021,12 @@ function registeredPublicQueryKeys(parsed) {
     return new Set(['v', 'list', 'index', 't', 'start', ...(parsed.pathname === '/results' ? ['search_query'] : [])]);
   }
   if (parsed.protocol !== 'https:' || parsed.port) return new Set();
+  if (host === 'pbs.twimg.com' && /^\/media\/[A-Za-z0-9_-]{6,128}(?:\.(?:jpg|jpeg|png|webp))?$/u.test(parsed.pathname)) {
+    const keys = new Set();
+    if (parsed.searchParams.getAll('format').every(value => /^(?:jpg|jpeg|png|webp)$/u.test(value))) keys.add('format');
+    if (parsed.searchParams.getAll('name').every(value => /^(?:thumb|small|medium|large|orig|\d{1,4}x\d{1,4})$/u.test(value))) keys.add('name');
+    return keys;
+  }
   if (host === 'space.bilibili.com' && /^\/\d+\/search(?:\/dynamic)?\/?$/u.test(parsed.pathname)) return new Set(['keyword']);
   if (host === 'music.163.com') {
     if (/^\/(?:artist(?:\/desc|\/album|\/mv)?|song|album|playlist|user\/home)\/?$/u.test(parsed.pathname)) return new Set(['id']);
@@ -2354,7 +2369,8 @@ async function callFixedFunctionUnlocked(targetId, functionDeclaration, args, { 
     try {
       sessionId = await ensureSession(targetId, deadline);
       const executionContextId = await fixedWorlds.resolve(targetId, sessionId, deadline);
-      const protocolTimeout = Math.max(100, Math.min(timeoutMs - 100, deadline.remaining('Runtime.callFunctionOn')));
+      // callFunctionOn has no protocol timeout parameter. The broker deadline
+      // bounds waiting, not remote execution; timeout quarantine must persist.
       return await sendCdp('Runtime.callFunctionOn', {
         functionDeclaration,
         executionContextId,
@@ -2362,7 +2378,6 @@ async function callFixedFunctionUnlocked(targetId, functionDeclaration, args, { 
         returnByValue: true,
         awaitPromise: false,
         userGesture: false,
-        timeout: protocolTimeout,
       }, { sessionId, targetId, timeoutMs, deadline });
     } catch (error) {
       const contextInvalid = error?.code === 'isolated_context_changed' || /Cannot find context|Execution context.*destroyed|Inspected target navigated/iu.test(String(error?.message || ''));
@@ -2396,7 +2411,7 @@ async function pageTargets(deadline) {
   for (const [targetId, destroyedAt] of destroyedTargets) {
     if (Date.now() - destroyedAt > IDEMPOTENCY_TTL_MS) destroyedTargets.delete(targetId);
   }
-  for (const targetId of new Set([...leases.keys(), ...managedTabs.keys(), ...orphanCreationTargets.keys()])) {
+  for (const targetId of new Set([...leases.keys(), ...managedTabs.keys(), ...orphanCreationTargets.keys(), ...quarantinedTargets.keys()])) {
     if (!liveTargetIds.has(targetId)) forgetDestroyedTargetState(targetId, 'target_destroyed');
   }
   // Target.getTargets may expose a child before the asynchronous
@@ -2614,7 +2629,7 @@ async function initializePendingNewTarget({ key, owner, requestId, fingerprint, 
     storeIdempotency(key, { operation: 'new', fingerprint, status: 'pending', markerUrl, targetId });
 
     if (liveTarget.url === markerUrl) {
-      await targetCommandUnlocked(targetId, 'Page.enable', {}, { deadline, timeoutMs: BUDGETS.metadata });
+      await targetCommandUnlocked(targetId, 'Page.enable', {}, { deadline, timeoutMs: BUDGETS.dom });
       // A lease is never exposed while this authenticated marker remains in
       // the address bar. This applies to about:blank destinations as well.
       await targetCommandUnlocked(targetId, 'Page.navigate', { url: targetUrl }, {
@@ -2734,7 +2749,9 @@ async function releaseTargetUnlocked(targetId, owner, leaseToken, deadline) {
   if (sessionId) await detachSessionOrRetire(targetId, sessionId, deadline, 1000);
   clearSessionByTarget(targetId, 'lease_released');
   leases.delete(targetId);
-  quarantinedTargets.delete(targetId);
+  // Releasing ownership does not prove the timed-out page recovered.
+  // Keep its quarantine across reacquisition; only explicit successful
+  // recovery or confirmed target destruction may clear it.
   stalledTargets.delete(targetId);
   invalidateTargetIdempotency(targetId, { keepManagedNew: true });
 }
@@ -2796,7 +2813,7 @@ async function recoverTargetUnlocked(targetId, owner, leaseToken, deadline) {
   }
   const result = await callFixedFunctionUnlocked(targetId, 'function(){return {title:String(document.title||\"\").slice(0,1000),ready:document.readyState}}', [], {
     deadline,
-    timeoutMs: BUDGETS.metadata,
+    timeoutMs: BUDGETS.dom,
   });
   quarantinedTargets.delete(targetId);
   return result.result?.value ?? null;
@@ -2804,9 +2821,41 @@ async function recoverTargetUnlocked(targetId, owner, leaseToken, deadline) {
 
 function routeBudget(pathname) {
   if (['/info', '/dom/query', '/research/snapshot'].includes(pathname)) return BUDGETS.read;
-  if (['/targets', '/activate', '/acquire', '/release'].includes(pathname)) return BUDGETS.metadata;
+  if (pathname === '/activate') return BUDGETS.dom;
+  if (['/targets', '/acquire', '/release'].includes(pathname)) return BUDGETS.metadata;
   if (['/new', '/navigate', '/back', '/screenshot', '/close', '/finalize', '/recover'].includes(pathname)) return BUDGETS.navigation;
   return BUDGETS.dom;
+}
+
+// Content-free timing distinguishes queue/attachment failures from a sent
+// screenshot awaiting Edge. A deadline only stops our wait, not remote work.
+let lastScreenshot = null;
+async function captureScreenshotUnlocked(targetId, format, deadline) {
+  const attempt = { targetId, format, startedAt: new Date().toISOString(), status: 'running', stage: 'capture', elapsedMs: 0 };
+  lastScreenshot = attempt;
+  const started = Date.now();
+  try {
+    const result = await targetCommandUnlocked(targetId, 'Page.captureScreenshot', {
+      format,
+      ...(format === 'jpeg' ? { quality: 80 } : {}),
+      fromSurface: true,
+      captureBeyondViewport: false,
+      optimizeForSpeed: true,
+    }, { deadline, timeoutMs: BUDGETS.screenshot });
+    const bytes = Buffer.from(result.data || '', 'base64');
+    if (!bytes.length) throw new BrokerError('screenshot_failed', 'Edge 未返回截图数据。', { targetId }, 502);
+    attempt.status = 'complete';
+    attempt.byteLength = bytes.length;
+    return bytes;
+  } catch (error) {
+    attempt.status = 'failed';
+    attempt.errorCode = error?.code || 'screenshot_failed';
+    attempt.stage = error?.details?.method === 'Page.captureScreenshot' ? 'edge_response' : 'capture_or_attach';
+    attempt.quarantined = quarantinedTargets.has(targetId);
+    throw error;
+  } finally {
+    attempt.elapsedMs = Date.now() - started;
+  }
 }
 
 async function handleHttpRequest(request, response) {
@@ -2845,8 +2894,9 @@ async function handleHttpRequest(request, response) {
     if (pathname === '/health') {
       ok(response, {
         service: SERVICE_NAME,
-        capabilities: ['isolated-context-reuse-v1', 'research-recipe-reload-v1', 'bilibili-body-container-v3', 'bilibili-attribution-v2', 'research-dom-window-v2', 'element-text-completeness-v1', 'visible-same-origin-frame-v1', 'scroll-selector-v1', 'iframe-center-wheel-v1', 'click-popup-urls-v1', 'leased-page-activate-v1', 'visible-open-shadow-v1', 'public-xhs-route-ids-v1', 'public-route-query-ids-v1', 'research-dom-snapshot-v1'],
+        capabilities: ['target-quarantine-lifetime-v1', 'renderer-read-budget-v2', 'isolated-context-reuse-v1', 'research-recipe-reload-v1', 'bilibili-body-container-v3', 'bilibili-attribution-v2', 'research-dom-window-v2', 'element-text-completeness-v1', 'visible-same-origin-frame-v1', 'scroll-selector-v1', 'iframe-center-wheel-v1', 'click-popup-urls-v1', 'leased-page-activate-v1', 'visible-open-shadow-v1', 'public-xhs-route-ids-v1', 'public-route-query-ids-v1', 'research-dom-snapshot-v1'],
         connection: { state: connectionState, approvalRequired: lastConnectError?.code === 'approval_required', lastErrorCode: lastConnectError?.code || null, lastCommandTimeout:lastCdpTimeout },
+        screenshot: { timeoutMs: BUDGETS.screenshot, last: lastScreenshot },
         leases: leases.size,
         sessions: sessions.size,
         taskPages: { active: activeTaskPageCount(), limit: MAX_ACTIVE_TASK_PAGES },
@@ -3095,7 +3145,7 @@ async function handleHttpRequest(request, response) {
     const leaseToken = requestLeaseToken(request);
     if (pathname === '/activate' && request.method === 'POST') {
       await withTargetLease(targetId, owner, leaseToken, deadline, () => targetCommandUnlocked(
-        targetId, 'Page.bringToFront', {}, { deadline, timeoutMs: BUDGETS.metadata, retrySession: false, sideEffect: true },
+        targetId, 'Page.bringToFront', {}, { deadline, timeoutMs: BUDGETS.dom, retrySession: false, sideEffect: true },
       ));
       ok(response, { targetId, activated: true });
       return;
@@ -3105,7 +3155,7 @@ async function handleHttpRequest(request, response) {
       try { destination = new URL(query.url); } catch { throw new BrokerError('invalid_url', 'navigate 需要有效 URL。', undefined, 400); }
       if (!['http:', 'https:'].includes(destination.protocol)) throw new BrokerError('invalid_url_scheme', 'navigate 只允许 http 或 https URL。', undefined, 400);
       const result = await withTargetLease(targetId, owner, leaseToken, deadline, async () => {
-        await targetCommandUnlocked(targetId, 'Page.enable', {}, { deadline, timeoutMs: BUDGETS.metadata });
+        await targetCommandUnlocked(targetId, 'Page.enable', {}, { deadline, timeoutMs: BUDGETS.dom });
         const navigation = await targetCommandUnlocked(targetId, 'Page.navigate', { url: destination.toString() }, { deadline, timeoutMs: BUDGETS.navigation, retrySession: false, sideEffect: true });
         await sleep(Math.min(350, deadline.remaining('navigation settle')));
         contextVersions.set(targetId, (contextVersions.get(targetId) || 0) + 1);
@@ -3123,7 +3173,7 @@ async function handleHttpRequest(request, response) {
       return;
     }
     if (pathname === '/info' && request.method === 'GET') {
-      const result = await withTargetLease(targetId, owner, leaseToken, deadline, () => callFixedFunctionUnlocked(targetId, DOM_QUERY_FUNCTION, [{ kind: 'document' }], { deadline, timeoutMs: BUDGETS.metadata }));
+      const result = await withTargetLease(targetId, owner, leaseToken, deadline, () => callFixedFunctionUnlocked(targetId, DOM_QUERY_FUNCTION, [{ kind: 'document' }], { deadline, timeoutMs: BUDGETS.dom }));
       ok(response, { targetId, page: result.result?.value ?? null, contextVersion: contextVersions.get(targetId) || 0 });
       return;
     }
@@ -3179,7 +3229,7 @@ async function handleHttpRequest(request, response) {
             if (!['http:', 'https:'].includes(destination.protocol) || destination.username || destination.password) {
               throw new BrokerError('invalid_url_scheme', '点击仅能在当前页跟随普通HTTP(S)链接。', { targetId }, 400);
             }
-            await targetCommandUnlocked(targetId, 'Page.enable', {}, { deadline, timeoutMs: BUDGETS.metadata });
+            await targetCommandUnlocked(targetId, 'Page.enable', {}, { deadline, timeoutMs: BUDGETS.dom });
             await targetCommandUnlocked(targetId, 'Page.navigate', { url: destination.toString() }, { deadline, timeoutMs: BUDGETS.navigation, retrySession: false, sideEffect: true });
             contextVersions.set(targetId, (contextVersions.get(targetId) || 0) + 1);
           } else if (pathname === '/clickAt') {
@@ -3212,14 +3262,7 @@ async function handleHttpRequest(request, response) {
     }
     if (pathname === '/screenshot' && request.method === 'GET') {
       if (query.file) throw new BrokerError('server_file_output_removed', '服务端 file 写入已移除；请由客户端使用 -OutFile 保存响应。', undefined, 410);
-      const result = await withTargetLease(targetId, owner, leaseToken, deadline, () => targetCommandUnlocked(targetId, 'Page.captureScreenshot', {
-          format: query.format === 'jpeg' ? 'jpeg' : 'png',
-          ...(query.format === 'jpeg' ? { quality: 80 } : {}),
-          fromSurface: true,
-          optimizeForSpeed: true,
-        }, { deadline, timeoutMs: BUDGETS.screenshot }));
-      const bytes = Buffer.from(result.data || '', 'base64');
-      if (!bytes.length) throw new BrokerError('screenshot_failed', 'Edge 未返回截图数据。', { targetId }, 502);
+      const bytes = await withTargetLease(targetId, owner, leaseToken, deadline, () => captureScreenshotUnlocked(targetId, query.format === 'jpeg' ? 'jpeg' : 'png', deadline));
       response.statusCode = 200;
       response.setHeader('Content-Type', query.format === 'jpeg' ? 'image/jpeg' : 'image/png');
       response.setHeader('Cache-Control', 'no-store');

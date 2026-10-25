@@ -14,8 +14,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 8339,
-      "sha256": "b110884bb9f56a21248765508031bef01266944b014f107c045b35835687befe"
+      "bytes": 10167,
+      "sha256": "49d3d82714bdbb86d6c16f417ff3628ee91e250a7e231bdb23420f289399e34c"
     },
     {
       "path": "README.md",
@@ -76,6 +76,11 @@
       "path": "docs/validation/2026-10-25-compact-reading.md",
       "bytes": 1861,
       "sha256": "7255e561eab4a54e4615842d88007076cde964734ffe77b4e147f0077bd40393"
+    },
+    {
+      "path": "docs/validation/2026-10-26-browser-routing.md",
+      "bytes": 1912,
+      "sha256": "777ba979e20e5fc717c67b00ada8042a99ee8df1a5449c2f1e78199830cd2c1c"
     },
     {
       "path": "external/feishu-mcp/.gitignore",
@@ -204,8 +209,8 @@
     },
     {
       "path": "skills/background-check-research/SKILL.md",
-      "bytes": 31066,
-      "sha256": "4017a0a69067bd2d22b7bc6ca5792bd76bca4f677ca1be59d9079d67bd8c845f"
+      "bytes": 31550,
+      "sha256": "34fe7fbea4e9fd5a7c5b57d356830366dd2ab58d017d1972d27026cfb6379f6f"
     },
     {
       "path": "skills/background-check-research/agents/openai.yaml",
@@ -214,8 +219,8 @@
     },
     {
       "path": "skills/background-check-research/references/access-policy.md",
-      "bytes": 10920,
-      "sha256": "f15c6b1b9800c2ff335ec1eeb53632f3092332496f43bc7aa2f60e112db8b4a9"
+      "bytes": 11682,
+      "sha256": "a51618fde2fd519a0da634855660a149161dce55bce5f97a71ad48d25c99554f"
     },
     {
       "path": "skills/background-check-research/references/maigret.md",
@@ -419,8 +424,8 @@
     },
     {
       "path": "skills/web-access/SKILL.md",
-      "bytes": 18143,
-      "sha256": "db7dcdb28b82c65e02f697dd4385dff6ffbe49fe65c80141242e774f12806628"
+      "bytes": 19267,
+      "sha256": "3da25d3a361c5f048368dc3891a79fdb29edb117ce3daf5d29c72ba4fa90066a"
     },
     {
       "path": "skills/web-access/agents/openai.yaml",
@@ -429,8 +434,8 @@
     },
     {
       "path": "skills/web-access/references/cdp-api.md",
-      "bytes": 31512,
-      "sha256": "2565c62577fb26068352014c60ea71c95f2dc8de0a82bf4d768b276811092ada"
+      "bytes": 33368,
+      "sha256": "eee57742ad5cdc46c1fc7d33a05fcc29e2820c79cd28277f55a34ac3259da358"
     },
     {
       "path": "skills/web-access/references/cdp-session.md",
@@ -489,8 +494,8 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-integration-selftest.mjs",
-      "bytes": 130843,
-      "sha256": "6cf8e03846bb3f61b6f881018078207eb707f6ba29948ebb0c7b8b89c1f49a1b"
+      "bytes": 133710,
+      "sha256": "33197789658f3d7d8923db8f1bcd4e06171e2defd0ca41dbdbf231c9df62249e"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-selftest.mjs",
@@ -499,8 +504,8 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy.mjs",
-      "bytes": 170979,
-      "sha256": "3d47994957ffccc2ee6ccd4a85ffee68e57a9de34ef881d83eae93e6b9a363d1"
+      "bytes": 173565,
+      "sha256": "eafcbb8992f6684f15f38ec3cf2d617b81e81320b7868f6db9e7116310b6834d"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy.ps1",
@@ -554,8 +559,8 @@
     },
     {
       "path": "skills/web-access/scripts/check-deps.mjs",
-      "bytes": 8605,
-      "sha256": "12232c48bac4942aea560b54a65614d43fec54bdcd23d69c0f1a96b4b7bab4fb"
+      "bytes": 9322,
+      "sha256": "3ddc3b760b2c59bcf59d5cce6c0c033f58520f18365ee149d3e64833a45bbedd"
     },
     {
       "path": "skills/web-access/scripts/check-deps.ps1",
@@ -596,6 +601,11 @@
       "path": "skills/web-access/scripts/match-site.ps1",
       "bytes": 234,
       "sha256": "a1b5d82b221b4768c62e36906b9bcf40e3bb963415e1b8f0a8eb35ed546ef949"
+    },
+    {
+      "path": "skills/web-access/scripts/quarantine-lifetime-selftest.mjs",
+      "bytes": 6455,
+      "sha256": "f48667e4772461791f00a80a6b09b0fc39ba633f20c0853542b542a04c87d21d"
     },
     {
       "path": "skills/web-access/scripts/research-batch-runtime.mjs",
@@ -646,6 +656,11 @@
       "path": "skills/web-access/scripts/run-node.ps1",
       "bytes": 1223,
       "sha256": "d80bb9a678b61e61330615c4d03e6d3039a23cad06e1eefd7e61d6920eb70809"
+    },
+    {
+      "path": "skills/web-access/scripts/screenshot-lifecycle-selftest.mjs",
+      "bytes": 3807,
+      "sha256": "8dc9fa9384310fdfbefb9927c1dc44d816ab17352f09fe22a5e388944f738cce"
     },
     {
       "path": "skills/web-access/scripts/sqlite-query.py",

@@ -60,6 +60,10 @@ and fall back to a working `node` on PATH. This avoids the WindowsApps `node.exe
 
 ## CDP Mode
 
+普通背调、特殊背调和专项网页调查默认使用本节 CDP 入口，不先调用 Windows Computer Use／CUA 做网址或窗口健康检查。`scripts/cdp-session.ps1` 由获准的 PowerShell shell 运行，不依赖 Computer Use、Browser 或 Node REPL 是否列在 `ALL_TOOLS` 中。预检成功后，在自己持有租约的页面验证真实 URL 和小范围正文，再进行页面操作。原生控制器未修复不构成 CDP 调查或 Goal 的前置阻塞。
+
+把故障限定在实际失败的控制器、页面或材料，不把单条路线的失败计数直接当作整个 Goal 的阻塞计数。仍有可读材料、其他获准来源或交付工作时继续推进。明确的安全/权限拒绝必须遵守其停止范围，不能以另一入口重试被拒绝动作；此时只推进不涉及该拒绝的独立工作。保留真实缺口，所有剩余工作确实无法推进时才按 Goal 规则判定 blocked。
+
 On Windows, prefer the user's visible, persistent Microsoft Edge profile and the single local CDP broker. Do not use Codex in-app/IAB, hosted, headless, or temporary browser profiles as a substitute for logged-in platform work. Before browser control, run:
 
 ```powershell

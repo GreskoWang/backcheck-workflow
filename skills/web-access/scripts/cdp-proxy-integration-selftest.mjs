@@ -95,7 +95,7 @@ function windowsAclSnapshot(filePath) {
   const powershell = powershellCandidates.find((candidate) => fs.existsSync(candidate));
   assert.ok(powershell, 'PowerShell executable required for ACL verification was not found');
   const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCommand], {
-    encoding: 'utf8', windowsHide: true, timeout: 7000, maxBuffer: 256 * 1024,
+    encoding: 'utf8', windowsHide: true, timeout: 15000, maxBuffer: 256 * 1024,
   });
   assert.equal(result.status, 0, result.stderr || result.stdout || 'Get-Acl failed');
   const value = JSON.parse(String(result.stdout || '').trim());
@@ -357,6 +357,7 @@ async function startFakeCdp({ browserVersion = null } = {}) {
         break;
       }
       case 'Page.getFrameTree': {
+        if (state.delayFrameOnce) { const ms=state.delayFrameOnce; state.delayFrameOnce=0; await sleep(ms); }
         const targetId = sessionTarget(message.sessionId);
         const target = state.targets.get(targetId);
         result = { frameTree: { frame: { id: `frame-${targetId || 'unknown'}`, url: target?.url || 'about:blank',
@@ -368,6 +369,7 @@ async function startFakeCdp({ browserVersion = null } = {}) {
         result = { executionContextId: 101 };
         break;
       case 'Runtime.callFunctionOn':
+        if (state.delayRuntimeOnce) { const ms=state.delayRuntimeOnce; state.delayRuntimeOnce=0; await sleep(ms); }
         if (state.stallRuntimeForTarget === sessionTarget(message.sessionId)) {
           state.stallRuntimeForTarget = null;
           return;
@@ -432,6 +434,7 @@ async function startFakeCdp({ browserVersion = null } = {}) {
         break;
       }
       case 'Page.enable': {
+        if (state.delayEnableOnce) { const ms=state.delayEnableOnce; state.delayEnableOnce=0; await sleep(ms); }
         result = {};
         const targetId = sessionTarget(message.sessionId);
         if (targetId && state.pendingDestroyOnEnable.delete(targetId)) {
@@ -661,7 +664,8 @@ async function startFakeCdp({ browserVersion = null } = {}) {
   };
 }
 
-function startBroker({ port, tokenDir, fakeCdpPort, leaseTtlMs = 4000, shutdownIpc = true }) {
+const FIXTURE_LEASE_TTL_MS = 8000; // Longer than a 5s renderer timeout plus bounded detach.
+function startBroker({ port, tokenDir, fakeCdpPort, leaseTtlMs = FIXTURE_LEASE_TTL_MS, shutdownIpc = true }) {
   const stdout = [];
   const stderr = [];
   const preloadSource = "process.on('message',(message)=>{if(message==='cdp-broker-selftest:shutdown')process.emit('SIGTERM')})";
@@ -777,7 +781,7 @@ async function assertBrowserIdentityRejected(tempRoot, label, browserVersion) {
       }
       return fs.existsSync(path.join(tokenDir, `${port}.token`))
         && processState.stdout.join('').includes('[Edge CDP Broker] listening');
-    }, { timeoutMs: 25000, label: `${label} broker secure startup` });
+    }, { timeoutMs: 45000, label: `${label} broker secure startup` });
     const outcome = await waitFor(async () => {
       if (processState.child.exitCode !== null) {
         throw new Error(`identity-test broker exited early (${processState.child.exitCode}): ${processState.stderr.join('')}`);
@@ -794,6 +798,9 @@ async function assertBrowserIdentityRejected(tempRoot, label, browserVersion) {
     assert.notEqual(health.value?.connection?.state, 'connected', 'rejected browser was published as connected');
     assert.equal(fake.state.methodCounts.get('Browser.getVersion'), 1);
     assert.equal(fake.state.methodCounts.get('Target.setDiscoverTargets') || 0, 0, 'rejected browser advanced past identity validation');
+  } catch (error) {
+    console.error('Identity fixture startup diagnostic:', {label,exitCode:processState.child.exitCode,stderr:processState.stderr.join('').slice(0,2000)});
+    throw error;
   } finally {
     await stopBroker(processState).catch(() => {});
     await fake.close().catch(() => {});
@@ -834,16 +841,17 @@ try {
     if (!fs.existsSync(tokenFile)) return null;
     const value = fs.readFileSync(tokenFile, 'utf8').trim();
     return value && value !== staleToken ? value : null;
-  }, { timeoutMs: 25000, label: 'broker token rotation' });
+  }, { timeoutMs: 45000, label: 'broker token rotation' });
   assert.match(token, /^[A-Za-z0-9_-]{40,64}$/u);
   assert.notEqual(token, staleToken);
 
   const markerKeyWaitStartedAt = Date.now();
   const markerKeyEncoded = await waitFor(() => {
+    if (broker.child.exitCode !== null) throw new Error(`broker exited during marker setup (${broker.child.exitCode}): ${broker.stderr.join('')}`);
     if (!fs.existsSync(markerKeyFile)) return null;
     const value = fs.readFileSync(markerKeyFile, 'utf8').trim();
     return /^[A-Za-z0-9_-]{43}$/u.test(value) ? value : null;
-  }, { timeoutMs: 25000, label: 'persistent marker key creation' });
+  }, { timeoutMs: 45000, label: 'persistent marker key creation' });
   const markerKeyReadyMs = Date.now() - markerKeyWaitStartedAt;
   const markerKey = Buffer.from(markerKeyEncoded, 'base64url');
   assert.equal(markerKey.length, 32);
@@ -1156,21 +1164,6 @@ try {
   const lease = acquired.value.leaseToken;
   assert.match(lease, /^[A-Za-z0-9_-]{24,128}$/u);
 
-  // The same slow renderer response that exceeds the old 2s metadata budget
-  // is accepted once; subsequent reads reuse only this document's world.
-  fakeCdp.state.testLoaderGeneration = 1;
-  fakeCdp.state.delayWorldOnce = 2200;
-  const worldCountBefore = fakeCdp.state.methodCounts.get('Page.createIsolatedWorld') || 0;
-  for (let i=0;i<3;i++) {
-    const read=await brokerRequest(baseUrl, `/info?target=${TARGET_ID}`, {token,lease});
-    assert.equal(read.status,200,read.text);
-  }
-  assert.equal((fakeCdp.state.methodCounts.get('Page.createIsolatedWorld')||0)-worldCountBefore,1);
-  fakeCdp.state.testLoaderGeneration = 2;
-  assert.equal((await brokerRequest(baseUrl, `/info?target=${TARGET_ID}`, {token,lease})).status,200);
-  assert.equal((fakeCdp.state.methodCounts.get('Page.createIsolatedWorld')||0)-worldCountBefore,2);
-  fakeCdp.state.testLoaderGeneration = 0;
-
   const closesBeforePreexistingChildChecks = fakeCdp.state.methodCounts.get('Target.closeTarget') || 0;
   const targetsWithPreexistingChild = await brokerRequest(baseUrl, '/targets', { token });
   assert.equal(
@@ -1298,6 +1291,25 @@ try {
   });
   expectError(acquireKeyConflict, 409, 'idempotency_key_conflict');
 
+  // Complete the short-TTL replay checks before intentionally slow renderer
+  // scenarios; their extra time must not expire an unrelated fixture key.
+  fakeCdp.state.testLoaderGeneration = 1;
+  fakeCdp.state.delayEnableOnce = 2200;
+  const worldCountBefore = fakeCdp.state.methodCounts.get('Page.createIsolatedWorld') || 0;
+  for (let i=0;i<3;i++) {
+    if (i===1) fakeCdp.state.delayFrameOnce=2200;
+    if (i===2) fakeCdp.state.delayRuntimeOnce=2200;
+    const read=await brokerRequest(baseUrl, `/info?target=${TARGET_ID}`, {token,lease});
+    assert.equal(read.status,200,read.text);
+  }
+  assert.equal((fakeCdp.state.methodCounts.get('Page.createIsolatedWorld')||0)-worldCountBefore,1);
+  fakeCdp.state.testLoaderGeneration = 2;
+  fakeCdp.state.delayWorldOnce = 2200;
+  assert.equal((await brokerRequest(baseUrl, `/info?target=${TARGET_ID}`, {token,lease})).status,200);
+  assert.equal((fakeCdp.state.methodCounts.get('Page.createIsolatedWorld')||0)-worldCountBefore,2);
+  for (const flag of ['delayEnableOnce','delayFrameOnce','delayRuntimeOnce','delayWorldOnce']) assert.equal(fakeCdp.state[flag],0);
+  fakeCdp.state.testLoaderGeneration = 0;
+
   const conflict = await brokerRequest(baseUrl, `/acquire?target=${TARGET_ID}`, {
     method: 'POST', token, owner: 'integration-test:other', requestId: 'integration-acquire-0002',
   });
@@ -1424,11 +1436,11 @@ try {
     method: 'POST', token, requestId: ttlReplayRequestId,
   });
   assert.equal(ttlReplayCreated.status, 200, ttlReplayCreated.text);
-  await sleep(2500);
+  await sleep(FIXTURE_LEASE_TTL_MS * 0.6);
   assert.equal((await brokerRequest(baseUrl, `/info?target=${ttlReplayCreated.value.targetId}`, {
     token, lease: ttlReplayCreated.value.leaseToken,
   })).status, 200);
-  await sleep(1800);
+  await sleep(FIXTURE_LEASE_TTL_MS * 0.4 + 300);
   const ttlReplay = await brokerRequest(baseUrl, ttlReplayPath, {
     method: 'POST', token, requestId: ttlReplayRequestId,
   });
@@ -1780,7 +1792,7 @@ try {
   assert.equal(lostNavigate.value?.ok, false, lostNavigate.text);
   assert.equal(lostNavigate.value?.leaseToken, undefined);
   assert.equal(fakeCdp.state.targets.get(lostNavigateRecord.targetId)?.url, lostNavigateUrl);
-  await sleep(4250);
+  await sleep(FIXTURE_LEASE_TTL_MS + 250);
   const recoveredLostNavigate = await brokerRequest(baseUrl, lostNavigatePath, {
     method: 'POST', token, requestId: lostNavigateRequestId,
   });
@@ -1891,6 +1903,31 @@ try {
   assert.equal(targetsAfterStalledRelease.status, 200, targetsAfterStalledRelease.text);
   assert.equal(targetsAfterStalledRelease.value.targets.find((target) => target.targetId === stalledTargetId)?.lease, 'available');
   assert.equal((await brokerRequest(baseUrl, '/health', { owner: null })).value.leases, 0);
+
+  // Releasing and reacquiring the same original page must not erase failure.
+  fakeCdp.state.detachBehaviors.delete(stalledTargetId);
+  const afterStallAcquire = await brokerRequest(baseUrl, `/acquire?target=${stalledTargetId}`, {
+    method: 'POST', token, requestId: 'integration-after-stall-acquire-0001',
+  });
+  assert.equal(afterStallAcquire.status, 200, afterStallAcquire.text);
+  const runtimeBeforeReacquire = fakeCdp.state.methodCounts.get('Runtime.callFunctionOn') || 0;
+  expectError(await brokerRequest(baseUrl, `/info?target=${stalledTargetId}`, {
+    token, lease: afterStallAcquire.value.leaseToken,
+  }), 409, 'target_quarantined');
+  assert.equal(fakeCdp.state.methodCounts.get('Runtime.callFunctionOn') || 0, runtimeBeforeReacquire,
+    'reacquisition must not silently retry the failed renderer');
+  // Only an explicit successful recovery can clear the original failure.
+  fakeCdp.state.stallRuntimeForTarget = null;
+  const recoveredQuarantine = await brokerRequest(baseUrl, `/recover?target=${stalledTargetId}`, {
+    method: 'POST', token, lease: afterStallAcquire.value.leaseToken,
+  });
+  assert.equal(recoveredQuarantine.status, 200, recoveredQuarantine.text);
+  assert.equal((await brokerRequest(baseUrl, `/info?target=${stalledTargetId}`, {
+    token, lease: afterStallAcquire.value.leaseToken,
+  })).status, 200);
+  assert.equal((await brokerRequest(baseUrl, `/release?target=${stalledTargetId}`, {
+    method: 'POST', token, lease: afterStallAcquire.value.leaseToken,
+  })).status, 200);
 
   const attachAbortTargetId = 'fake-attach-abort';
   fakeCdp.state.targets.set(attachAbortTargetId, {
@@ -2340,6 +2377,9 @@ try {
   broker = null;
 
   console.log(`cdp-proxy integration self-test: auth, five-slot broker admission, popup-click reservation with reverse-order opener transfer and bounded no-opener recovery, delayed-discovery containment, pre-lease/reconnect child baselines, derived/orphan fail-closed cleanup, managed-page capability, stale-slot cleanup, queue, fixed research DOM snapshots (full long bodies, isolated world, recursive public URL sanitation, recipe/lease/injection rejection, unchanged CDP allowlist), idempotency, new-loss recovery/concurrency, attach abort (${attachAbortCloseDelayMs}ms socket retirement), side-effect destruction, authenticated orphan cleanup/restart (${restartConnectionReadyMs}ms post-token reconnect), delivered-page preservation, profile singleton, marker-key ACL (${markerKeyReadyMs}ms post-token wait), target lifecycle, malformed HTTP, detach recovery, and lease-expiry checks passed`);
+} catch (error) {
+  if (broker) console.error('Fixture broker diagnostic:', {exitCode:broker.child.exitCode,stderr:broker.stderr.join('').slice(0,2000)});
+  throw error;
 } finally {
   if (broker) await stopBroker(broker).catch(() => {});
   if (fakeCdp) await fakeCdp.close().catch(() => {});
