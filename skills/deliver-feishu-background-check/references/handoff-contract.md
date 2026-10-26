@@ -1,5 +1,7 @@
 # Research Handoff Contract
 
+路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
+
 > **版本路由：本文件是旧 `schema 1.10` 的 `exhaustive_audit` 严格契约。默认三小时定向模式使用 `schema 1.11 + research_profile: three_hour_targeted_v1`，必须改读 [三小时定向交接契约](handoff-targeted-contract.md)。两套完成语义不得混用。**
 
 > 以下调查通道规则只描述旧 `exhaustive_audit`：网页使用带持久用户配置与登录态的真实、可见、可交互桌面浏览器 UI；十四个平台桶均须至少有一条完成的真实桌面浏览器 UI 必访路线。默认由执行者自主启动或选择 Microsoft Edge、创建任务页并导航，不要求用户预开 Edge、指定页签或提供 endpoint／target；用户明确指定或已确认另一系统桌面浏览器具备所需持久配置／登录态时可以使用，Chrome 不按名称禁用。Codex 内置／in-app／`iab`／临时 hosted／headless 浏览器不能承担这些路线。新研究包优先写 `tool_kind: browser_ui`；旧值 `microsoft_edge_visible` 继续兼容。公开 API／获授权导出可独立完成其许可范围内具体 surface 的穷尽证据，不要求用浏览器重复同一 surface 的逐项遍历，但不能替代平台桶的桌面浏览器 UI 必访。下文保留的 `edge_*` 字段、`max_task_open_edge_pages`、`edge-route-evidence-1.2` 和 `network-preflight-1.4` 名称均为 schema 1.10 兼容字段名，语义适用于实际使用的合格持久桌面浏览器；API／导出使用各自的来源、分页终点及逐项复核证据。定向模式的详细范围与登录后续跑规则见新契约。
@@ -183,15 +185,15 @@ Every platform must prove that every Chapter 4 surface reached a defensible, ite
       "edge_page_continuity_id": "6f3ca92b-7226-46a1-91e1-9d19ec9d57d8",
       "max_task_open_edge_pages": 1,
       "user_login_completed_at": null,
-      "edge_evidence_path": "O:\\背调\\...\\weibo\\timeline-browser-evidence.json",
+      "edge_evidence_path": "<WORKSPACE>/.../weibo/timeline-browser-evidence.json",
       "edge_evidence_sha256": "64位小写SHA-256",
       "status": "complete",
       "termination": "cursor_exhausted",
       "discovered_items": 146,
       "reviewed_items": 146,
       "unreviewed_items": 0,
-      "result_log_path": "O:\\背调\\...\\weibo\\profile-status.json",
-      "item_ledger_path": "O:\\背调\\...\\weibo\\profile-items.jsonl",
+      "result_log_path": "<WORKSPACE>/.../weibo/profile-status.json",
+      "item_ledger_path": "<WORKSPACE>/.../weibo/profile-items.jsonl",
       "item_ledger_sha256": "64位小写SHA-256",
       "query_ledger_path": null,
       "query_ledger_sha256": null,
@@ -264,7 +266,7 @@ The normalized file at `result_log_path` has this exact shape:
   "edge_page_continuity_id": "6f3ca92b-7226-46a1-91e1-9d19ec9d57d8",
   "max_task_open_edge_pages": 1,
   "user_login_completed_at": null,
-  "edge_evidence_path": "O:\\背调\\...\\weibo\\timeline-browser-evidence.json",
+  "edge_evidence_path": "<WORKSPACE>/.../weibo/timeline-browser-evidence.json",
   "edge_evidence_sha256": "64位小写SHA-256",
   "status": "complete",
   "termination": "cursor_exhausted",
@@ -278,7 +280,7 @@ The normalized file at `result_log_path` has this exact shape:
   "completed_at": "2026-09-02T10:30:00+08:00",
   "raw_evidence": [
     {
-      "path": "O:\\背调\\...\\weibo\\timeline-manual-review.json",
+      "path": "<WORKSPACE>/.../weibo/timeline-manual-review.json",
       "sha256": "64位小写SHA-256",
       "kind": "manual_review_log"
     }
@@ -309,7 +311,7 @@ The file at `edge_evidence_path` has this exact shape:
   "review_start_mode": "surface_start",
   "review_started_at": "2026-09-02T09:00:10+08:00",
   "captured_at": "2026-09-02T10:30:00+08:00",
-  "artifact_path": "O:\\背调\\...\\weibo\\timeline-final-page.png",
+  "artifact_path": "<WORKSPACE>/.../weibo/timeline-final-page.png",
   "artifact_sha256": "64位小写SHA-256",
   "artifact_kind": "browser_screenshot"
 }
@@ -414,7 +416,7 @@ One `risk_group` represents one merged risk category:
       "source_type": "official_account_content",
       "screenshots": [
         {
-          "path": "O:\\背调\\YYYY-MM-DD\\对象名\\process\\evidence\\youtube-example.png",
+          "path": "<WORKSPACE>/YYYY-MM-DD/对象名/process/evidence/youtube-example.png",
           "caption": "油管视频页面",
           "platform_label": "油管",
           "visible_text": "截图中可辨认的关键文字或画面说明",
@@ -491,7 +493,7 @@ Rules:
   "domestic_route_reachable": true,
   "overseas_route_reachable": true,
   "tested_hosts": ["www.baidu.com", "www.google.com", "weibo.com", "x.com"],
-  "log_path": "O:\\背调\\...\\network-preflight.json"
+  "log_path": "<WORKSPACE>/.../network-preflight.json"
 }
 ```
 
@@ -527,7 +529,7 @@ Every item-bearing `item_ledger_path` is UTF-8 JSONL. Each non-empty line is one
     "detail_capture_kind": "video_detail_page",
     "title_state": "present",
     "cover_state": "present",
-    "cover_path": "O:\\背调\\具体任务\\process\\video-123-cover.png",
+    "cover_path": "<WORKSPACE>/具体任务/process/video-123-cover.png",
     "cover_sha256": "64位小写SHA-256",
     "description_state": "complete_expanded",
     "play_count_status": "not_applicable",
@@ -562,7 +564,7 @@ A row is a real video when any of these redundant signals applies: its normalize
   "detail_capture_kind": "video_detail_page",
   "title_state": "present",
   "cover_state": "present",
-  "cover_path": "O:\\背调\\具体任务\\process\\video-123-cover.png",
+  "cover_path": "<WORKSPACE>/具体任务/process/video-123-cover.png",
   "cover_sha256": "64位小写SHA-256",
   "description_state": "complete_expanded",
   "play_count_status": "observed",
@@ -589,12 +591,12 @@ A row is a real video when any of these redundant signals applies: its normalize
   "native_rank": 1,
   "visible_order_text": "按最热视频排序，第1项",
   "observed_at": "2026-09-08T10:00:00+08:00",
-  "ranking_snapshot_path": "O:\\背调\\具体任务\\process\\account-native-ranking.json",
+  "ranking_snapshot_path": "<WORKSPACE>/具体任务/process/account-native-ranking.json",
   "ranking_snapshot_sha256": "账号级排序快照的64位小写SHA-256"
 }
 ```
 
-The wrapper is `{"path": "O:\\背调\\具体任务\\process\\video-123-native-rank.json", "sha256": "64位小写SHA-256"}`. `source_account_url` equals the delivered account URL, `source_video_url` equals the row URL, `source_surface` is exactly `account_native_popular`, `sort_mode` is `popular` or `most_viewed`, `ranking_scope` is exactly `account_all_videos`, `native_rank` is a positive integer, `visible_order_text` is non-empty, and `observed_at` exactly matches `video_metadata.observed_at`. `ranking_snapshot_path` is a real UTF-8 JSON account-order snapshot under `$env:BACKGROUND_CHECK_WORKSPACE` and its hash equals `ranking_snapshot_sha256`. Search ordering, a third-party chart, a per-surface subset, an un-hashed ordering claim, or individually authored rank rows that do not share one account snapshot is not native account-wide rank evidence.
+The wrapper is `{"path": "<WORKSPACE>/具体任务/process/video-123-native-rank.json", "sha256": "64位小写SHA-256"}`. `source_account_url` equals the delivered account URL, `source_video_url` equals the row URL, `source_surface` is exactly `account_native_popular`, `sort_mode` is `popular` or `most_viewed`, `ranking_scope` is exactly `account_all_videos`, `native_rank` is a positive integer, `visible_order_text` is non-empty, and `observed_at` exactly matches `video_metadata.observed_at`. `ranking_snapshot_path` is a real UTF-8 JSON account-order snapshot under `$env:BACKGROUND_CHECK_WORKSPACE` and its hash equals `ranking_snapshot_sha256`. Search ordering, a third-party chart, a per-surface subset, an un-hashed ordering claim, or individually authored rank rows that do not share one account snapshot is not native account-wide rank evidence.
 
 The referenced account snapshot contains exactly:
 
@@ -638,11 +640,11 @@ The account Top 10 is derived after de-duplication:
     "sampled_frame_timestamps_seconds": [0, 10, 15, 20, 30, 40, 50, 60],
     "keyframe_scene_change_timestamps_seconds": [15, 30],
     "keyframe_scene_change_reviewed": true,
-    "frame_manifest_path": "O:\\背调\\具体任务\\process\\video-123-frames.jsonl",
+    "frame_manifest_path": "<WORKSPACE>/具体任务/process/video-123-frames.jsonl",
     "frame_manifest_sha256": "64位小写SHA-256",
     "full_audio_coverage": true,
     "audio_scan_method": "combined_full",
-    "audio_text_path": "O:\\背调\\具体任务\\process\\video-123-full-audio.jsonl",
+    "audio_text_path": "<WORKSPACE>/具体任务/process/video-123-full-audio.jsonl",
     "audio_text_sha256": "64位小写SHA-256",
     "audio_risk_terms_sha256": "与路线完整risk_terms_sha256一致",
     "ocr_visual_sensitive_elements_reviewed": true,
@@ -653,7 +655,7 @@ The account Top 10 is derived after de-duplication:
         "context_start_seconds": 10,
         "context_end_seconds": 50,
         "evidence_kind": "frame",
-        "evidence_path": "O:\\背调\\具体任务\\process\\video-123-00-30.png",
+        "evidence_path": "<WORKSPACE>/具体任务/process/video-123-00-30.png",
         "evidence_sha256": "64位小写SHA-256",
         "original_or_transcript": "00:30 的原文或完整转写摘录",
         "context": "已回看命中点前后各15秒后的具体语境。",
@@ -672,7 +674,7 @@ The timeline starts at `0`, ends at `duration_seconds`, preserves strictly incre
 {
   "source_video_url": "https://www.douyin.com/video/123",
   "timestamp_seconds": 30,
-  "frame_path": "O:\\背调\\具体任务\\process\\video-123-00-30.png",
+  "frame_path": "<WORKSPACE>/具体任务/process/video-123-00-30.png",
   "frame_sha256": "64位小写SHA-256",
   "capture_kinds": ["interval_sample", "keyframe"]
 }
@@ -770,7 +772,7 @@ The old `coverage.general_search_runs` and `coverage.platform_runs` fields are r
     "review_mode": "agent_context",
     "reviewed_at": "2026-09-06T10:00:30+08:00",
     "evidence_refs": [
-      {"path": "O:\\背调\\具体任务\\process\\raw-items.json", "sha256": "真实源文件SHA-256", "locator": "json:/items/0"}
+      {"path": "<WORKSPACE>/具体任务/process/raw-items.json", "sha256": "真实源文件SHA-256", "locator": "json:/items/0"}
     ],
     "video_triage": {
       "title_reviewed": true,
@@ -779,7 +781,7 @@ The old `coverage.general_search_runs` and `coverage.platform_runs` fields are r
       "result": "clear",
       "reason": "完整标题、封面和展开简介逐项核查后未见风险信号。",
       "risk_terms_sha256": "与coverage.risk_terms_sha256一致",
-      "detail_source_ref": {"path": "O:\\背调\\具体任务\\process\\raw-items.json", "sha256": "真实源文件SHA-256", "locator": "json:/items/0"}
+      "detail_source_ref": {"path": "<WORKSPACE>/具体任务/process/raw-items.json", "sha256": "真实源文件SHA-256", "locator": "json:/items/0"}
     }
   }
 }
@@ -809,7 +811,7 @@ text, media_kinds, video_metadata, media, attachments, subject_interactions
     "url": "https://www.douyin.com/user/example",
     "discovered_items": 26,
     "observed_at": "2026-09-06T10:00:45+08:00",
-    "source_ref": {"path": "O:\\背调\\具体任务\\process\\raw-terminal.json", "sha256": "真实文件SHA-256", "locator": "json:/response/has_more"},
+    "source_ref": {"path": "<WORKSPACE>/具体任务/process/raw-terminal.json", "sha256": "真实文件SHA-256", "locator": "json:/response/has_more"},
     "scope_locator": "/scope",
     "signal": "has_more_false",
     "marker": null

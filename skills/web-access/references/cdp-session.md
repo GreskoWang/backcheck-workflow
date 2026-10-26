@@ -1,5 +1,7 @@
 # 持久 CDP 客户端
 
+路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
+
 `scripts/cdp-session.ps1` 在独立 PowerShell 进程中持有一个自建页的 lease、manage capability 与稳定创建 request ID。所有请求仍调用现有 `cdp-request.ps1`，不增加 broker 权限或任意 JavaScript / CDP 接口。
 
 ## 启动与持续使用
@@ -17,7 +19,7 @@ pwsh -NoProfile -File "$env:BACKCHECK_SKILLS_ROOT\web-access\scripts\cdp-session
 ```json
 {"action":"info"}
 {"action":"query","body":{"kind":"text","selector":"body","maxChars":4000}}
-{"action":"query","body":{"kind":"elements","selector":"main a[href]","visibility":"rendered","limit":20,"fields":["text","href","title"]},"path":"O:\\任务\\process\\links.json"}
+{"action":"query","body":{"kind":"elements","selector":"main a[href]","visibility":"rendered","limit":20,"fields":["text","href","title"]},"path":"<WORKSPACE>/process/links.json"}
 {"action":"scroll","y":600,"direction":"down"}
 {"action":"scroll","y":600,"direction":"down","selector":"main"}
 {"action":"navigate","url":"https://example.com"}
@@ -25,7 +27,7 @@ pwsh -NoProfile -File "$env:BACKCHECK_SKILLS_ROOT\web-access\scripts\cdp-session
 {"action":"recover"}
 {"action":"click","body":{"selector":"a.example"}}
 {"action":"clickAt","body":{"selector":"button.example"}}
-{"action":"shot","path":"O:\\任务\\process\\screen.jpg"}
+{"action":"shot","path":"<WORKSPACE>/process/screen.jpg"}
 {"action":"finish"}
 ```
 

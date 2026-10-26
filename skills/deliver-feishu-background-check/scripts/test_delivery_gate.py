@@ -86,7 +86,7 @@ class DeliveryGateTests(unittest.TestCase):
     def test_fake_business_policy_source_fails_delivery(self):
         snapshot = copy.deepcopy(self.snapshot)
         snapshot['review_context']['business_risk_review']['policy_sources'] = [
-            {'path': r'O:\背调\不存在的风险表.md', 'sha256': '0' * 64}
+            {'path': str(self.root / '不存在的风险表.md'), 'sha256': '0' * 64}
         ]
         run, result, _ = self.run_cli(snapshot, delivery=True, strict_warnings=False)
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)

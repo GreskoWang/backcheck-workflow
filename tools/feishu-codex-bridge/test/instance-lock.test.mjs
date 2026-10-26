@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -109,7 +110,7 @@ test('a reused PID owned by an unrelated process does not preserve a stale lock 
     const lock = acquireInstanceLock(lockPath, {
       legacyPidPath, entryPath,
       inspectProcess: (pid) => pid === 5232 ? {
-        name: 'svchost.exe', commandLine: 'C:\\Windows\\System32\\svchost.exe',
+        name: 'svchost.exe', commandLine: fixturePath('system', 'svchost.exe'),
         createdAtMs: Date.parse('2026-10-08T12:40:17Z'),
       } : null,
     });
@@ -126,7 +127,7 @@ test('a real bridge owner stays locked, including when another instance tries to
     fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
       pid: 34056, token: 'live-owner', createdAt: '2026-10-08T14:15:05.616Z',
     }));
-    const commandLine = `"C:\\node.exe" "${entryPath}"`;
+    const commandLine = `"${process.execPath}" "${entryPath}"`;
     assert.throws(() => acquireInstanceLock(lockPath, {
       entryPath,
       inspectProcess: () => ({

@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -65,7 +66,7 @@ function fakeSpawn(capture, action) {
 }
 
 test('production resume pins exact UUID, workspace sandbox, user approval, and no automatic network', () => {
-  const args = buildProductionResumeArgs({ threadId, workspace: 'O:\\背调', prompt });
+  const args = buildProductionResumeArgs({ threadId, workspace: fixturePath('工作区'), prompt });
   assert.equal(args[1], 'resume');
   assert.ok(args.includes('--no-daemon'));
   assert.deepEqual(args.slice(args.indexOf('-s'), args.indexOf('-s') + 2), ['-s', 'workspace-write']);
@@ -75,7 +76,7 @@ test('production resume pins exact UUID, workspace sandbox, user approval, and n
   assert.equal(args.at(-2), threadId);
   assert.equal(args.at(-1), prompt);
   assert.equal(args.filter((value) => value === threadId).length, 1);
-  assert.throws(() => buildProductionResumeArgs({ threadId, workspace: 'O:\\背调', prompt, sandboxMode: 'danger-full-access' }));
+  assert.throws(() => buildProductionResumeArgs({ threadId, workspace: fixturePath('工作区'), prompt, sandboxMode: 'danger-full-access' }));
 });
 
 test('production CLI resumes a verified bound session and allows research tools without PTY keys', async (t) => {

@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -106,7 +107,7 @@ test('startup probe checks structured output through a read-only SDK thread', as
   const options = [];
   let schema;
   const result = await validatePreflightCompatibility({
-    config: { workspace: 'O:\\background-check', codexPreflightModel: 'gpt-6-sol' },
+    config: { workspace: fixturePath('workspace'), codexPreflightModel: 'gpt-6-sol' },
     createCodex: () => ({ startThread(threadOptions) {
       options.push(threadOptions);
       return { async run(_prompt, turnOptions) {

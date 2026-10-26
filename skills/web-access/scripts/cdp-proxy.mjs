@@ -7,6 +7,7 @@ import http from 'node:http';
 import net from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
+import { windowsSystemPath } from './windows-paths.mjs';
 import path from 'node:path';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -269,7 +270,7 @@ const targetsBySession = new Map();
 const eventWaiters = new Set();
 const contextVersions = new Map();
 const fixedWorlds = createFixedWorldResolver({sendCdp, makeError:(...args) => new BrokerError(...args),
-  frameTimeoutMs:BUDGETS.dom, worldTimeoutMs:BUDGETS.context});
+  metadataTimeoutMs:BUDGETS.dom, worldTimeoutMs:BUDGETS.context});
 let connectionBaselineTargets = new Set();
 const leases = new Map();
 const managedTabs = new Map();
@@ -1538,9 +1539,9 @@ function authorize(request) {
 function windowsPowerShellPath() {
   const candidates = [
     path.join(os.homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'native', 'powershell', 'pwsh.exe'),
-    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'PowerShell', '7', 'pwsh.exe'),
+    ...(process.env.ProgramFiles ? [path.join(process.env.ProgramFiles, 'PowerShell', '7', 'pwsh.exe')] : []),
     ...String(process.env.PATH || '').split(path.delimiter).filter(Boolean).map((directory) => path.resolve(directory, 'pwsh.exe')),
-    path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    windowsSystemPath('WindowsPowerShell', 'v1.0', 'powershell.exe'),
   ];
   const found = candidates.find((candidate) => fs.existsSync(candidate));
   if (!found) throw new BrokerError('acl_tool_missing', '找不到可用于硬化 token ACL 的 PowerShell。');
@@ -1548,7 +1549,7 @@ function windowsPowerShellPath() {
 }
 
 function currentWindowsSid() {
-  const executable = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'whoami.exe');
+  const executable = windowsSystemPath('whoami.exe');
   const result = spawnSync(executable, ['/user', '/fo', 'csv', '/nh'], {
     encoding: 'utf8', windowsHide: true, timeout: 5000, maxBuffer: 64 * 1024,
   });
@@ -1559,7 +1560,7 @@ function currentWindowsSid() {
 
 function hardenAndVerifyWindowsAcl(filePath, isDirectory, sid) {
   if (os.platform() !== 'win32') return;
-  const icacls = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'icacls.exe');
+  const icacls = windowsSystemPath('icacls.exe');
   const commandOptions = { encoding: 'utf8', windowsHide: true, timeout: 7000, maxBuffer: 256 * 1024 };
   const reset = spawnSync(icacls, [filePath, '/reset', '/q'], commandOptions);
   if (reset.status !== 0) throw new BrokerError('acl_hardening_failed', String(reset.stderr || reset.stdout || 'icacls reset failed').trim());

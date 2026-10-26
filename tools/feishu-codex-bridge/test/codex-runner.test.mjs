@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -270,7 +271,7 @@ function executionScope() {
 
 function nativeConfig(stateDir) {
   return {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
     stateDir,
     codexDispatchMode: 'desktop_native_v1',
     codexSandboxMode: 'danger-full-access',
@@ -309,7 +310,7 @@ test('new requests bind and monitor one desktop-owned native thread', async () =
           assert.match(options.marker, /^FEISHU-NATIVE-RQ-20260930-000000-SYNTH43366841-/u);
           return {
             threadId,
-            sessionPath: 'C:\\sessions\\native.jsonl',
+            sessionPath: fixturePath('sessions', 'native.jsonl'),
             source: 'vscode',
             originator: 'codex_work_desktop',
             threadSource: 'user',
@@ -353,7 +354,7 @@ test('same-request native recovery only monitors the already bound desktop threa
       codexThreadCreationMode: 'desktop_native_v1',
       codexThreadSource: 'vscode',
       codexThreadOriginator: 'codex_work_desktop',
-      codexNativeSessionPath: 'C:\\sessions\\native.jsonl',
+      codexNativeSessionPath: fixturePath('sessions', 'native.jsonl'),
       codexNativeDispatchMarker: 'FEISHU-NATIVE-RQ-RECOVERY-abc123',
     }, nativeConfig(stateDir), {
       desktopDispatcher: {
@@ -364,7 +365,7 @@ test('same-request native recovery only monitors the already bound desktop threa
         },
       },
     });
-    assert.deepEqual(calls, ['monitor:C:\\sessions\\native.jsonl']);
+    assert.deepEqual(calls, [`monitor:${fixturePath('sessions', 'native.jsonl')}`]);
   } finally {
     fs.rmSync(stateDir, { recursive: true, force: true });
   }
@@ -378,13 +379,13 @@ test('a verified legacy CLI thread resumes only its own request through the CLI'
       requestId: 'RQ-LEGACY', requestText: '恢复', dispatchScope: executionScope(),
       codexThreadId: threadId, codexThreadRequestId: 'RQ-LEGACY',
       codexThreadSource: 'cli', codexThreadOriginator: 'codex-tui',
-      codexCliSessionPath: 'C:\\sessions\\legacy.jsonl',
+      codexCliSessionPath: fixturePath('sessions', 'legacy.jsonl'),
     }, nativeConfig(stateDir), {
       bootstrapVisibleThread() { throw new Error('must not create a second thread'); },
       executeBoundCliThread({ threadId: id, requestId, prompt, sessionPath }) {
         assert.equal(id, threadId);
         assert.equal(requestId, 'RQ-LEGACY');
-        assert.equal(sessionPath, 'C:\\sessions\\legacy.jsonl');
+        assert.equal(sessionPath, fixturePath('sessions', 'legacy.jsonl'));
         assert.match(prompt, /RQ-LEGACY/u);
         return { threadId, finalResponse: '报告 https://x.feishu.cn/docx/abc' };
       },
@@ -406,13 +407,13 @@ test('new requests bind a CLI thread durably before CLI continuation', async () 
       bootstrapVisibleThread({ inputMode }) {
         assert.equal(inputMode, 'startup_argument_no_keys');
         calls.push('bootstrap');
-        return { threadId, sessionPath: 'C:\\sessions\\cli.jsonl', source: 'cli', originator: 'codex-tui' };
+        return { threadId, sessionPath: fixturePath('sessions', 'cli.jsonl'), source: 'cli', originator: 'codex-tui' };
       },
       onThreadBootstrapped(id) { assert.equal(id, threadId); calls.push('bound'); },
       onExecutionStarting() { calls.push('executing'); },
       executeBoundCliThread({ threadId: id, sessionPath, prompt }) {
         assert.equal(id, threadId);
-        assert.equal(sessionPath, 'C:\\sessions\\cli.jsonl');
+        assert.equal(sessionPath, fixturePath('sessions', 'cli.jsonl'));
         assert.match(prompt, /review-evidence/u);
         calls.push('resume');
         return { threadId, finalResponse: '报告 https://x.feishu.cn/docx/abc' };
@@ -432,7 +433,7 @@ test('CLI continuation failure after binding requires local review', async () =>
       dispatchScope: executionScope(), codexThreadId: threadId,
       codexThreadRequestId: 'RQ-CLI-TIMEOUT',
       codexThreadSource: 'cli', codexThreadOriginator: 'codex-tui',
-      codexCliSessionPath: 'C:\\sessions\\timeout.jsonl',
+      codexCliSessionPath: fixturePath('sessions', 'timeout.jsonl'),
     }, { ...nativeConfig(stateDir), codexDispatchMode: 'cli_visible_v1' }, {
       bootstrapVisibleThread() { throw new Error('must not create another thread'); },
       executeBoundCliThread({ threadId: id }) {

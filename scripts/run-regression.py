@@ -38,6 +38,7 @@ def main():
         cwd=ROOT/'tools/feishu-codex-bridge'
         commands.append(('bridge',[args.node,'--test','--test-concurrency=2',*map(str,sorted((cwd/'test').glob('*.test.mjs')))],cwd,180))
     if args.group in ('all','python'):
+        commands.append(('python-package',[sys.executable,'-m','unittest','discover','-s',str(ROOT/'scripts'),'-p','test_package.py'],ROOT,60))
         for group in ('coverage','media','pipeline'):
             cwd=ROOT/'tools/research-batch/test'/group
             commands.append(('python-'+group,[sys.executable,'-m','unittest','discover','-s',str(cwd),'-p','test_*.py'],ROOT,120))

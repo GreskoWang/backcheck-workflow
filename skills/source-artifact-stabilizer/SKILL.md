@@ -61,8 +61,8 @@ Example:
 
 ```powershell
 & $bundledPython "$env:BACKCHECK_SKILLS_ROOT\source-artifact-stabilizer\scripts\probe_artifact.py" `
-  "O:\project\Resources" `
-  --out "O:\project\Process\artifact_probe.json"
+  "$env:BACKGROUND_CHECK_WORKSPACE\Resources" `
+  --out "$env:BACKGROUND_CHECK_WORKSPACE\Process\artifact_probe.json"
 ```
 
 If bundled paths are unknown, call the workspace dependency tool first and use its Python path.

@@ -1,3 +1,6 @@
+import os from 'node:os';
+import nodePath from 'node:path';
+import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { DOM_QUERY_FUNCTION, CLICK_FUNCTION, validateDomQuery, validateClickSpec, validateShadowPath, ALLOWED_CDP_METHODS } from './cdp-proxy.mjs';
@@ -138,7 +141,7 @@ test('new-tab public links retain same-page navigation behavior',()=>{
   const f=fixture();const link=new Element('a',{attributes:{target:'_blank',href:'/public/profile'}}).setText('主页');f.inside.append(link);f.inside.point=link;const r=f.click(locator({selector:'a',expectedText:'主页'}),true);assert.equal(r.navigationUrl,'https://www.bilibili.com/public/profile');assert.equal(link.clicks,0);
 });
 test('unsafe new-tab destinations remain blocked',()=>{
-  for(const href of ['javascript:alert(1)','file:///C:/private','https://user:password@example.test/']){const f=fixture();const a=new Element('a',{attributes:{target:'_blank',href}}).setText('主页');f.inside.append(a);f.inside.point=a;assert.equal(f.click(locator({selector:'a',expectedText:'主页'}),true).error,'unsupported_link');assert.equal(a.clicks,0);}
+  for(const href of ['javascript:alert(1)',pathToFileURL(nodePath.join(os.tmpdir(), 'private-fixture')).href,'https://user:password@example.test/']){const f=fixture();const a=new Element('a',{attributes:{target:'_blank',href}}).setText('主页');f.inside.append(a);f.inside.point=a;assert.equal(f.click(locator({selector:'a',expectedText:'主页'}),true).error,'unsupported_link');assert.equal(a.clicks,0);}
 });
 test('slotted element inherits anchor navigation through composed ancestry',()=>{
   const f=fixture();const a=new Element('a',{attributes:{target:'_blank',href:'/public'}});const slot=new Element('slot');a.append(slot);f.inside.append(a);const span=new Element('span').setText('主页');f.thread.append(span);span.assignedSlot=slot;slot.assigned=[span];f.inside.point=span;const r=f.click({selector:'span',shadowPath:[],expectedText:'主页'},true);assert.equal(r.error,'not_found');

@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
+import { windowsSystemPath } from './windows-paths.mjs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -70,7 +71,7 @@ function makeTestBrokerMarker(port, markerKey, nonce) {
 
 function windowsAclSnapshot(filePath) {
   assert.equal(os.platform(), 'win32', 'Windows ACL snapshot is Windows-only');
-  const whoami = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'whoami.exe');
+  const whoami = windowsSystemPath('whoami.exe');
   const identity = spawnSync(whoami, ['/user', '/fo', 'csv', '/nh'], {
     encoding: 'utf8', windowsHide: true, timeout: 5000, maxBuffer: 64 * 1024,
   });
@@ -89,8 +90,8 @@ function windowsAclSnapshot(filePath) {
   const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
   const powershellCandidates = [
     path.join(os.homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'native', 'powershell', 'pwsh.exe'),
-    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'PowerShell', '7', 'pwsh.exe'),
-    path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    ...(process.env.ProgramFiles ? [path.join(process.env.ProgramFiles, 'PowerShell', '7', 'pwsh.exe')] : []),
+    windowsSystemPath('WindowsPowerShell', 'v1.0', 'powershell.exe'),
   ];
   const powershell = powershellCandidates.find((candidate) => fs.existsSync(candidate));
   assert.ok(powershell, 'PowerShell executable required for ACL verification was not found');
@@ -761,7 +762,7 @@ function removeTestTempRoot(tempRoot) {
     return;
   } catch (firstError) {
     if (os.platform() !== 'win32') throw firstError;
-    const icacls = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'icacls.exe');
+    const icacls = windowsSystemPath('icacls.exe');
     spawnSync(icacls, [resolved, '/reset', '/t', '/c', '/q'], {
       encoding: 'utf8', windowsHide: true, timeout: 7000, maxBuffer: 256 * 1024,
     });

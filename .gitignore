@@ -3,6 +3,7 @@
 !/README.md
 !/.gitignore
 !/.gitattributes
+!/.github/
 !/Setup-Backcheck.ps1
 !/Verify-Package.ps1
 !/recovery-session-env.ps1

@@ -185,7 +185,7 @@ class FetchAssetsBehaviorTest(unittest.TestCase):
         self.assertNotIn("password@", serialized)
 
     def test_local_and_non_http_urls_are_rejected(self):
-        for url in ("file:///C:/file.png", "https://127.0.0.1/a.png", "http://localhost/a.png", "http://192.168.1.1/a.png", "ftp://example.org/a"):
+        for url in ((Path(tempfile.gettempdir()) / "file-fixture.png").as_uri(), "https://127.0.0.1/a.png", "http://localhost/a.png", "http://192.168.1.1/a.png", "ftp://example.org/a"):
             with self.subTest(url=url), self.assertRaises(fetch.AssetError):
                 fetch.validated_url(url)
 

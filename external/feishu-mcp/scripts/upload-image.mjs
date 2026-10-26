@@ -19,7 +19,7 @@ function usage() {
   return [
     "用法：",
     "  预检（默认，不写入）：",
-    "  node upload-image.mjs --file <O:\\背调下的图片> --document-id <文档token> --image-block-id <空图片块id>",
+    "  node upload-image.mjs --file <图片路径> --document-id <文档token> --image-block-id <空图片块id>",
     "",
     "  确认上传：",
     "  node upload-image.mjs --file <图片> --document-id <文档token> --image-block-id <空图片块id> --expected-sha256 <预检值> --commit",

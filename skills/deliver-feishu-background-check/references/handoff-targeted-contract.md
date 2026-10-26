@@ -1,5 +1,7 @@
 # 三小时定向背调交接契约（schema 1.11）
 
+路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
+
 本文件只适用于默认研究模式 `research_profile: three_hour_targeted_v1`。旧的
 `schema_version: 1.10` 继续按照 [handoff-contract.md](handoff-contract.md) 执行，
 并视为 `exhaustive_audit`；不得把本文件的限量规则用于放宽旧包。
@@ -531,7 +533,7 @@ X 有主页时 `review_start_month` 使用实际检查到的最早月份 `YYYY-M
   "source_type": "official_account_content",
   "screenshots": [
     {
-      "path": "O:\\背调\\...\\risk.png",
+      "path": "<WORKSPACE>/.../risk.png",
       "caption": "风险位置",
       "platform_label": "油管",
       "visible_text": "截图中的关键文字或画面说明",

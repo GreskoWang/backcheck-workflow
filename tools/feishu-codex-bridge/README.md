@@ -1,5 +1,7 @@
 ## 当前 D 盘恢复配置（2026-10-17）
 
+路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
+
 本机实际派单模式为 `desktop_native_handoff_v1`，工作目录 `$env:BACKGROUND_CHECK_WORKSPACE`，会话 Home `$env:CODEX_HOME`。下方旧 CLI 模式说明仅保留为历史实现记录。使用工作区 `背调工具.cmd` 进行状态检查、凭证录入、登录、群绑定和启动；入口会加载 D 盘运行环境。配置文件是 `config/backcheck-local.json`。不直接按历史示例启动监听。
 
 当前不启用记账；旧表格目标已移除。旧列名、单价与责任人规则仍须在启用新账本前核对。群邀请链接只是参考入口，必须用机器人实际可见的 chat ID 完成本机绑定。启动前先执行 `CheckFeishu` 验证模板用户访问。首次启动只处理启用时间之后的新消息。
@@ -50,7 +52,7 @@
 {
   "requestId": "RQ-...",
   "documents": [
-    { "url": "https://my.feishu.cn/docx/报告token", "snapshotPath": "O:\\背调\\案件目录\\终审快照.json" }
+    { "url": "https://my.feishu.cn/docx/报告token", "snapshotPath": "<WORKSPACE>/案件目录/终审快照.json" }
   ]
 }
 ```

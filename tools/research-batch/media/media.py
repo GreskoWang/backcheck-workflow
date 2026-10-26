@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import math
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -257,7 +258,10 @@ def prepare_videoshots(items: list[dict], base: Path, output: Path) -> tuple[lis
 
 
 def get_font(requested: str | None, size: int) -> tuple[ImageFont.ImageFont, str]:
-    candidates = [requested] if requested else ["C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf", "DejaVuSans.ttf"]
+    windows_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+    system_fonts = [str(Path(windows_root) / "Fonts" / font)
+                    for font in ("msyh.ttc", "simhei.ttf")] if windows_root else []
+    candidates = [requested] if requested else [*system_fonts, "DejaVuSans.ttf"]
     for candidate in candidates:
         try:
             return ImageFont.truetype(candidate, size), str(candidate)

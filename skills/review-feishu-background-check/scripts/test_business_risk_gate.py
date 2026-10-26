@@ -69,7 +69,7 @@ class BusinessRiskGateTests(unittest.TestCase):
 
     def test_nonexistent_policy_source_fails(self):
         review = copy.deepcopy(self.review)
-        review["policy_sources"] = [{"path": r"O:\背调\不存在的风险表.md", "sha256": "0" * 64}]
+        review["policy_sources"] = [{"path": str(gate.CURRENT_BUSINESS_RISK_POLICY.with_name("不存在的风险表.md")), "sha256": "0" * 64}]
         result = self.audit(review)
         self.assertEqual(result["verdict"], "FAIL")
         self.assertIn("BUSINESS_RISK_POLICY_SOURCE_INVALID", {item["code"] for item in result["errors"]})

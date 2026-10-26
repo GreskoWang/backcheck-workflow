@@ -1,3 +1,4 @@
+import { windowsFixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,7 +12,7 @@ import {
 
 test('ANSI clear and cursor moves reconstruct the current screen, not erased secrets', () => {
   const raw = [
-    '\x1b[2J\x1b[1;1Hsecret@example.com C:\\private\\token.txt',
+    `\x1b[2J\x1b[1;1Hsecret@example.com ${windowsFixturePath('private', 'token.txt')}`,
     '\x1b[2J\x1b[3;1H\x1b[32m› Ask Codex to do anything\x1b[0m',
     '\x1b[36;1HRQ-PROBE-TEST',
   ].join('');
@@ -26,7 +27,7 @@ test('ANSI clear and cursor moves reconstruct the current screen, not erased sec
 });
 
 test('only the full official folder picker is treated as a trust confirmation', () => {
-  const workspace = 'C:\\Users\\Excal\\AppData\\Local\\Temp\\feishu-empty-thread-probe-ABC';
+  const workspace = windowsFixturePath('feishu-empty-thread-probe-ABC');
   const picker = [
     '\x1b[2J\x1b[4;1HFolder access',
     `\x1b[5;1H${workspace}`,
@@ -39,7 +40,7 @@ test('only the full official folder picker is treated as a trust confirmation', 
   assert.equal(detectTrustConfirmation(picker, { workspace })?.trustTarget, workspace);
   const safe = redactTerminalScreen(picker, { requestId: 'RQ-PROBE-TEST', workspace });
   assert.match(safe, /工作区信任确认/u);
-  assert.match(safe, /画面确认目标：C:\\Users\\Excal\\AppData\\Local\\Temp\\feishu-empty-thread-probe-ABC/u);
+  assert.ok(safe.includes(`画面确认目标：${workspace}`));
   assert.match(safe, /文件夹设置可能在没有模型请求时自动运行代码/u);
 
   const quoted = '\x1b[2J\x1b[3;1H用户说不要信任目录，引用 Trust this folder?\x1b[35;1HAsk Codex to do anything';
@@ -59,7 +60,7 @@ test('authentication and QR screens are hidden in their entirety', () => {
 
 test('unknown content, paths, tokens, and business text never leave the allowlist', () => {
   const observer = new ProbeTerminalObserver('RQ-PROBE-TEST');
-  observer.push('\x1b[2J\x1b[1;1H客户姓名 张三 C:\\secret\\contract.docx token_12345678901234567890');
+  observer.push(`\x1b[2J\x1b[1;1H客户姓名 张三 ${windowsFixturePath('secret', 'contract.docx')} token_12345678901234567890`);
   observer.push('\x1b[2;1Hnetwork error https://example.test/private?key=abc');
   const safe = observer.snapshot();
   assert.match(safe, /非诊断画面文字已隐藏/u);
@@ -75,7 +76,7 @@ test('network, model, permission, and HTTP diagnostics keep actionable text and 
       /Error: failed to send request for url \[URL\].*HTTP 429 Too Many Requests/u],
     ['Warning: model gpt-5.6-luna is not available for this account',
       /Warning: model gpt-5\.6-luna is not available for this account/u],
-    ['Error: Permission denied (os error 5) opening C:\\Users\\John Doe\\auth.json',
+    [`Error: Permission denied (os error 5) opening ${windowsFixturePath('John Doe', 'auth.json')}`,
       /Error: Permission denied \(os error 5\) opening \[PATH AND TAIL REDACTED\]/u],
     ['Error: authorization failed: HTTP 401 Unauthorized',
       /Error: authorization failed: HTTP 401 Unauthorized/u],
@@ -86,7 +87,7 @@ test('network, model, permission, and HTTP diagnostics keep actionable text and 
 });
 
 test('sensitive fields inside an error are replaced while status remains readable', () => {
-  const input = 'Error: unauthorized HTTP 401 for name@example.com at C:\\Users\\John Doe\\auth.json token=sk-1234567890abcdef ABCD-EFGH';
+  const input = `Error: unauthorized HTTP 401 for name@example.com at ${windowsFixturePath('John Doe', 'auth.json')} token=sk-1234567890abcdef ABCD-EFGH`;
   const safe = redactDiagnosticLine(input);
   assert.match(safe, /Error: unauthorized HTTP 401/u);
   for (const secret of ['name@example.com', 'John Doe', 'auth.json', 'sk-1234567890abcdef', 'ABCD-EFGH']) {

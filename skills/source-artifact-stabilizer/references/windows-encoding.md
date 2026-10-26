@@ -15,7 +15,7 @@ Use this reference when paths, Chinese text, Excel column names, or shell quotin
 - Use bundled Python when available:
 
 ```powershell
-& "$env:RESEARCH_PYTHON" script.py --input "O:\含中文\file.xlsx"
+& "$env:RESEARCH_PYTHON" script.py --input "$env:BACKGROUND_CHECK_WORKSPACE\含中文\file.xlsx"
 ```
 
 - Write script files and pass values through `argv`, not through stdin source code.

@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,9 +26,9 @@ function officialTrustScreen(workspace) {
 test('startup classifier never treats sign-in or trust confirmation as a ready composer', () => {
   assert.equal(classifyCliStartup('\x1b[2JWelcome\nAsk Codex to do anything'), 'composer');
   assert.equal(classifyCliStartup('Sign in to Codex\nAsk Codex to do anything'), 'sign_in');
-  assert.equal(classifyCliStartup(`${officialTrustScreen('C:\\Temp\\probe')}\x1b[35;1HAsk Codex to do anything`), 'trust_confirmation');
+  assert.equal(classifyCliStartup(`${officialTrustScreen(fixturePath('probe'))}\x1b[35;1HAsk Codex to do anything`), 'trust_confirmation');
   assert.equal(classifyCliStartup('quoted Trust this folder?\nAsk Codex to do anything'), 'composer');
-  assert.equal(classifyCliStartup(`${officialTrustScreen('C:\\Temp\\probe')}\x1b[2J\x1b[35;1HAsk Codex to do anything`), 'composer');
+  assert.equal(classifyCliStartup(`${officialTrustScreen(fixturePath('probe'))}\x1b[2J\x1b[35;1HAsk Codex to do anything`), 'composer');
   assert.equal(classifyCliStartup('Loading Codex'), 'loading');
   const update = '\x1b[2J\x1b[4;1HUpdate available 0.158.0 -> 0.159.0' +
     '\x1b[8;1H1. Update now\x1b[9;1H2. Skip\x1b[10;1H3. Skip until next version';
@@ -264,20 +265,20 @@ test('a real folder trust picker aborts early and failure cleanup never presses 
 
 test('standalone environment removes parent Codex identity but preserves CODEX_HOME', () => {
   const env = createStandaloneCodexEnv({
-    Path: 'C:\\bin',
+    Path: fixturePath('bin'),
     CODEX_THREAD_ID: 'parent-thread',
     CODEX_SESSION_ID: 'parent-session',
     CODEX_APP_TOOLS_PIPE_PATH: 'pipe',
     CODEX_INTERNAL_ORIGINATOR_OVERRIDE: 'Codex Desktop',
-    CODEX_HOME: 'D:\\codex-home',
+    CODEX_HOME: fixturePath('codex-home'),
     OPENAI_API_KEY: 'test-value',
   });
   assert.deepEqual(env, {
-    Path: 'C:\\bin',
-    CODEX_HOME: 'D:\\codex-home',
+    Path: fixturePath('bin'),
+    CODEX_HOME: fixturePath('codex-home'),
     OPENAI_API_KEY: 'test-value',
   });
-  assert.equal(createStandaloneCodexEnv({ Path: 'C:\\bin' }).CODEX_HOME,
+  assert.equal(createStandaloneCodexEnv({ Path: fixturePath('bin') }).CODEX_HOME,
     path.join(os.homedir(), '.codex'));
 });
 
@@ -287,20 +288,20 @@ test('only the exact standalone source=cli metadata is accepted', () => {
     source: 'cli',
     originator: 'codex-tui',
     cli_version: '0.158.0',
-    cwd: 'O:\\背调',
+    cwd: fixturePath('工作区'),
   };
-  assert.equal(isVisibleCliSessionMeta(valid, { workspace: 'O:\\背调' }), true);
+  assert.equal(isVisibleCliSessionMeta(valid, { workspace: fixturePath('工作区') }), true);
   assert.equal(isVisibleCliSessionMeta({ ...valid, source: { subagent: {} } }, {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
   }), false);
   assert.equal(isVisibleCliSessionMeta({ ...valid, source: 'exec' }, {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
   }), false);
   assert.equal(isVisibleCliSessionMeta({ ...valid, cli_version: '0.159.0' }, {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
   }), false);
-  assert.equal(isVisibleCliSessionMeta({ ...valid, cwd: 'O:\\其他' }, {
-    workspace: 'O:\\背调',
+  assert.equal(isVisibleCliSessionMeta({ ...valid, cwd: fixturePath('其他') }, {
+    workspace: fixturePath('工作区'),
   }), false);
   assert.deepEqual(visibleThreadVersions, {
     cli: '0.158.0', sdk: '0.158.0', pty: '1.1.0',

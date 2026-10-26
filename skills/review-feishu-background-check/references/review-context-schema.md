@@ -1,5 +1,7 @@
 # 快速审阅上下文
 
+路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
+
 审阅上下文只负责把“当前任务事实应写成什么”与“飞书现在写了什么”分开。一个任务建立一次；调查事实和平台合同未变化时，后续 revision 直接复用，不重新调查、不重新手工抄写十四个平台。本文件下面的 JSON 结构供单主体校验脚本使用；团队合并文档须另以全组派单顺序、每人十四平台和非本批区块保护为上下文，不把单主体标题结构套入。
 
 ## 基本结构
@@ -43,7 +45,7 @@
   "revision_id": 42,
   "policy_sources": [
     {
-      "path": "O:\\背调\\背调风险提示.md",
+      "path": "<WORKSPACE>/背调风险提示.md",
       "sha256": "当前文件字节的64位小写SHA-256"
     }
   ],
@@ -103,7 +105,7 @@
         "status": "no_result",
         "fact_evidence": {
           "source_type": "research_record",
-          "source_locator": "O:\\背调\\YYYY-MM-DD\\对象\\调查结论.md#微博",
+          "source_locator": "<WORKSPACE>/YYYY-MM-DD/对象/调查结论.md#微博",
           "checked_at": "2026-09-12T19:50:00+08:00",
           "summary": "未确认到主体微博主页。",
           "confirmed_homepage_count": 0
@@ -159,12 +161,12 @@
   "source_kind": "restricted_source",
   "restricted_source": {
     "reason": "minor_sexual_content_safety",
-    "record_path": "O:\\背调\\YYYY-MM-DD\\对象\\process\\受限事实记录.json",
+    "record_path": "<WORKSPACE>/YYYY-MM-DD/对象/process/受限事实记录.json",
     "record_sha256": "64位小写SHA-256",
     "direct_url_sha256": "记录内 source_url 的 UTF-8 SHA-256",
-    "original_image_path": "O:\\背调\\YYYY-MM-DD\\对象\\process\\未遮挡原图.jpg",
+    "original_image_path": "<WORKSPACE>/YYYY-MM-DD/对象/process/未遮挡原图.jpg",
     "original_image_sha256": "64位小写SHA-256",
-    "safe_image_path": "O:\\背调\\YYYY-MM-DD\\对象\\process\\公开遮挡图.jpg",
+    "safe_image_path": "<WORKSPACE>/YYYY-MM-DD/对象/process/公开遮挡图.jpg",
     "safe_image_sha256": "64位小写SHA-256",
     "reviewer_id": "与当前 review_context.reviewer_id 相同",
     "checked_at": "带时区的 ISO-8601 时间"

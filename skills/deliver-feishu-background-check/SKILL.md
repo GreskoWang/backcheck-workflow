@@ -44,7 +44,7 @@ pwsh -NoProfile -File "$env:BACKGROUND_CHECK_WORKSPACE\external\feishu-mcp\scrip
 
 浏览器握手、截图、渲染或图钉跳转失败，与飞书 API 身份分开诊断；API 正常时不重新拉起 OAuth。图标或实际跳转未验证只挂起相应终审项目，不妨碍其他已授权内容写入、回读和本地整理；不能据此宣称成品 PASS。
 
-禁止临时重写登录流程、把 App Secret 放入命令行或自行拼装新的 OAuth 权限。真正的云端／远程环境若缺少本机 DPAPI 凭据、`O:\` 脚本、`localhost:3000` 回调或原账号浏览器登录态，应报告本机授权设施不可用，不能假称已自动续权。Codex 的工具审批提示与飞书 OAuth 是两类状态；`default_tools_approval_mode = "prompt"` 不能作为要求用户重新登录飞书的理由。任何“需要你授权”的答复必须同时给出：已运行的预检命令、返回状态、实际观察到的用户专属阻碍；缺一项即禁止作此结论。
+禁止临时重写登录流程、把 App Secret 放入命令行或自行拼装新的 OAuth 权限。真正的云端／远程环境若缺少本机 DPAPI 凭据、已安装的本机授权脚本、`localhost:3000` 回调或原账号浏览器登录态，应报告本机授权设施不可用，不能假称已自动续权。Codex 的工具审批提示与飞书 OAuth 是两类状态；`default_tools_approval_mode = "prompt"` 不能作为要求用户重新登录飞书的理由。任何“需要你授权”的答复必须同时给出：已运行的预检命令、返回状态、实际观察到的用户专属阻碍；缺一项即禁止作此结论。
 
 本节或 UAT 恢复脚本发生修改后，必须运行 `scripts/validate-identity-contract.ps1`。该校验未通过时不得把新的身份规则投入交付流程。
 

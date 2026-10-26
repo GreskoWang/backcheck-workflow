@@ -1,3 +1,4 @@
+import { fixtureFileUrl } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildCodexEnvironment } from '../src/codex-client.mjs';
@@ -16,7 +17,7 @@ test('no configured proxy preserves the inherited environment', () => {
   assert.deepEqual(buildCodexEnvironment(parent, ''), parent);
 });
 test('unexpected external proxies and embedded credentials are rejected', () => {
-  for (const route of ['https://example.com:443', 'http://user:password@localhost:10808', 'file:///tmp/proxy']) {
+  for (const route of ['https://example.com:443', 'http://user:password@localhost:10808', fixtureFileUrl('proxy')]) {
     assert.throws(() => buildCodexEnvironment({}, route), /local HTTP proxy/u);
   }
 });

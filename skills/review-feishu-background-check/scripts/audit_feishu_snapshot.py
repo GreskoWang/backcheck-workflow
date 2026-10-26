@@ -2220,7 +2220,7 @@ def self_test() -> int:
 
     fake_policy_source = copy.deepcopy(valid)
     fake_policy_source["review_context"]["business_risk_review"]["policy_sources"] = [
-        {"path": r"O:\背调\不存在的风险表.md", "sha256": "0" * 64}
+        {"path": str(Path(policy_source()["path"]).with_name("不存在的风险表.md")), "sha256": "0" * 64}
     ]
     fake_policy_result = audit(fake_policy_source)
     if fake_policy_result["verdict"] != "FAIL" or not any(

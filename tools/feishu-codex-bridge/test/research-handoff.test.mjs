@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -5,8 +6,8 @@ import { commitRecoveredResearchHandoff } from '../src/research-handoff.mjs';
 
 const requestId = 'RQ-20261004-IGDA';
 const threadId = '00000000-934e-7000-8000-a871fd3740a6';
-const sessionPath = 'C:\\Users\\Excal\\.codex\\sessions\\native.jsonl';
-const instructionPath = 'O:\\背调\\native\\IGDA.md';
+const sessionPath = fixturePath('codex', 'sessions', 'native.jsonl');
+const instructionPath = fixturePath('工作区', 'native', 'IGDA.md');
 const marker = `FEISHU-NATIVE-${requestId}-nonce`;
 const digest = 'a'.repeat(64);
 

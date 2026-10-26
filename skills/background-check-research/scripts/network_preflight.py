@@ -801,7 +801,7 @@ def main() -> int:
             "no pre-opened Edge session, endpoint, or tab id is required."
         ),
     )
-    parser.add_argument("--out", type=Path, help="write legacy network-preflight-1.4 JSON under O:\\背调")
+    parser.add_argument("--out", type=Path, help="write legacy network-preflight-1.4 JSON under the configured workspace")
     parser.add_argument(
         "--channel", choices=("browser", "edge", "api"), default="browser",
         help=(

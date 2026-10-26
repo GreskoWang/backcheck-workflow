@@ -1,3 +1,6 @@
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { CLICK_FUNCTION } from './cdp-proxy.mjs';
@@ -54,7 +57,7 @@ const link = new Element('profile', { tagName: 'A', target: '_blank', href: '/us
 const label = new Element('profile label', { parentElement: link });
 assert.equal(fixture([label])('a > p', true).navigationUrl, 'https://www.douyin.com/user/public-account');
 assert.equal(label.clicks + link.clicks, 0, 'a new-tab link must not spawn an unleased popup');
-for (const href of [null, '', 'javascript:alert(1)', 'file:///C:/private', 'https://user:password@example.test/']) {
+for (const href of [null, '', 'javascript:alert(1)', pathToFileURL(path.join(os.tmpdir(), 'private-fixture')).href, 'https://user:password@example.test/']) {
   const unsafe = new Element('unsafe', { tagName: 'A', target: '_blank', href });
   assert.equal(fixture([unsafe])('a', true).error, 'unsupported_link');
   assert.equal(unsafe.clicks, 0);

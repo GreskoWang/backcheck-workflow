@@ -1,22 +1,59 @@
-"""Build/verify a SHA-256 manifest of Git-selected assets, never runtime state."""
+"""Build/verify a byte-exact manifest of portable Git-selected assets."""
 from pathlib import Path
-import argparse, hashlib, json, subprocess, sys
-ROOT=Path(__file__).resolve().parents[1]
-MANIFEST=ROOT/'package-manifest.json'
-def source_files():
-    output=subprocess.check_output(['git','-C',str(ROOT),'ls-files','--cached','--others','--exclude-standard','-z'])
-    return sorted(set(p.decode('utf-8') for p in output.split(b'\0') if p and p!=b'package-manifest.json'))
-def record(rel):
-    p=ROOT/rel
-    if not p.resolve().is_relative_to(ROOT):raise ValueError(f'Outside package: {rel}')
-    data=p.read_bytes();return {'path':rel,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+import argparse
+import hashlib
+import json
+
+from check_portability import scan, source_files
+
+ROOT = Path(__file__).resolve().parents[1]
+MANIFEST_NAME = 'package-manifest.json'
+
+
+def record(root, rel):
+    path = root / rel
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError(f'Outside package: {rel}')
+    data = path.read_bytes()
+    return {'path': rel, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+
+
+def verify(root=ROOT, *, write=False):
+    names = source_files(root)
+    problems = scan(root, names)
+    if problems:
+        return {'status': 'FAIL', 'portability': problems}
+    selected = sorted(set(names) - {MANIFEST_NAME})
+    records = [record(root, name) for name in selected]
+    manifest_path = root / MANIFEST_NAME
+    if write:
+        manifest_path.write_text(json.dumps({'schema': 1, 'algorithm': 'sha256', 'files': records},
+                                           ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        entries = manifest['files']
+        listed = [entry['path'] for entry in entries]
+        if (manifest['schema'] != 1 or manifest['algorithm'] != 'sha256'
+                or len(listed) != len(set(listed))):
+            raise ValueError('invalid manifest schema or duplicate entries')
+    except (OSError, ValueError, KeyError, TypeError):
+        return {'status': 'FAIL', 'reason': 'invalid_or_missing_manifest'}
+    expected = {entry['path']: entry for entry in entries}
+    mismatches = [entry['path'] for entry in records if expected.get(entry['path']) != entry]
+    unlisted = sorted(set(selected) - set(listed))
+    unexpected = sorted(set(listed) - set(selected))
+    return {'status': 'FAIL' if mismatches or unexpected else 'PASS', 'files': len(records),
+            'mismatches': mismatches, 'unlisted': unlisted, 'unexpected': unexpected}
+
+
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--write',action='store_true');args=ap.parse_args()
-    if args.write:
-        files=[record(p) for p in source_files()]
-        MANIFEST.write_text(json.dumps({'schema':1,'algorithm':'sha256','files':files},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-    manifest=json.loads(MANIFEST.read_text(encoding='utf-8'))
-    failures=[r['path'] for r in manifest['files'] if not (ROOT/r['path']).is_file() or record(r['path'])!=r]
-    print(json.dumps({'status':'FAIL' if failures else 'PASS','files':len(manifest['files']),'mismatches':failures},ensure_ascii=False))
-    return bool(failures)
-if __name__=='__main__':raise SystemExit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--write', action='store_true')
+    args = parser.parse_args()
+    result = verify(write=args.write)
+    print(json.dumps(result, ensure_ascii=False))
+    return result['status'] != 'PASS'
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

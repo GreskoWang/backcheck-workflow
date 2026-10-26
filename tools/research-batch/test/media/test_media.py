@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -18,6 +19,19 @@ spec.loader.exec_module(media)
 
 
 class MediaBehaviorTest(unittest.TestCase):
+    def test_font_uses_windows_environment_and_respects_explicit_override(self):
+        root = str(Path(tempfile.gettempdir()) / 'system-font-fixture')
+        sentinel = object()
+        with patch.dict(media.os.environ, {'SystemRoot': root}, clear=True), patch.object(media.ImageFont, 'truetype', return_value=sentinel) as loader:
+            font, source = media.get_font(None, 18)
+            self.assertIs(font, sentinel)
+            self.assertEqual(source, str(Path(root) / 'Fonts' / 'msyh.ttc'))
+            loader.assert_called_once_with(source, 18)
+            loader.reset_mock()
+            explicit = str(Path(root) / 'custom.ttf')
+            self.assertEqual(media.get_font(explicit, 20), (sentinel, explicit))
+            loader.assert_called_once_with(explicit, 20)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="背调媒体测试-")
         self.root = Path(self.temp.name)

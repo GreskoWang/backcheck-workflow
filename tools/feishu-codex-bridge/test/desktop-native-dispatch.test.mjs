@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ function makeSession(root, {
   sessionId = id,
   marker = 'FEISHU-NATIVE-RQ-20260930-TEST-abc123',
   prompt = `Native prompt ${marker}`,
-  workspace = 'O:\\背调',
+  workspace = fixturePath('工作区'),
   originator = 'codex_work_desktop',
   source = 'vscode',
   threadSource = 'user',
@@ -92,7 +93,7 @@ test('marker avoids Markdown-sensitive underscores', () => {
 });
 
 test('native prompt and deep link preserve the batch identity', () => {
-  const instruction = 'O:\\背调\\state\\native\\RQ-TEST.md';
+  const instruction = fixturePath('工作区', 'state', 'native', 'RQ-TEST.md');
   const digest = crypto.createHash('sha256').update('task').digest('hex');
   const prompt = buildDesktopNativePrompt({
     requestId: 'RQ-TEST',
@@ -103,7 +104,7 @@ test('native prompt and deep link preserve the batch identity', () => {
   });
   assert.match(prompt, /FEISHU-NATIVE-RQ-TEST-abc123/u);
   assert.match(prompt, /RQ-TEST\.md/u);
-  const deepLink = buildCodexNewDeepLink({ workspace: 'O:\\背调', prompt });
+  const deepLink = buildCodexNewDeepLink({ workspace: fixturePath('工作区'), prompt });
   assert.match(deepLink, /^codex:\/\/new\?/u);
   assert.equal(new URL(deepLink).searchParams.get('prompt'), prompt);
 });
@@ -111,29 +112,29 @@ test('native prompt and deep link preserve the batch identity', () => {
 test('session metadata accepts only a desktop-owned user thread in the workspace', () => {
   const base = {
     id: '00000000-3538-7000-8000-46c9a76ce73d',
-    cwd: 'O:\\背调',
+    cwd: fixturePath('工作区'),
     originator: 'codex_work_desktop',
     source: 'vscode',
     thread_source: 'user',
     timestamp: '2026-09-30T13:15:08.131Z',
   };
-  assert.equal(isDesktopNativeSessionMeta(base, { workspace: 'O:\\背调' }), true);
+  assert.equal(isDesktopNativeSessionMeta(base, { workspace: fixturePath('工作区') }), true);
   assert.equal(isDesktopNativeSessionMeta({ ...base, originator: 'Codex Desktop' }, {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
   }), true);
   assert.equal(isDesktopNativeSessionMeta({ ...base, originator: 'codex-tui' }, {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
   }), false);
   assert.equal(isDesktopNativeSessionMeta({ ...base, source: 'exec' }, {
-    workspace: 'O:\\背调',
+    workspace: fixturePath('工作区'),
   }), false);
-  assert.equal(isDesktopNativeSessionMeta({ ...base, cwd: 'C:\\wrong' }, {
-    workspace: 'O:\\背调',
+  assert.equal(isDesktopNativeSessionMeta({ ...base, cwd: fixturePath('wrong') }, {
+    workspace: fixturePath('工作区'),
   }), false);
   assert.equal(isDesktopNativeSessionMeta({
     ...base,
     session_id: '00000000-8a54-7000-8000-ec6ec458b987',
-  }, { workspace: 'O:\\背调' }), false);
+  }, { workspace: fixturePath('工作区') }), false);
 });
 
 test('recovery discovery ignores marked historical files written before the draft opened', () => {
@@ -150,7 +151,7 @@ test('recovery discovery ignores marked historical files written before the draf
       originator: 'Codex Desktop',
     });
     const found = findDesktopNativeSession({
-      sessionsRoot: root, marker, expectedPrompt: prompt, workspace: 'O:\\背调',
+      sessionsRoot: root, marker, expectedPrompt: prompt, workspace: fixturePath('工作区'),
       notBeforeMs: Date.parse('2026-09-30T13:15:08Z'),
     });
     assert.equal(found.meta.id, '00000000-2810-7000-8000-2b5ab74f6a8a');
@@ -162,8 +163,8 @@ test('recovery discovery ignores marked historical files written before the draf
 test('ambiguous UI acknowledgement never invokes Send again and requires session evidence', async () => {
   const marker = 'FEISHU-NATIVE-RQ-20260930-TEST-abc123';
   const base = {
-    requestId: 'RQ-20260930-TEST', threadTitle: 'Native test', workspace: 'O:\\背调',
-    instructionPath: 'O:\\背调\\state\\native\\RQ-TEST.md',
+    requestId: 'RQ-20260930-TEST', threadTitle: 'Native test', workspace: fixturePath('工作区'),
+    instructionPath: fixturePath('工作区', 'state', 'native', 'RQ-TEST.md'),
     instructionSha256: 'a'.repeat(64), marker,
     sessionsRoot: 'unused', discoveryTimeoutMs: 1,
   };
@@ -209,7 +210,7 @@ test('session discovery fails closed on an invalid or duplicate marked session',
       sessionsRoot: root,
       marker,
       expectedPrompt,
-      workspace: 'O:\\背调',
+      workspace: fixturePath('工作区'),
       notBeforeMs: Date.parse('2026-09-30T13:15:08.000Z'),
     });
     assert.equal(found.meta.originator, 'codex_work_desktop');
@@ -223,7 +224,7 @@ test('session discovery fails closed on an invalid or duplicate marked session',
       sessionsRoot: root,
       marker,
       expectedPrompt,
-      workspace: 'O:\\背调',
+      workspace: fixturePath('工作区'),
     }), /appeared in 2 Codex sessions/u);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -244,7 +245,7 @@ test('session discovery rejects a marker outside the submitted user prompt', () 
       sessionsRoot: root,
       marker,
       expectedPrompt,
-      workspace: 'O:\\背调',
+      workspace: fixturePath('工作区'),
     }), /invalid Codex session/u);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -262,7 +263,7 @@ test('session discovery rejects a wrong full prompt and mismatched metadata ids'
       sessionsRoot: wrongPromptRoot,
       marker,
       expectedPrompt,
-      workspace: 'O:\\背调',
+      workspace: fixturePath('工作区'),
     }), /invalid Codex session/u);
   } finally {
     fs.rmSync(wrongPromptRoot, { recursive: true, force: true });
@@ -279,7 +280,7 @@ test('session discovery rejects a wrong full prompt and mismatched metadata ids'
       sessionsRoot: mismatchedIdRoot,
       marker,
       expectedPrompt,
-      workspace: 'O:\\背调',
+      workspace: fixturePath('工作区'),
     }), /invalid Codex session/u);
   } finally {
     fs.rmSync(mismatchedIdRoot, { recursive: true, force: true });
@@ -305,8 +306,8 @@ test('dispatcher launches, submits, binds the unique native session, then reads 
     const result = await dispatcher.dispatch({
       requestId: 'RQ-20260930-TEST',
       threadTitle: '飞书背调测试',
-      workspace: 'O:\\背调',
-      instructionPath: 'O:\\背调\\state\\native\\RQ-TEST.md',
+      workspace: fixturePath('工作区'),
+      instructionPath: fixturePath('工作区', 'state', 'native', 'RQ-TEST.md'),
       instructionSha256: 'a'.repeat(64),
       marker,
       sessionsRoot: root,

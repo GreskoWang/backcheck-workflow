@@ -7,8 +7,9 @@
 ## 从采集缓存直接导出
 
 ```powershell
+$taskDir = Join-Path $env:BACKGROUND_CHECK_WORKSPACE '任务'
 $python = $env:RESEARCH_PYTHON
-& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\export_manifest.py" 'D:\任务\batch\result.json' 'D:\任务\NEW-media.json'
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\export_manifest.py" "$taskDir\batch\result.json" "$taskDir\NEW-media.json"
 ```
 
 自动读取标准 `result.items[].media[]`，保留“唯一媒体项→原媒体 ID→正文 ID→账号／原帖／日期”；跨帖同 URL 保留各自归因。image／photo／cover／thumbnail／video-poster可进入图片下载，video保留需播放核查的失败占位。明确非媒体类型在内嵌 `export_report` 按原因计数；类型未知或仍标候选／归属未核的媒体保留显式候选占位，不猜测过滤。已知媒体缺数、占位、未展开图集保留显式失败项，不能导出成空缺并假装看完。
@@ -40,8 +41,8 @@ $python = $env:RESEARCH_PYTHON
 
 ```powershell
 $python = $env:RESEARCH_PYTHON
-& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\fetch_assets.py" 'D:\任务\remote-media.json' 'D:\任务\素材01'
-& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\media.py" sheet 'D:\任务\素材01\local-manifest.json' 'D:\任务\配图批读01'
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\fetch_assets.py" "$taskDir\remote-media.json" "$taskDir\素材01"
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\media.py" sheet "$taskDir\素材01\local-manifest.json" "$taskDir\配图批读01"
 ```
 
 默认最多 3 个并发，每项只作一次下载尝试，**不重试**；允许最多 5 次安全重定向，请求数包含实际发起的跳转尝试。每项默认 20 秒、10 MiB、4000万像素上限；可调 `--concurrency 1..3`、`--timeout`（不超过120秒）、`--max-bytes`（不超过50MiB）。首次返回 429 后，停止该批次对同一 host 的新请求，待处理项明确标为 `not_downloaded`；已在途项按实际结果记录，其他 host 继续。不会通过切代理、改认证或无限等待恢复。
@@ -54,8 +55,8 @@ $python = $env:RESEARCH_PYTHON
 
 ```powershell
 $python = $env:RESEARCH_PYTHON
-& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\media.py" sheet 'D:\任务\media.json' 'D:\任务\配图批读01'
-& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\media.py" videoshot 'D:\任务\videoshot.json' 'D:\任务\视频采样01' --cols 3 --rows 4
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\media.py" sheet "$taskDir\media.json" "$taskDir\配图批读01"
+& $python -X utf8 "$env:BACKGROUND_CHECK_WORKSPACE\tools\research-batch\media\media.py" videoshot "$taskDir\videoshot.json" "$taskDir\视频采样01" --cols 3 --rows 4
 ```
 
 输出父目录必须已存在，目标目录必须不存在；成功后整个结果目录原子改名提交。出现致命错误时，自己的 `.目标名.pending-*` 诊断目录保留，位置写在错误中。不会清理用户文件。

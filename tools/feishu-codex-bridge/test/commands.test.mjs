@@ -1,3 +1,4 @@
+import { fixturePath } from './fixture-paths.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -10,7 +11,7 @@ test('accepts only explicit background-check commands', () => {
     body: '张三 https://example.com',
   });
   assert.equal(parseCommand('帮我查一下张三').kind, 'unknown');
-  assert.equal(parseCommand('删除 O:\\背调').kind, 'unknown');
+  assert.equal(parseCommand(`删除 ${fixturePath('工作区')}`).kind, 'unknown');
 });
 
 test('accepts a complete team dispatch header without an extra command prefix', () => {
