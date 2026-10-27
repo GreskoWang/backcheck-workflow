@@ -95,6 +95,11 @@ function createClient({ port, owner, target }) {
       method, headers: { ...headers, 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
+    if (route.startsWith('/screenshot?') && response.ok) {
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (!response.headers.get('content-type')?.startsWith('image/jpeg') || bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255) throw new Error('Screenshot response is not JPEG');
+      return { screenshot: bytes };
+    }
     const data = await response.json();
     if (!response.ok || data.ok === false) {
       const error = new Error(safeMessage(data.error?.message || `Broker HTTP ${response.status}`));
@@ -134,10 +139,44 @@ export async function runWorker(directory) {
   process.once('SIGTERM', () => { stopped = true; });
   process.once('SIGINT', () => { stopped = true; });
   const cancelled = () => stopped || (fs.existsSync(path.join(directory, 'control.json')) && readJson(path.join(directory, 'control.json')).cancel === true);
+  let capturePending = true;
+  const visualIndexPath = path.join(directory, 'visual-read-index.json');
+  const visualFrames = state.capture_visual_frames === true && fs.existsSync(visualIndexPath) ? readJson(visualIndexPath).frames : [];
+  let capturedThisRun = 0;
+  const expandedCounts = new Map();
   const result = await collectBatch({
     state, directory, cancelled,
     snapshot: async signal => {
-      if (!state.compatibility) return (await request(`/research/snapshot?${query}`, 'POST', { recipe: state.recipe }, signal)).value;
+      if (!state.compatibility) {
+        let value = (await request(`/research/snapshot?${query}`, 'POST', { recipe: state.recipe }, signal)).value;
+        if ((state.expand_visible_x_text === true || state.expand_visible_youtube_text === true) && state.recipe === 'generic-posts') {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const control = value.page_state?.visible_expand_controls?.find(control =>
+              ((state.expand_visible_x_text === true && /^https:\/\/x\.com\/FIIO_official\/status\/\d+$/i.test(control.post_url || '')) ||
+               (state.expand_visible_youtube_text === true && control.author === 'FIIO' && /^https:\/\/www\.youtube\.com\/post\/Ug[A-Za-z0-9_-]{16,70}$/.test(control.post_url || '')))
+              && (expandedCounts.get(control.post_url) || 0) < 2);
+            if (!control) break;
+            const clicked = await request(`/click?${query}`, 'POST', { selector: control.selector, index: control.index, expectedText: control.expected_text }, signal);
+            expandedCounts.set(control.post_url, (expandedCounts.get(control.post_url) || 0) + 1);
+            if (!clicked.clicked) break;
+            const after = await request(`/info?${query}`, 'GET', undefined, signal);
+            if (infoUrl(after) !== state.target_url) throw new Error('Text expansion changed page; collection stopped');
+            const next = (await request(`/research/snapshot?${query}`, 'POST', { recipe: state.recipe }, signal)).value;
+            if (JSON.stringify(next.items) === JSON.stringify(value.items)) break;
+            value = next;
+          }
+        }
+        if (state.capture_visual_frames === true && capturePending && value.items?.some(item => item.media?.items?.length)) {
+          if (capturedThisRun >= 40) { const error = new Error('Forty viewport frames are ready for reading'); error.code = 'visual_batch_ready'; throw error; }
+          const shot = await request(`/screenshot?${query}&format=jpeg`, 'GET', undefined, signal);
+          const filename = `visual-${String(visualFrames.length + 1).padStart(5, '0')}.jpg`;
+          fs.writeFileSync(path.join(directory, filename), shot.screenshot, { flag: 'wx' });
+          visualFrames.push({ file: filename, sources: value.items.map(item => ({ source_id: item.source_id, post_url: item.post_url })), scope: 'viewport_only' });
+          saveJson(visualIndexPath, { frames: visualFrames });
+          capturedThisRun++; capturePending = false;
+        }
+        return value;
+      }
       const info = await request(`/info?${query}`, 'GET', undefined, signal);
       let text = (await request(`/dom/query?${query}`, 'POST', { kind: 'text', selector: 'main', maxChars: 16000 }, signal)).value;
       if (!text?.found) text = (await request(`/dom/query?${query}`, 'POST', { kind: 'text', selector: 'body', maxChars: 16000 }, signal)).value;
@@ -155,6 +194,7 @@ export async function runWorker(directory) {
         const result = await request(`/click?${query}`, 'POST', { selector: 'button', expectedText: wanted, index: matches[0].index }, signal);
         if (!result.clicked) throw new Error('Registered next-page control did not activate');
       } else await scroll('down', 700, signal);
+      capturePending = true;
     },
     recover: async signal => { await scroll('up', 350, signal); await scroll('down', 700, signal); },
   });

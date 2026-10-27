@@ -1,4 +1,5 @@
 import * as Lark from '@larksuiteoapi/node-sdk';
+import { activeGroupPolicies, acceptsGroupMessage } from './group-policy.mjs';
 
 const MESSAGE_PAGE_SIZE = 50;
 const CHAT_PAGE_SIZE = 100;
@@ -107,6 +108,7 @@ export class FeishuMessagePoller {
     client,
     botIdentity,
     getBinding,
+    getPolicies,
     onMessage,
     logger,
     intervalMs,
@@ -119,11 +121,12 @@ export class FeishuMessagePoller {
   }) {
     if (!client) throw new Error('polling client is required');
     if (!botIdentity?.openId) throw new Error('bot identity is required for polling');
-    if (typeof getBinding !== 'function') throw new Error('getBinding must be a function');
+    if (typeof getBinding !== 'function' && typeof getPolicies !== 'function') throw new Error('getBinding or getPolicies must be a function');
     if (typeof onMessage !== 'function') throw new Error('onMessage must be a function');
     this.client = client;
     this.botIdentity = botIdentity;
     this.getBinding = getBinding;
+    this.getPolicies = getPolicies;
     this.onMessage = onMessage;
     this.logger = logger;
     this.intervalMs = intervalMs;
@@ -182,8 +185,12 @@ export class FeishuMessagePoller {
 
   async pollOnce() {
     const cycleEndSeconds = Math.floor(this.now() / 1000);
-    const binding = this.getBinding();
-    const chatIds = binding?.chatId ? [binding.chatId] : await this.listChatIds();
+    const binding = this.getBinding?.();
+    const policies = this.getPolicies ? activeGroupPolicies(this.getPolicies()) : null;
+    const policyByChat = policies ? new Map(policies.map((policy) => [policy.chatId, policy])) : null;
+    // Explicit multi-group mode never falls back to all visible chats, even
+    // when every configured group is disabled or awaiting its cutover.
+    const chatIds = policies ? [...policyByChat.keys()] : binding?.chatId ? [binding.chatId] : await this.listChatIds();
     const records = [];
     const failedChats = new Set();
     const errors = [];
@@ -191,7 +198,9 @@ export class FeishuMessagePoller {
     const fetches = await Promise.allSettled(chatIds.map(async (chatId) => {
       const defaultStart = cycleEndSeconds - Math.ceil(this.lookbackMs / 1000);
       const persisted = this.getWatermark?.(chatId);
-      const startSeconds = this.watermarks.get(chatId) ?? persisted ?? defaultStart;
+      const remembered = this.watermarks.get(chatId) ?? persisted ?? defaultStart;
+      const cutoff = policyByChat?.get(chatId)?.activationFromMs;
+      const startSeconds = cutoff ? Math.max(remembered, Math.floor(cutoff / 1000)) : remembered;
       const items = await this.listMessages(chatId, startSeconds, cycleEndSeconds);
       return { chatId, items };
     }));
@@ -216,11 +225,13 @@ export class FeishuMessagePoller {
     let forwardedCount = 0;
     for (const record of unique.values()) {
       try {
+        const policy = policyByChat?.get(record.chatId);
+        if (policy && !acceptsGroupMessage(policy, { chatId: record.chatId, createTime: record.item.create_time })) continue;
         const message = await normalizePolledMessage(
           record.item,
           record.chatId,
           this.botIdentity,
-          { allowUnmentioned: binding?.chatId === record.chatId },
+          { allowUnmentioned: Boolean(policy) || binding?.chatId === record.chatId },
         );
         if (!message) continue;
         await this.onMessage(message);

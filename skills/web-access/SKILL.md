@@ -60,9 +60,9 @@ and fall back to a working `node` on PATH. This avoids the WindowsApps `node.exe
 
 ## CDP Mode
 
-普通背调、特殊背调和专项网页调查默认使用本节 CDP 入口，不先调用 Windows Computer Use／CUA 做网址或窗口健康检查。`scripts/cdp-session.ps1` 由获准的 PowerShell shell 运行，不依赖 Computer Use、Browser 或 Node REPL 是否列在 `ALL_TOOLS` 中。预检成功后，在自己持有租约的页面验证真实 URL 和小范围正文，再进行页面操作。原生控制器未修复不构成 CDP 调查或 Goal 的前置阻塞。
+普通背调、特殊背调、专项网页调查及其配套工具修复默认只使用获准的本节 CDP 入口，不调用 Windows Computer Use／CUA 检查或操作 Edge，包括查看连接弹窗、确认窗口状态和截图，也不把它作为交付或 Goal 推进的前置条件。`scripts/cdp-session.ps1` 由获准的 PowerShell shell 运行，不依赖 Computer Use、Browser 或 Node REPL 是否列在 `ALL_TOOLS` 中。原生控制器未修复不构成所有 CDP 调查的前置阻塞。
 
-把故障限定在实际失败的控制器、页面或材料，不把单条路线的失败计数直接当作整个 Goal 的阻塞计数。仍有可读材料、其他获准来源或交付工作时继续推进。明确的安全/权限拒绝必须遵守其停止范围，不能以另一入口重试被拒绝动作；此时只推进不涉及该拒绝的独立工作。保留真实缺口，所有剩余工作确实无法推进时才按 Goal 规则判定 blocked。
+把故障限定在实际失败的控制器、页面或材料，不把单条路线的失败计数直接当作整个 Goal 的阻塞计数。普通技术故障沿用原断点和既有恢复计数，按有界恢复规则处理；仍失败时采用获准且不涉及安全拒绝的替代来源，将原路线记为具体缺口。明确的安全／权限拒绝须保留原文并遵守实际停止范围，不自行宣布只限制一次调用，不以另一入口重试被拒绝动作，也不把新回合或提示词修改当成拒绝解除。仍有不涉及该拒绝的可读缓存、其他获准来源、分析或交付工作时继续推进，所有剩余工作确实无法推进时才按 Goal 规则判定 blocked。
 
 On Windows, prefer the user's visible, persistent Microsoft Edge profile and the single local CDP broker. Do not use Codex in-app/IAB, hosted, headless, or temporary browser profiles as a substitute for logged-in platform work. Before browser control, run:
 
@@ -78,11 +78,9 @@ edge://inspect/#remote-debugging
 
 and enable **Allow remote debugging for this browser instance** only within the authorization rules below. A missing `DevToolsActivePort` means only that the live endpoint is not ready; it does not prove the switch is off. On Windows, inspect `Local State` at `devtools.remote_debugging.user-enabled`: when it is `true`, ensure the ordinary visible Edge using the default user-data directory is running, wait for the endpoint file and listener, then retry once without asking the user to toggle the switch. Edge may display a browser security confirmation when a debugging connection is established; a timeout alone does not prove that a prompt exists. A user's request to perform the browser task authorizes routine opening, navigation, reading, scrolling, clicking, and screenshots within that task, so do not ask them to pre-open Edge, choose a tab, provide an endpoint, or reconfirm every ordinary action. Authentication credentials, CAPTCHA, 2FA, new OAuth scopes, and paid access remain subject to their applicable user-confirmation rules. Handle Edge remote-debugging prompts as follows:
 
-用户已明确授权代点 Edge 远程调试“允许”时，对既有本机 Edge 与本地 broker 在当前任务范围内发起的预期连接提示，由代理使用当前获准的电脑控制工具主动点击，不再固定交给用户，也不重复索取同一授权。点击前实际读取可见提示，核对 Edge 窗口、连接上下文及权限范围，确认是预期的“是否允许远程调试？”提示，再点击一次“允许”。未看到提示不盲点，不以超时推断用户未授权；来源或权限范围不明时先核实。首次启用调试或实质扩大访问权限时，遵守当前工具的操作时确认要求，不能将这条代点授权扩展为任意安全提示的通行许可。
+broker 明确要求授权时，简短说明当前连接状态；只有确认存在待处理的预期 Edge 授权提示，才请用户点击“允许”。背调及其工具修复不调用 CUA 查看或代点提示，不以超时推断弹窗存在或用户未授权。等待时继续已读缓存、分析和获准的飞书工作稿，不为制造提示反复重载 broker 或重启 Edge。
 
-点击后核对连接状态及原任务页的 URL、可读性，保留原断点和已用恢复次数；不为测试代点能力重载 broker、重启 Edge 或制造新提示。若电脑控制工具因网址识别、权限校验等原因明确拒绝操作，遵守其停止要求，不用其他通道或脚本绕过，也不把修改技能当作原生故障已修复。
-
-连接与页面可读性分别核对：`/health` 与 `/targets` 成功只证明 broker 能连接并列页。在本路线持有租约的目标上，继续用 `/info` 核对实际 URL，再做小范围可见正文查询；需要看图时才截图。能建页、能列页或 activated=true 都不证明正文已加载。扩展/CUA 的 debugger 生命周期与平台服务端限制不属于本目录可修的代码；本地测试通过后仍须验证原失败页面，未现场复验只能称本地修复完成。
+连接与页面可读性分别核对：`connected` 且 `approvalRequired=false` 只表示连接就绪，`/targets` 成功只证明能列页。在本任务原有、归属明确且持有有效租约的目标上，用 `/info` 核对实际 URL，再做小范围可见正文查询，通过后从断点继续，不新建页面重跑；需要看图时才通过 CDP 截图。保留原断点和恢复计数。能建页、列页或 activated=true 都不证明正文已加载，本地测试通过后仍须验证原失败页面，未现场复验只能称本地修复完成。已发生的安全拒绝仍受上文停止范围约束。
 
 同一 Edge 调试实例只复用一个 broker；OS 级锁拒绝第二套连接域。同一 target 只有一个 owner 和串行命令队列，不与扩展或 DevTools 同时控制。`new` 必须复读确认认证创建标记已消失才返回 capability；失败不发布租约。禁止读取或导出 cookies、tokens、浏览器存储、凭据数据库和私有接口。断线、闲置或 broker 退出均保留页面，只通过具备本页管理 capability 的显式 finalize 关闭自建页。
 

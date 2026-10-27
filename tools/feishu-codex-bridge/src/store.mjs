@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { canResumeDeliveryReview, deliveryReviewInputFingerprint } from './delivery-review.mjs';
 
 function readJson(filePath, fallback) {
   try {
@@ -30,9 +31,21 @@ function normalized(value) {
   return String(value || '').trim();
 }
 
+function sourceMessageIds(job) {
+  return [...new Set([job?.sourceMessageId, ...(job?.sourceAliases || []).map((item) => item.messageId)].filter(Boolean))];
+}
+
+function intakeFingerprint(job) {
+  const text = String(job?.requestText || '').normalize('NFC').replace(/\r\n?/gu, '\n').trim();
+  const media = Array.isArray(job?.sourceMediaKeys) ? job.sourceMediaKeys.map(String) : [];
+  if (!text && !media.length) return null;
+  return crypto.createHash('sha256').update(JSON.stringify({ text, media })).digest('hex');
+}
+
 function assertPersistedUniqueness(jobs) {
   const requestIds = new Set();
-  const sourceMessageIds = new Set();
+  const sourceIds = new Set();
+  const canonicalIds = new Set();
   const threadOwners = new Map();
 
   for (const job of jobs) {
@@ -43,12 +56,16 @@ function assertPersistedUniqueness(jobs) {
     }
     requestIds.add(requestId);
 
-    const sourceMessageId = normalized(job?.sourceMessageId);
-    if (sourceMessageId) {
-      if (sourceMessageIds.has(sourceMessageId)) {
+    for (const sourceMessageId of sourceMessageIds(job)) {
+      if (sourceIds.has(sourceMessageId)) {
         throw new Error(`duplicate source message id in job store: ${sourceMessageId}`);
       }
-      sourceMessageIds.add(sourceMessageId);
+      sourceIds.add(sourceMessageId);
+    }
+    const canonicalId = normalized(job?.canonicalSourceMessageId || job?.sourceMessageId);
+    if (canonicalId) {
+      if (canonicalIds.has(canonicalId)) throw new Error(`duplicate canonical source message id: ${canonicalId}`);
+      canonicalIds.add(canonicalId);
     }
 
     const threadId = normalized(job?.codexThreadId);
@@ -126,6 +143,15 @@ export class BridgeStore {
       // reinterpret it as an interrupted run or put it back on the queue.
       if (job.status === 'paused') continue;
       if (job.status === 'running' || job.status === 'queued') {
+        // A saved result is resumed only through the read-only review path.
+        // The CLI execution guard remains intact for every research attempt.
+        if (canResumeDeliveryReview(job)) {
+          job.status = 'queued';
+          job.reviewRecoveryOnly = true;
+          job.recoveredAt = new Date().toISOString();
+          changed = true;
+          continue;
+        }
         const threadId = normalized(job.codexThreadId);
         const ownerRequestId = normalized(job.codexThreadRequestId);
         const cliTurnMayHaveRun = Boolean(job.codexCliAttemptStartedAt) ||
@@ -175,7 +201,7 @@ export class BridgeStore {
   getJobBySourceMessageId(messageId) {
     const jobs = this.listJobs();
     assertPersistedUniqueness(jobs);
-    const matches = jobs.filter((job) => job.sourceMessageId === messageId);
+    const matches = jobs.filter((job) => sourceMessageIds(job).includes(messageId));
     if (matches.length > 1) {
       throw new Error(`duplicate source message id in job store: ${messageId}`);
     }
@@ -191,22 +217,54 @@ export class BridgeStore {
     return jobs;
   }
 
-  addJobForMessage(messageId, job) {
+  addJobForMessage(messageId, job, { canonicalSourceMessageId, canonicalSourceVerified = false } = {}) {
     const jobs = this.listJobs();
     assertPersistedUniqueness(jobs);
-    const existing = jobs.find((item) => item.sourceMessageId === messageId);
+    const existing = jobs.find((item) => sourceMessageIds(item).includes(messageId));
     if (existing) {
       this.markMessageSeen(messageId);
       return { added: false, job: existing };
     }
+    if (canonicalSourceMessageId && (canonicalSourceVerified !== true || !/^om_[A-Za-z0-9]+$/u.test(canonicalSourceMessageId))) {
+      throw new Error('canonical origin requires verified message metadata');
+    }
+    const canonicalId = canonicalSourceMessageId || messageId;
+    const canonicalOwner = jobs.find((item) =>
+      (item.canonicalSourceMessageId || item.sourceMessageId) === canonicalId ||
+      sourceMessageIds(item).includes(canonicalId));
+    if (canonicalOwner) {
+      // One durable jobs.json commit claims the forwarding alias. A crash
+      // before updating seen IDs is repaired by the source lookup on replay.
+      canonicalOwner.sourceAliases = [...(canonicalOwner.sourceAliases || []), {
+        messageId, chatId: job.chatId, createdAtMs: job.sourceMessageCreatedAtMs,
+        reason: 'verified_forward_origin',
+      }];
+      this.saveJobs(jobs);
+      this.markMessageSeen(messageId);
+      return { added: false, duplicate: true, job: canonicalOwner };
+    }
+    const fingerprint = intakeFingerprint(job);
+    const candidates = fingerprint && job.chatId ? jobs.filter((item) =>
+      item.chatId && item.chatId !== job.chatId &&
+      (item.intakeFingerprint || intakeFingerprint(item)) === fingerprint) : [];
+    const intakeHold = candidates.length ? {
+      reason: 'cross_group_same_content_requires_origin_review',
+      candidateRequestIds: candidates.map((item) => item.requestId),
+      heldAt: new Date().toISOString(),
+    } : null;
     // Write the durable job before claiming the source message. If the process
     // stops between these writes, the sourceMessageId lookup above makes replay
     // idempotent and repairs the missing claim without creating a second job.
-    const isolatedJob = this.#isolateNewJob({ ...job, sourceMessageId: messageId }, jobs);
+    const isolatedJob = this.#isolateNewJob({
+      ...job, sourceMessageId: messageId, canonicalSourceMessageId: canonicalId,
+      sourceOriginVerified: canonicalSourceVerified === true,
+      sourceAliases: [], intakeFingerprint: fingerprint,
+      ...(intakeHold ? { status: 'intake_held', stage: 'cross_group_duplicate_review', intakeHold } : {}),
+    }, jobs);
     jobs.push(isolatedJob);
     this.saveJobs(jobs);
     this.markMessageSeen(messageId);
-    return { added: true, job: isolatedJob };
+    return { added: true, held: Boolean(intakeHold), job: isolatedJob };
   }
 
   #isolateNewJob(job, jobs) {
@@ -216,7 +274,7 @@ export class BridgeStore {
       throw new Error(`duplicate request id in job store: ${requestId}`);
     }
     const sourceMessageId = normalized(job?.sourceMessageId);
-    if (sourceMessageId && jobs.some((item) => item.sourceMessageId === sourceMessageId)) {
+    if (sourceMessageId && jobs.some((item) => sourceMessageIds(item).includes(sourceMessageId))) {
       throw new Error(`duplicate source message id in job store: ${sourceMessageId}`);
     }
     // A new Feishu request must never inherit a thread id from the caller or a
@@ -232,11 +290,38 @@ export class BridgeStore {
     };
   }
 
+  prepareDeliveryReview(requestId, { workspace } = {}) {
+    const jobs = this.listJobs();
+    assertPersistedUniqueness(jobs);
+    const job = findUniqueJob(jobs, requestId);
+    if (job.intakeHold || job.duplicateOfRequestId || !canResumeDeliveryReview(job) ||
+        !['queued', 'running', 'review_pending', 'failed'].includes(job.status)) {
+      throw new Error('delivery review requires a resumable owned result; paused, handed-off, or terminal jobs cannot resume');
+    }
+    try {
+      const inputFingerprint = deliveryReviewInputFingerprint({
+        ...job, stateDir: this.stateDir, workspace,
+      });
+      return { ...job, reviewInputFingerprint: inputFingerprint };
+    } catch (error) {
+      error.code = 'review_evidence_invalid';
+      error.reviewStatus = 'BLOCKED';
+      throw error;
+    }
+  }
+
   prepareExecutionJob(requestId) {
     const jobs = this.listJobs();
     assertPersistedUniqueness(jobs);
     const job = findUniqueJob(jobs, requestId);
 
+    if (job.intakeHold || job.status === 'intake_held' || job.duplicateOfRequestId) {
+      throw new Error(`request ${requestId} requires cross-group origin review before execution`);
+    }
+
+    if (job.stage === 'verifying_delivery') {
+      throw new Error(`request ${requestId} requires delivery-review-only preparation`);
+    }
     if (job.status === 'paused') {
       throw new Error(
         `request ${requestId} is paused and cannot execute until explicitly resumed`,
@@ -293,7 +378,7 @@ export class BridgeStore {
     const job = findUniqueJob(jobs, requestId);
     if (job.status === 'paused') return job;
 
-    const pausableStatuses = new Set(['queued', 'running', 'recovery_required']);
+    const pausableStatuses = new Set(['queued', 'running', 'recovery_required', 'review_pending']);
     if (!pausableStatuses.has(job.status)) {
       throw new Error(
         `request ${requestId} cannot be paused from status ${job.status || 'missing'}`,
@@ -433,7 +518,9 @@ export class BridgeStore {
   updateJob(requestId, patch) {
     const jobs = this.listJobs();
     assertPersistedUniqueness(jobs);
-    for (const field of ['requestId', 'sourceMessageId', 'codexThreadId', 'codexThreadRequestId']) {
+    for (const field of ['requestId', 'sourceMessageId', 'codexThreadId', 'codexThreadRequestId',
+      'chatId', 'requestText', 'sourceMediaKeys',
+      'canonicalSourceMessageId', 'sourceOriginVerified', 'sourceAliases', 'intakeFingerprint', 'intakeHold']) {
       if (Object.hasOwn(patch, field)) {
         throw new Error(`updateJob cannot change protected field ${field}`);
       }

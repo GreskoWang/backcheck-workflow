@@ -113,11 +113,16 @@ export function mergeItem(previous, current) {
   }
   const textSource = current.text.length >= previous.text.length ? current : previous;
   const quoteSource = current.quoted_text.length >= previous.quoted_text.length ? current : previous;
+  // An absent quote has no text-completeness evidence. In particular, an
+  // empty-quote tie must not import a later collapsed card's flags into the
+  // complete main text retained from an earlier observation. Non-empty quotes
+  // retain the existing conservative check until field-level flags are known.
+  const hasQuote = quoteSource.quoted_text.length > 0;
   const result = { ...previous, ...current, text: textSource.text, quoted_text: quoteSource.quoted_text,
     post_url: current.post_url || previous.post_url || null,
     account: current.account || previous.account || null, date: current.date || previous.date || null,
-    text_truncated: textSource.text_truncated || quoteSource.text_truncated,
-    needs_expansion: textSource.needs_expansion || quoteSource.needs_expansion };
+    text_truncated: textSource.text_truncated || (hasQuote && quoteSource.text_truncated),
+    needs_expansion: textSource.needs_expansion || (hasQuote && quoteSource.needs_expansion) };
   const media = new Map();
   for (const entry of [...previous.media, ...current.media]) media.set(entry.url || entry.media_id, entry);
   result.media = [...media.values()];
@@ -131,6 +136,17 @@ function scopedUrl(raw) {
   url.hash = '';
   url.searchParams.sort();
   return url.toString();
+}
+
+function hasSubstantiveProgress(previous, current) {
+  if (!previous) return Boolean(current.text.trim() || current.quoted_text.trim() || current.media.length);
+  if ((current.text && current.text !== previous.text)
+      || (current.quoted_text && current.quoted_text !== previous.quoted_text)
+      || (!previous.account && current.account) || (!previous.date && current.date)
+      || (previous.text_truncated && !current.text_truncated)
+      || (previous.needs_expansion && !current.needs_expansion)) return true;
+  const knownMedia = new Set(previous.media.map(item => item.url || item.media_id));
+  return current.media.some(item => !knownMedia.has(item.url || item.media_id));
 }
 
 export function buildResult(state, items) {
@@ -166,7 +182,17 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
   const items = loadItems(directory, state);
   const seenSnapshots = new Set([...items.values()].filter(item => item.source_id.startsWith('viewport-')).map(item => item.text));
   let idle = 0;
-  let recoveryAttempted = false;
+  // Persist this collector's stall cycle independently of broker/user recovery
+  // counters. A resumed stalled job must not gain another recovery merely by
+  // starting a worker. Legacy terminal stall checkpoints already used theirs.
+  const hasRecoveryCheckpoint = Object.hasOwn(state, 'stall_recovery_attempted');
+  if (hasRecoveryCheckpoint && typeof state.stall_recovery_attempted !== 'boolean') throw new Error('Invalid stall recovery checkpoint');
+  let recoveryAttempted = hasRecoveryCheckpoint ? state.stall_recovery_attempted
+    : ['stall', 'empty_response'].includes(state.stop_reason);
+  const recoveryCount = Object.hasOwn(state, 'stall_recovery_count') ? state.stall_recovery_count : 0;
+  if (!Number.isSafeInteger(recoveryCount) || recoveryCount < 0) throw new Error('Invalid stall recovery checkpoint');
+  state.stall_recovery_attempted = recoveryAttempted;
+  state.stall_recovery_count = recoveryCount;
   const deadline = now() + state.max_seconds * 1000;
   state.state = 'running';
   state.worker_pid = process.pid;
@@ -222,7 +248,7 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
         if (!previous || JSON.stringify(previous) !== JSON.stringify(combined)) {
           items.set(item.source_id, combined);
           if (!compact) fs.appendFileSync(journal, JSON.stringify(combined) + '\n', 'utf8');
-          progress += 1;
+          if (hasSubstantiveProgress(previous, combined)) progress += 1;
         }
       }
       // Persist what was actually obtained, but never advance through a broken
@@ -236,15 +262,23 @@ export async function collectBatch({ state, directory, snapshot, advance, recove
         stop('needs_review', 'cache_limit'); break;
       }
       idle = progress ? 0 : idle + 1;
-      if (progress) recoveryAttempted = false;
+      if (progress) {
+        recoveryAttempted = false;
+        state.stall_recovery_attempted = false;
+      }
       const pagination = page.pagination;
       const endpoint = !page.loading && !page.extraction_truncated && !state.compatibility
         && ((page.explicit_end_hints?.length || 0) > 0 || (pagination?.verified && pagination.at_last_page === true));
       if (endpoint) { stop('collected', 'visible_endpoint'); break; }
       if (idle >= state.plateau_steps) {
         if (!recoveryAttempted) {
-          await runBounded(signal => recover(signal));
+          // Reserve and persist before the action, including failures/cancels.
+          // Only later substantive source progress opens a new stall cycle.
           recoveryAttempted = true;
+          state.stall_recovery_attempted = true;
+          state.stall_recovery_count += 1;
+          checkpoint();
+          await runBounded(signal => recover(signal));
           idle = 0;
           checkpoint();
           await runBounded(signal => wait(Math.min(state.interval_ms, Math.max(1, deadline - now())), signal));

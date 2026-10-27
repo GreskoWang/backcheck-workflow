@@ -32,6 +32,8 @@ App Secret 交互输入后由当前 Windows 用户 DPAPI 加密。新机器必�
 
 ## 浏览器与回归
 
+2026-10-27 修复增加 `--group repair` 专项回归，详见 [修复发布说明](REPAIRS-2026-10-27.md)。表格渲染需要 requirements.txt 中的 openpyxl/Pillow 以及相应字体；Windows 默认读取 `WINDIR`/`SystemRoot` 下的 Fonts，也可显式设置 `BACKCHECK_FONTS_DIR`。缺少指定字体会报告不可渲染，不用替代字体伪造通过。
+
 加载环境后，执行 `skills/web-access/scripts/check-deps.ps1`。沿用可见 Edge 的既有账号；实际出现的浏览器安全授权、密码、验证码、首次 OAuth 或新增权限由用户确认，普通打开、点击、滚动和截图由工具执行。单页面失败不重启共享连接，先检查该页与其他页面的独立状态。
 
 ```powershell

@@ -261,6 +261,7 @@ let connectionMeta = null;
 let connectingPromise = null;
 let lastConnectError = null;
 let lastCdpTimeout = null;
+let metadataHealthProbe = null;
 let profileLockServer = null;
 let profileLockKey = null;
 let commandId = 0;
@@ -270,7 +271,7 @@ const targetsBySession = new Map();
 const eventWaiters = new Set();
 const contextVersions = new Map();
 const fixedWorlds = createFixedWorldResolver({sendCdp, makeError:(...args) => new BrokerError(...args),
-  metadataTimeoutMs:BUDGETS.dom, worldTimeoutMs:BUDGETS.context});
+  frameTimeoutMs:BUDGETS.dom, worldTimeoutMs:BUDGETS.context});
 let connectionBaselineTargets = new Set();
 const leases = new Map();
 const managedTabs = new Map();
@@ -827,10 +828,17 @@ function sendCdp(method, params = {}, options = {}) {
       // dropping every other owner's connection is neither required nor safe.
       const isolatedManagedClose = method === 'Target.closeTarget' && targetId
         && managedTabs.has(targetId) && closingTargets.has(targetId);
-      const retireConnection = !sessionId && !isolatedManagedClose;
-      lastCdpTimeout = { method, targetId:targetId || null, at:new Date().toISOString(), timeoutMs, elapsedMs:Date.now()-startedAt, connectionRetired:Boolean(retireConnection) };
+      // Read-only metadata cannot create a late session or page. Fail only
+      // this request first, then test this already-validated socket once.
+      // Initialization and every other browser-level method keep retirement.
+      const isolatedReadOnlyMetadata = !sessionId && connectionState === 'connected'
+        && (method === 'Target.getTargets' || method === 'Target.getTargetInfo');
+      const retireConnection = !sessionId && !isolatedManagedClose && !isolatedReadOnlyMetadata;
+      const timeoutRecord = { method, targetId:targetId || null, at:new Date().toISOString(), timeoutMs, elapsedMs:Date.now()-startedAt, connectionRetired:Boolean(retireConnection) };
+      lastCdpTimeout = timeoutRecord;
       entry.reject(new BrokerError('cdp_timeout', `CDP 命令 ${method} 超过 ${timeoutMs}ms。`, { method, targetId, timeoutMs, outcomeUnknown: true }, 504));
       if (retireConnection) retireBrowserSocket(commandSocket, 'unresponsive_connection');
+      else if (isolatedReadOnlyMetadata) probeReadOnlyMetadataSocket(commandSocket, timeoutRecord);
     }, timeoutMs);
     entry.timer = timer;
     pending.set(id, entry);
@@ -840,6 +848,38 @@ function sendCdp(method, params = {}, options = {}) {
       entry.reject(new BrokerError('connection_lost', error.message || 'CDP 发送失败。', { method, targetId }, 502));
     }
   });
+}
+
+function probeReadOnlyMetadataSocket(socket, timeoutRecord) {
+  if (browserSocket !== socket || connectionState !== 'connected' || !isOpen(socket)) return;
+  if (metadataHealthProbe?.socket === socket) {
+    timeoutRecord.connectionHealthCheck = metadataHealthProbe.observation;
+    return;
+  }
+  const budgetMs = Math.min(1000, BUDGETS.metadata);
+  const observation = { status: 'pending', method: 'Browser.getVersion', budgetMs };
+  const probe = { socket, observation };
+  metadataHealthProbe = probe;
+  timeoutRecord.connectionHealthCheck = observation;
+  const startedAt = Date.now();
+  // No caller deadline, retry, reconnect or side-effect command is inherited.
+  // Browser.getVersion is deliberately outside the metadata exception above,
+  // so its timeout retires this generation and cannot recursively probe.
+  probe.promise = (async () => {
+    try {
+      const version = await sendCdp('Browser.getVersion', {}, { timeoutMs: budgetMs });
+      if (browserSocket !== socket || !isOpen(socket)) { observation.status = 'stale'; return; }
+      if (!edgeCdpVersion(version)) throw new BrokerError('wrong_browser_identity', '健康探测没有确认当前 Edge 连接。', undefined, 503);
+      observation.status = 'healthy';
+    } catch (error) {
+      observation.status = browserSocket === socket ? 'failed' : 'retired_or_replaced';
+      observation.code = /^[a-z][a-z0-9_]{1,80}$/u.test(error?.code || '') ? error.code : 'health_probe_failed';
+      retireBrowserSocket(socket, 'metadata_health_probe_failed');
+    } finally {
+      observation.elapsedMs = Date.now() - startedAt;
+      if (metadataHealthProbe === probe) metadataHealthProbe = null;
+    }
+  })();
 }
 
 function waitForEvent(method, sessionId, timeoutMs, deadline) {
@@ -903,10 +943,10 @@ function isOutcomeUnknownError(error) {
     || isSessionInvalidError(error);
 }
 
-function queueForTarget(targetId, deadline, operation) {
+function queueForTarget(targetId, deadline, operation, { allowStalled = false } = {}) {
   let waitMs;
   try { waitMs = deadline.remaining('target queue'); } catch (error) { return Promise.reject(error); }
-  if (stalledTargets.has(targetId)) {
+  if (stalledTargets.has(targetId) && !allowStalled) {
     return Promise.reject(new BrokerError('target_lane_stalled', '该 target 的上一项操作未在绝对预算内结束；必须先 recover。', { targetId }, 409));
   }
   let lane = targetQueues.get(targetId);
@@ -1517,7 +1557,7 @@ async function withTargetLease(targetId, owner, leaseToken, deadline, operation,
       throw new BrokerError('lease_changed', '命令执行期间 target lease 已变化。', { targetId }, 409);
     }
     return result;
-  });
+  }, { allowStalled: options.allowStalled === true });
 }
 
 function safeEqualToken(actual, expected) {
@@ -2386,7 +2426,7 @@ async function callFixedFunctionUnlocked(targetId, functionDeclaration, args, { 
         await quarantineTimedOutTarget(targetId, sessionId, error);
         throw new BrokerError('outcome_unknown', '页面动作可能已生效但执行上下文或响应已丢失；已隔离 target，禁止自动重放。', { targetId, cause: error?.code || null }, 409);
       }
-      if (error?.code === 'cdp_timeout') {
+      if (['cdp_timeout', 'request_timeout', 'request_aborted'].includes(error?.code)) {
         await quarantineTimedOutTarget(targetId, sessionId, error);
         throw error;
       }
@@ -2805,7 +2845,8 @@ async function closeManagedTargetUnlocked(targetId, owner, leaseToken, deadline)
 }
 
 async function recoverTargetUnlocked(targetId, owner, leaseToken, deadline) {
-  requireLease(targetId, owner, leaseToken, { allowQuarantined: true });
+  const lease = requireLease(targetId, owner, leaseToken, { allowQuarantined: true });
+  const epoch = lease.epoch;
   const oldSessionId = sessions.get(targetId);
   if (oldSessionId && isOpen(browserSocket)) {
     const detached = await detachSessionOrRetire(targetId, oldSessionId, deadline, 700);
@@ -2816,8 +2857,22 @@ async function recoverTargetUnlocked(targetId, owner, leaseToken, deadline) {
     deadline,
     timeoutMs: BUDGETS.dom,
   });
+  deadline.remaining('target recovery result');
+  const page = result?.result?.value;
+  if (result?.exceptionDetails) {
+    throw new BrokerError('recovery_probe_failed', '固定恢复健康检查抛出异常；保留 target 隔离状态。', { targetId, reason: 'runtime_exception' }, 502);
+  }
+  if (!page || typeof page !== 'object' || Array.isArray(page)
+      || typeof page.title !== 'string' || page.title.length > 1000
+      || !['loading', 'interactive', 'complete'].includes(page.ready)) {
+    throw new BrokerError('recovery_probe_failed', '固定恢复健康检查未返回有效页面状态；保留 target 隔离状态。', { targetId, reason: 'invalid_health' }, 502);
+  }
+  const current = requireLease(targetId, owner, leaseToken, { allowQuarantined: true });
+  if (current.epoch !== epoch) {
+    throw new BrokerError('lease_changed', '恢复期间 target lease 已变化。', { targetId }, 409);
+  }
   quarantinedTargets.delete(targetId);
-  return result.result?.value ?? null;
+  return page;
 }
 
 function routeBudget(pathname) {
@@ -3133,11 +3188,11 @@ async function handleHttpRequest(request, response) {
 
     if (pathname === '/recover' && request.method === 'POST') {
       const leaseToken = requestLeaseToken(request);
-      if (stalledTargets.has(query.target)) {
-        requireLease(query.target, owner, leaseToken, { allowQuarantined: true });
-        stalledTargets.delete(query.target);
-      }
-      const page = await withTargetLease(query.target, owner, leaseToken, deadline, () => recoverTargetUnlocked(query.target, owner, leaseToken, deadline), { allowQuarantined: true });
+      requireLease(query.target, owner, leaseToken, { allowQuarantined: true });
+      // Only explicit, leased recovery may enter a stalled lane. Keep the
+      // marker in place so ordinary requests stay blocked until validation.
+      const page = await withTargetLease(query.target, owner, leaseToken, deadline, () => recoverTargetUnlocked(query.target, owner, leaseToken, deadline), { allowQuarantined: true, allowStalled: true });
+      stalledTargets.delete(query.target);
       ok(response, { targetId: query.target, recovered: true, page });
       return;
     }

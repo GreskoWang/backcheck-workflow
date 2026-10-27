@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveGroupPolicies, activeGroupPolicies } from '../tools/feishu-codex-bridge/src/group-policy.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 export const configPath = process.env.BACKCHECK_CONFIG_PATH || path.join(root, 'backcheck-local.json');
@@ -23,6 +24,13 @@ export function assertListenerReady() {
   const bindingPath = path.join(runtime.env.BACKGROUND_CHECK_WORKSPACE, 'tools', 'feishu-codex-bridge', 'state', 'binding.json');
   const binding = JSON.parse(fs.readFileSync(bindingPath, 'utf8').replace(/^\uFEFF/u, ''));
   if (binding.chatId !== localConfig.target_chat_id) throw new Error('Target chat and stored binding disagree');
+  const statePath = path.join(path.dirname(bindingPath), 'runtime.json');
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8').replace(/^\uFEFF/u, ''));
+  const policies = resolveGroupPolicies({ localConfig, binding, runtime: state });
+  if (!activeGroupPolicies(policies).some((policy) => policy.chatId === binding.chatId)) {
+    throw new Error('The original dispatch group must retain an active policy');
+  }
+  return policies;
 }
 
 export function assertAccountingReady() {

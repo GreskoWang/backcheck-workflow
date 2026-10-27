@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "release": "2026-10-27 repairs",
+  "verified_at": "2026-10-27T16:28:28.941414+00:00",
+  "status": "PASS",
+  "scope": "Offline fixtures and loopback services in an isolated Windows checkout; prior live maintenance acceptance remains separately scoped.",
+  "groups": 51,
+  "checks": [
+    {
+      "test": "audit_feishu_snapshot",
+      "seconds": 2.78,
+      "status": "PASS"
+    },
+    {
+      "test": "bridge",
+      "seconds": 149.84,
+      "resolution": {
+        "full_run": {
+          "tests": 501,
+          "passed": 500,
+          "failed": 1
+        },
+        "rerun": {
+          "file": "feishu-delivery-adapters.test.mjs",
+          "tests": 27,
+          "passed": 27
+        },
+        "reason": "Preserved strict snapshot and manifest mutation rejection; updated assertions to distinguish typed audit error and its original cause."
+      },
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-click-selftest",
+      "seconds": 0.23,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-dom-completeness-selftest",
+      "seconds": 0.19,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-managed-close-timeout-selftest",
+      "seconds": 0.28,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-proxy-http-selftest",
+      "seconds": 1.72,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-proxy-integration-selftest",
+      "seconds": 107.45,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-proxy-selftest",
+      "seconds": 2.55,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-request-selftest",
+      "seconds": 23.75,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-scroll-selftest",
+      "seconds": 0.42,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-session-cleanup-selftest",
+      "seconds": 0.33,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-session-selftest",
+      "seconds": 225.44,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-shadow-selftest",
+      "seconds": 0.95,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-cdp-visible-frame-selftest",
+      "seconds": 0.52,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-fixed-world-selftest",
+      "seconds": 4.58,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-quarantine-lifetime-selftest",
+      "seconds": 0.61,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-research-batch-selftest",
+      "seconds": 35.0,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-research-detail-selftest",
+      "seconds": 5.81,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-research-dom-recipes-selftest",
+      "seconds": 1.88,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-research-recipe-loader-selftest",
+      "seconds": 0.39,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-research-viewport-selftest",
+      "seconds": 1.61,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-screenshot-lifecycle-selftest",
+      "seconds": 0.41,
+      "status": "PASS"
+    },
+    {
+      "test": "browser-windows-paths-selftest",
+      "seconds": 0.31,
+      "status": "PASS"
+    },
+    {
+      "test": "python-coverage",
+      "seconds": 1.11,
+      "status": "PASS"
+    },
+    {
+      "test": "python-deliver-feishu-background-check",
+      "seconds": 113.64,
+      "status": "PASS"
+    },
+    {
+      "test": "python-media",
+      "seconds": 24.89,
+      "status": "PASS"
+    },
+    {
+      "test": "python-package",
+      "seconds": 4.97,
+      "status": "PASS"
+    },
+    {
+      "test": "python-pipeline",
+      "seconds": 42.73,
+      "status": "PASS"
+    },
+    {
+      "test": "python-review-feishu-background-check",
+      "seconds": 0.89,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-browser-metadata-isolation",
+      "seconds": 1.45,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-browser-metadata-protocol",
+      "seconds": 27.34,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-collector-viewport",
+      "seconds": 1.73,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-delivery-review-recovery",
+      "seconds": 2.98,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-dom-abort-protocol",
+      "seconds": 21.25,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-dom-request-quarantine",
+      "seconds": 0.16,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-protocol-startup-diagnostics",
+      "seconds": 26.41,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-receipt-chat-binding",
+      "seconds": 0.36,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-recovery-fixture-contract",
+      "seconds": 0.2,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-recovery-health-protocol",
+      "seconds": 27.62,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-recovery-health-validation",
+      "seconds": 0.45,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test-session-outcome-unknown",
+      "seconds": 220.31,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test_compact_reconciliation",
+      "seconds": 142.22,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test_doctor_runtime",
+      "seconds": 9.86,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test_team_visual_contract",
+      "seconds": 10.59,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test_workflow_collector",
+      "seconds": 0.69,
+      "status": "PASS"
+    },
+    {
+      "test": "repair-test_workflow_watch",
+      "seconds": 1.61,
+      "status": "PASS"
+    },
+    {
+      "test": "uat-recovery",
+      "seconds": 2.33,
+      "status": "PASS"
+    },
+    {
+      "test": "validate_feishu_document",
+      "seconds": 150.2,
+      "status": "PASS"
+    },
+    {
+      "test": "validate_research_payload",
+      "seconds": 532.97,
+      "status": "PASS"
+    },
+    {
+      "test": "x-bulk",
+      "seconds": 8.53,
+      "status": "PASS"
+    },
+    {
+      "test": "x-readiness",
+      "seconds": 2.44,
+      "status": "PASS"
+    }
+  ],
+  "skills_validated": 5,
+  "shared_assets": {
+    "背调风险提示.md": {
+      "unchanged": true,
+      "sha256": "a33126f5dd2982bcb6eaf5999814639ac62e8999200a96329e745f8287447597"
+    },
+    "背调风险提示.xlsx": {
+      "unchanged": true,
+      "sha256": "9d7fe5e1a27d3f5af773c8425cb7d573b45bdfea396e2b30071d0df20bd07714"
+    },
+    "模板.docx": {
+      "unchanged": true,
+      "sha256": "d7b639c3184fe9b0deb387f7d202e125486c0effd64d0f6cb0c0f64887471f69"
+    }
+  },
+  "source_sha256": {
+    "skills/web-access/scripts/cdp-proxy.mjs": "dd984974cf029b0e47c82cfb3a5039c9ced64ed1ab2ee161d90d538feefc300f",
+    "skills/web-access/scripts/cdp-session.ps1": "5c8da0667a78ade928ab546d940cef9429077837f987bf63e28270cc53bf61dd",
+    "skills/web-access/scripts/research-dom-recipes.mjs": "43851dcfc3a5ff354bbaf49c632c5189e76364df3826425ef5293175269e74d3",
+    "tools/research-batch/pipeline/compact.py": "692f4a5a5e22b34b667bcbb2214f27f104238bb8b0a04781aae280707f19268d",
+    "tools/research-batch/pipeline/prepare.py": "98b4d5600122c7de2644626a9e2d0cb52e0b8539d5b88341a344bc2d4c7607a4",
+    "tools/feishu-codex-bridge/src/bridge.mjs": "27aa356f373c82be8dac4643fe68b2dd336ab8182e209f392c872478cbade35a",
+    "tools/feishu-codex-bridge/src/delivery-review.mjs": "775c4e2854e4c5cd78b67e76b9a182d5bddd5cb7e06babffc2b170a915e8e8f2",
+    "tools/feishu-codex-bridge/src/acceptance-receipt.mjs": "6ac7e97016873321837ad3ecfdb276dd11fbfa4dab42c99405f0cea85a0e822d"
+  },
+  "privacy": {
+    "machine_paths_excluded": true,
+    "credentials_and_business_state_excluded": true,
+    "team_identities_retained_by_owner_request": true
+  },
+  "preservation": {
+    "formal_sources_changed_during_publication": false,
+    "browser_or_listener_restarted_during_publication": false
+  },
+  "remaining_limits": [
+    "Native Windows CUA URL detection is not repaired by this repository.",
+    "Current-revision all-platform continuous three-window live acceptance is incomplete.",
+    "Physical second-machine installation, authorization and live acceptance still required."
+  ],
+  "preflight_remediation": [
+    "Missing local install fixtures were created only in the ignored isolated checkout.",
+    "System temporary directories avoid deep-checkout test path overflow.",
+    "Full offline validation suites have bounded 300/600 second budgets; browser operation budgets unchanged.",
+    "Viewport fixture inherits parent geometry; adversarial visible-child cases remain in the 26-case viewport selftest.",
+    "Protocol harness separates secure startup from the unchanged connection deadline and observes bounded cleanup."
+  ]
+}

@@ -72,6 +72,7 @@ function readResearchVisibleDom(recipe) {
   }
   const configs = {
     'weibo-feed': {
+      listWindow: 'viewport_plus_one_screen',
       hosts: ['weibo.com', 'www.weibo.com', 's.weibo.com', 'm.weibo.cn'],
       cards: ['article,[class*="Feed_wrap"],.WB_feed_type', '.card-wrap,.card9'],
       bodies: ['[class*="detail_wbtext"],.WB_text,.weibo-text', '.content .text'],
@@ -81,6 +82,7 @@ function readResearchVisibleDom(recipe) {
       kind: 'post',
     },
     'bilibili-dynamic': {
+      listWindow: 'viewport_plus_one_screen',
       hosts: ['bilibili.com', 'www.bilibili.com', 'space.bilibili.com', 't.bilibili.com'],
       cards: ['.bili-dyn-list__item,.bili-dyn-item', '.dyn-card,[class*="dynamic-card"]'],
       bodies: ['.bili-dyn-content__orig,.bili-dyn-content__orig__desc,.bili-rich-text,.dyn-card-text,.opus-module-content'],
@@ -92,6 +94,7 @@ function readResearchVisibleDom(recipe) {
       kind: 'dynamic',
     },
     'bilibili-video': {
+      listWindow: 'rendered_dom',
       hosts: ['bilibili.com', 'www.bilibili.com', 'space.bilibili.com'],
       cards: ['.bili-video-card,.small-item,.video-card', 'li'],
       bodies: ['.bili-video-card__info--tit,.title,[title]'],
@@ -99,6 +102,7 @@ function readResearchVisibleDom(recipe) {
       authors: '.bili-video-card__info--author,.up-name', kind: 'video_listing',
     },
     'douyin-posts': {
+      listWindow: 'viewport_plus_one_screen',
       hosts: ['douyin.com', 'www.douyin.com'],
       cards: ['[data-e2e="user-post-list"] li,.user-post-list li,li'],
       bodies: ['[data-e2e="video-desc"],[data-e2e="aweme-title"],.title'],
@@ -106,6 +110,7 @@ function readResearchVisibleDom(recipe) {
       authors: '[data-e2e="video-author-name"],.author-name', kind: 'post_listing',
     },
     'xiaohongshu-notes': {
+      listWindow: 'viewport_plus_one_screen',
       hosts: ['xiaohongshu.com', 'www.xiaohongshu.com'],
       cards: ['section.note-item,.note-item'],
       bodies: ['.title,.note-text,.note-content,.desc'],
@@ -113,11 +118,27 @@ function readResearchVisibleDom(recipe) {
       kind: 'note_listing',
     },
     'generic-posts': {
+      listWindow: 'rendered_dom',
       hosts: null, cards: ['article,[role="article"]'], bodies: [],
       reposts: 'blockquote', dates: 'time', authors: '[rel="author"]', kind: 'article',
     },
   };
   const config = configs[recipe];
+  const youtubePosts = recipe === 'generic-posts' && ['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(photoPage.hostname)
+    && /^\/(?:channel\/UC[A-Za-z0-9_-]+|@[A-Za-z0-9_.-]+)\/posts\/?$/u.test(photoPage.pathname);
+  const youtubeTranscript = recipe === 'generic-posts'
+    && photoPage.protocol === 'https:' && !photoPage.port
+    && ['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(photoPage.hostname)
+    && photoPage.pathname === '/watch'
+    && /^[A-Za-z0-9_-]{11}$/.test(photoPage.searchParams.get('v') || '');
+  if (youtubePosts) {
+    config.hosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com'];
+    config.cards = ['ytd-backstage-post-renderer'];
+    config.bodies = ['#content-text'];
+    config.authors = '#author-text';
+    config.dates = '#published-time-text';
+    config.kind = 'community_post';
+  }
   // Controller-only state in the isolated world, never in DOM attributes,
   // page application state or browser storage. Distinguishes real DOM cards
   // while lazy media loads; these IDs are observations, never public post IDs.
@@ -164,7 +185,17 @@ function readResearchVisibleDom(recipe) {
       const style = getComputedStyle(node);
       result = style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.contentVisibility !== 'hidden' && Number(style.opacity || 1) !== 0;
     }
-    if (result && node.parentElement) result = visible(node.parentElement);
+    if (result && node.parentElement && (youtubePosts || youtubeTranscript || recipe === 'weibo-feed')) {
+      // YouTube and long Weibo feeds use zero-height layout wrappers around visible cards.
+      // Match the broker's rendered-DOM rule: ancestors must be shown, while
+      // the selected node itself must have a real box.
+      let depth = 0;
+      for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        const style = getComputedStyle(parent);
+        if (++depth > 256 || skippedTags.has(parent.tagName) || parent.hidden || parent.isContentEditable || attr(parent, 'aria-hidden') === 'true' || attr(parent, 'inert') !== null
+            || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || Number(style.opacity || 1) === 0) { result = false; break; }
+      }
+    } else if (result && node.parentElement) result = visible(node.parentElement);
     if (result && typeof node.getBoundingClientRect === 'function') {
       const box = node.getBoundingClientRect();
       const style = getComputedStyle(node);
@@ -242,6 +273,35 @@ function readResearchVisibleDom(recipe) {
   }
   const pageUrl = httpUrl(document.location?.href || document.baseURI);
   const pageHost = pageUrl ? new URL(pageUrl).hostname : '';
+  // Read only the already-open public transcript panel. Older YouTube panels
+  // expose each visible segment through its accessible label while marking
+  // the painted duplicate text aria-hidden. Do not read those hidden children.
+  // No player state, timedtext URL, network request, storage or arbitrary code.
+  if (youtubeTranscript) {
+    const oldSegments = select(document, 'ytd-transcript-segment-renderer [aria-label]');
+    const newSegments = oldSegments.length ? [] : select(document, 'transcript-segment-view-model');
+    const nodes = oldSegments.length ? oldSegments : newSegments;
+    const segments = [];
+    let chars = 0, truncated = nodes.length > 20000, emptySegments = 0;
+    for (const [index, node] of nodes.slice(0, 20000).entries()) {
+      const read = oldSegments.length
+        ? {text:normalize(attr(node, 'aria-label') || ''), truncated:false}
+        : readText(node);
+      if (!read.text) { emptySegments++; continue; }
+      if (read.text.length > 4000 || chars + read.text.length > 1000000) { truncated = true; break; }
+      segments.push({ordinal:index, text:read.text});
+      chars += read.text.length;
+      if (read.truncated || snapshotBudget.exhausted) { truncated = true; break; }
+    }
+    return {schema_version:1, recipe, items:[], page_state:{
+      url:pageUrl, completion:'visible_dom_only', historical_completion_proven:false,
+      transcript:{version:1, video_id:photoPage.searchParams.get('v'),
+        layout:oldSegments.length ? 'accessible_segment_labels' : newSegments.length ? 'visible_segment_text' : 'not_observed',
+        segments, rendered_segment_count:nodes.length, extracted_segment_count:segments.length,
+        empty_segment_count:emptySegments, characters:chars, extraction_truncated:truncated,
+        coverage:'currently_rendered_public_transcript', full_video_coverage_proven:false}
+    }};
+  }
   function sourceLink(raw) {
     const url = httpUrl(raw);
     if (!url) return null;
@@ -289,10 +349,32 @@ function readResearchVisibleDom(recipe) {
       const url = httpUrl(image.currentSrc || attr(image, 'src'));
       if (!url || /(?:placeholder|transparent|loading|blank)(?:[._/-]|$)/i.test(new URL(url).pathname)) { placeholderCount++; continue; }
       const imageUrl = new URL(url);
+      if (recipe === 'generic-posts' && imageUrl.hostname === 'abs.twimg.com' && imageUrl.pathname.startsWith('/emoji/')) continue;
       const imageBox = image.getBoundingClientRect();
       if (recipe === 'bilibili-dynamic' && /(?:^|\.)hdslb\.com$/i.test(imageUrl.hostname)
           && imageUrl.pathname.startsWith('/bfs/face/') && imageBox.width <= 64 && imageBox.height <= 64) continue;
       entries.push({ kind: kind.includes('listing') ? 'cover' : 'image', url, alt: normalize(attr(image, 'alt')) || null });
+    }
+    // X paints photos as visible CSS backgrounds while its duplicate IMG has
+    // opacity zero. Read only public photo sources on X's rendered articles.
+    if (recipe === 'generic-posts' && /^(?:www\.)?x\.com$/i.test(photoPage.hostname)) {
+      for (const node of Array.from(card.querySelectorAll('div')).slice(0, 2000)) {
+        const box = node.getBoundingClientRect();
+        if (!(box.width > 0 && box.height > 0)) continue;
+        let shown = true, depth = 0;
+        for (let parent = node; parent instanceof Element; parent = parent.parentElement) {
+          const style = getComputedStyle(parent);
+          if (++depth > 256 || parent.hidden || parent.isContentEditable || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || Number(style.opacity || 1) === 0) { shown = false; break; }
+        }
+        if (!shown) continue;
+        const match = /^url\(["']?(https:\/\/[^"')]+)["']?\)$/.exec(getComputedStyle(node).backgroundImage || '');
+        if (!match) continue;
+        const url = httpUrl(match[1]);
+        if (!url) continue;
+        const source = new URL(url);
+        if (source.protocol !== 'https:' || source.hostname !== 'pbs.twimg.com' || !source.pathname.startsWith('/media/')) continue;
+        entries.push({ kind: 'image', url, alt: null, representation: 'visible_css_background' });
+      }
     }
     for (const video of select(card, 'video')) {
       const url = httpUrl(video.currentSrc || attr(video, 'src'));
@@ -324,7 +406,7 @@ function readResearchVisibleDom(recipe) {
             || children.reduce((size, child) => size + String(child.nodeValue || '').length, 0) > 80) continue;
       }
       const text = textOf(node);
-      if (/^(?:展开(?:全文|更多)?|全文|查看全文|查看更多|更多|展开全部|show more|read more)(?:\s*[>›»…]*)?$/i.test(text)) markers.push({ kind: 'expand_text', text });
+      if (/^(?:展开(?:全文|更多)?|全文|查看全文|查看更多|显示更多|更多|展开全部|show more|read more)(?:\s*[>›»…]*)?$/i.test(text)) markers.push({ kind: 'expand_text', text });
       if (/^(?:查看|展开)(?:全部)?\s*\d*\s*(?:张)?(?:图片|照片|图集)$/.test(text)) markers.push({ kind: 'open_gallery', text });
     }
     return { needed: markers.some(marker => marker.kind === 'expand_text'), markers };
@@ -356,11 +438,35 @@ function readResearchVisibleDom(recipe) {
     if (roots.length) { cards = [outermost(roots)[0]]; detail = true; }
   }
   const renderedCards = cards;
-  // Infinite Bilibili feeds retain old cards. Read the viewport plus one screen
-  // of overlap, not every card accumulated since the top of the page.
-  const windowed = recipe === 'bilibili-dynamic' && !detail;
-  const windowUnavailable = windowed && (!viewportHeight || !viewportWidth);
-  if (windowed) cards = windowUnavailable ? [] : renderedCards.filter(card => inViewport(card, viewportHeight));
+  // Registered infinite-feed recipes read the current viewport first, then
+  // one screen of overlap. Retained offscreen bodies cannot consume the text
+  // budget before current cards. Card discovery still inspects rendered DOM.
+  // Paginated video lists stay whole-page: their advance action clicks next.
+  // Generic articles have no validated list geometry contract.
+  const windowed = (config.listWindow === 'viewport_plus_one_screen' || youtubePosts) && !detail;
+  const windowUnavailable = windowed && (!Number.isFinite(viewportHeight) || viewportHeight <= 0
+    || !Number.isFinite(viewportWidth) || viewportWidth <= 0);
+  if (windowed) {
+    // Weibo can retain an offscreen article box while rendering its body
+    // on screen. Inspect only bounded, visible body/media geometry; no text.
+    const cardInWindow = (card, margin = 0) => {
+      if (inViewport(card, margin)) return true;
+      if (recipe !== 'weibo-feed') return false;
+      // Paragraphs also cover the existing unclassified public-body fallback.
+      const selector = [...config.bodies, 'p,img,video'].join(',');
+      const candidates = card.querySelectorAll(selector);
+      const count = Math.min(candidates.length, 64);
+      for (let index = 0; index < count; index++) {
+        const child = candidates[index];
+        if (visible(child) && inViewport(child, margin)) return true;
+      }
+      return false;
+    };
+    const current = windowUnavailable ? [] : renderedCards.filter(card => cardInWindow(card));
+    const currentSet = new Set(current);
+    const overlap = windowUnavailable ? [] : renderedCards.filter(card => !currentSet.has(card) && cardInWindow(card, viewportHeight));
+    cards = [...current, ...overlap];
+  }
   const items = [];
   for (const card of cards) {
     if (snapshotBudget.exhausted || snapshotBudget.nodes <= 0 || snapshotBudget.chars <= 0) {
@@ -452,6 +558,8 @@ function readResearchVisibleDom(recipe) {
   const pageState = { url: pageUrl, title: typeof document.title === 'string' ? document.title : '', route_matches_recipe: routeMatches,
     visible_card_count: cards.length, rendered_card_count: renderedCards.length, windowed, window_unavailable: windowUnavailable,
     collection_window: windowed ? 'viewport_plus_one_screen' : 'rendered_dom',
+    collection_window_basis: detail ? 'detail_full_body' : windowed ? 'registered_infinite_feed'
+      : recipe === 'bilibili-video' ? 'pagination_requires_whole_rendered_page' : 'unregistered_list_geometry',
     extracted_item_count: items.length, unresolved_source_count: items.filter(item => !item.stable_deduplication).length, loading: loadingNodes.length > 0,
     loading_count: loadingNodes.length, login_hints: loginHints, verification_hints: verificationHints,
     explicit_end_hints: [...new Set(endHints)], endpoint_hint_observed: endHints.length > 0,
@@ -461,6 +569,26 @@ function readResearchVisibleDom(recipe) {
     truncation_reason: windowUnavailable ? 'viewport_unavailable' : snapshotBudget.exhausted ? 'snapshot_budget' : cardBudgetExhausted ? 'card_budget' : null,
     pagination, completion: 'visible_dom_only', historical_completion_proven: false,
     warnings: ['Rendered DOM observations only; virtualized, unmounted, collapsed, media and comments may remain unread.'] };
+  if (recipe === 'generic-posts' && /^(?:www\.)?x\.com$/i.test(photoPage.hostname)) {
+    pageState.visible_expand_controls = select(document, 'article button').slice(0, 2000).map((button, index) => {
+      const expected_text = textOf(button);
+      if (!inViewport(button) || !/^(?:显示更多|Show more)$/i.test(expected_text)) return null;
+      const card = button.closest('article');
+      const source = card && findLink(card, []);
+      return source ? { selector: 'article button', index, expected_text, post_url: source.post_url } : null;
+    }).filter(Boolean).slice(0, 2);
+  }
+  if (youtubePosts) {
+    const selector = 'ytd-backstage-post-renderer tp-yt-paper-button';
+    pageState.visible_expand_controls = select(document, selector).slice(0, 2000).map((button, index) => {
+      const expected_text = textOf(button);
+      if (!inViewport(button) || !/^(?:Read more|显示更多|展开)$/i.test(expected_text)) return null;
+      const card = button.closest('ytd-backstage-post-renderer');
+      const source = card && findLink(card, []);
+      const author = card && textOf(select(card, '#author-text')[0]);
+      return source && author === 'FIIO' ? { selector, index, expected_text, post_url: source.post_url, author } : null;
+    }).filter(Boolean).slice(0, 2);
+  }
   if (!routeMatches) pageState.warnings.push('recipe_host_mismatch');
   if (!cards.length && !pageState.loading && !loginHints.length && !verificationHints.length) pageState.warnings.push('no_matching_visible_cards; this is not proof of no posts');
   if (pageState.extraction_truncated) pageState.warnings.push('visible_text_budget_exhausted_or_window_unavailable; stop and reread smaller page state before claiming text coverage');
