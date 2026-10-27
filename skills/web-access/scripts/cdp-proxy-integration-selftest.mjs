@@ -408,6 +408,12 @@ async function startFakeCdp({ browserVersion = null } = {}) {
         state.maxActiveRuntimeCalls = Math.max(state.maxActiveRuntimeCalls, state.activeRuntimeCalls);
         await sleep(140);
         state.activeRuntimeCalls -= 1;
+        // Match only the production recovery probe. Ordinary DOM results keep
+        // their existing shape so missing-health-field failures remain visible.
+        if (message.params?.functionDeclaration === 'function(){return {title:String(document.title||"").slice(0,1000),ready:document.readyState}}') {
+          result = { result: { type: 'object', value: { title: 'Fake Page', ready: 'complete' } } };
+          break;
+        }
         if (String(message.params?.functionDeclaration || '').includes('function readResearchVisibleDom(recipe)')) {
           state.researchRuntimeCalls.push({ ...message.params, sessionId: message.sessionId });
           result = { result: { type: 'object', value: state.researchSnapshot } };

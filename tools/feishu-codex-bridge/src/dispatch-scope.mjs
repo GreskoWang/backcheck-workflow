@@ -9,6 +9,18 @@ export const OWNED_ASSIGNMENT_CODES = Object.freeze([...OWNED_CODES]);
 export const LOCAL_ASSIGNMENT_CODES = Object.freeze([...LOCAL_EXECUTION_CODES]);
 export const TEAM_ASSIGNMENT_ORDER = Object.freeze([...TEAM_CODES]);
 
+// A resolved allocation receipt covers the whole dispatch independently of
+// the watched accounting codes and the narrower local research assignments.
+export function isResolvedTeamDispatch(scope) {
+  if (scope?.requestMode !== 'team_dispatch' ||
+      !Array.isArray(scope.receiptAssignments) || !scope.receiptAssignments.length ||
+      !Array.isArray(scope.assignments) ||
+      (scope.ambiguousItems != null && (!Array.isArray(scope.ambiguousItems) || scope.ambiguousItems.length))) return false;
+  if (scope.decision === 'execute') return scope.assignments.length > 0;
+  return scope.decision === 'no_owned_assignment' && scope.assignments.length === 0 &&
+    scope.receiptAssignments.every(item => !OWNED_CODES.includes(item.code) && item.code !== 'DIRECT');
+}
+
 // Retain all six watched assignments for receipt/accounting, but keep the
 // research prompt and thread limited to the three codes on this computer.
 export function localExecutionScope(scope) {

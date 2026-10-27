@@ -767,24 +767,32 @@ def main(argv=None) -> int:
         if name == "watch":
             prepare.add_argument("--max-wait", type=float, default=1800)
             prepare.add_argument("--poll-interval", type=float, default=0.5)
-    for command in ("status", "cancel", "read", "confirm", "discard-pending"):
+    for command in ("status", "cancel", "read", "confirm", "discard-pending", "reconcile-plan", "reconcile-apply"):
         child = sub.add_parser(command)
         child.add_argument("--out", type=Path, required=True)
         if command == "confirm":
             child.add_argument("--batch", required=True)
             child.add_argument("--reviewer", required=True)
+        if command.startswith("reconcile-"):
+            child.add_argument("--plan", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "cancel":
             result = cancel(args.out)
         elif args.command == "status":
             result = read_json(media.local_path(str(args.out), Path.cwd()) / "state.json")
+            if result.get("layout") == compact.LAYOUT:
+                result = compact.status(compact_api(), args.out)
         elif args.command == "read":
             result = compact.read_next(compact_api(), args.out)
         elif args.command == "confirm":
             result = compact.confirm(compact_api(), args.out, args.batch, args.reviewer)
         elif args.command == "discard-pending":
             result = compact.discard_pending(compact_api(), args.out)
+        elif args.command == "reconcile-plan":
+            result = compact.reconcile_plan(compact_api(), args.out, args.plan)
+        elif args.command == "reconcile-apply":
+            result = compact.reconcile_apply(compact_api(), args.out, args.plan)
         else:
             kwargs = dict(max_chars=args.max_chars, fetch_public=args.fetch_public, resume=args.resume,
                           retry_media=args.retry_media, concurrency=args.concurrency, timeout=args.timeout, layout=args.layout)

@@ -14,18 +14,18 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 682,
-      "sha256": "8239c00ce8a404e3291f30d298a29cddd9b541a7863e56898692317d6a6b68a1"
+      "bytes": 691,
+      "sha256": "b7292aeede7088102aeeede66cf10ed375113f779f1597bb3befcc7b7a9eae79"
     },
     {
       "path": "AGENTS.md",
-      "bytes": 10119,
-      "sha256": "4d765509424e42f2302a2c7db4b7305763a6eaa4887d18254f5a9d96a633e5a8"
+      "bytes": 10916,
+      "sha256": "1e28f644dcf67fa697298c4fb661706c53330c9d8e8ce94a0d8ae39491c0e4d0"
     },
     {
       "path": "README.md",
-      "bytes": 2155,
-      "sha256": "779c38297e7fd53c09a57be6439be4d2621d246aa8f9cecf72d85d301c5d155e"
+      "bytes": 2192,
+      "sha256": "b955f4ecd79ec2b65405a72d1c879f736ebdc5dd3fa195634762a53bf6e13ea2"
     },
     {
       "path": "Setup-Backcheck.ps1",
@@ -44,8 +44,8 @@
     },
     {
       "path": "config/backcheck-config.mjs",
-      "bytes": 2248,
-      "sha256": "bd667b2f83632aabd6d6f70ed2385cce7c2b6e91dcd4459881b4f03b8b6a7eba"
+      "bytes": 2799,
+      "sha256": "d0c3d0066b4f7f9e2343e5c48e6d20ce88462946886e07de75974dc83984f9fc"
     },
     {
       "path": "config/feishu-readiness.mjs",
@@ -59,13 +59,18 @@
     },
     {
       "path": "docs/INSTALL.md",
-      "bytes": 3455,
-      "sha256": "18344b96d15f04ea92c83f2f4d2d23b9ae89a9e415a86f405e664a4abafcd703"
+      "bytes": 3824,
+      "sha256": "b897aff7a45810d9b5cbe72ceb9aedd587651e42e881ade0ec91d2f517b7164b"
     },
     {
       "path": "docs/MAINTAINING.md",
-      "bytes": 3006,
-      "sha256": "6404cd7aa0d700506da2545b1d5a8fecb0c65b31b94bafd7e86d525548a4b492"
+      "bytes": 3058,
+      "sha256": "b51d53b1c5c7cb1479ce7f7563d0d5a016f0f6741362dfe7203e537e489b0c0c"
+    },
+    {
+      "path": "docs/REPAIRS-2026-10-27.md",
+      "bytes": 5034,
+      "sha256": "00c23dca702ede59b259fe20fcfdf9e9eba20007441b4a9d3703ac0ffc43e110"
     },
     {
       "path": "docs/TOOL-AUDIT.md",
@@ -198,14 +203,19 @@
       "sha256": "b5a7d93b9cf02334d3e36577818ceed371efb51ea3e90346d6d7b4b569cf1d9d"
     },
     {
+      "path": "reports/repair-release-2026-10-27.json",
+      "bytes": 8781,
+      "sha256": "0712f180605d8a1359b0c008f4480ba6d0f309fb66a39b33d65290ffb3c61aa5"
+    },
+    {
       "path": "reports/source-provenance.json",
       "bytes": 46538,
       "sha256": "a1c6d48fbb5eb74de59fac7710334f41040bed87a7cdd336ae5a9d3d352b3878"
     },
     {
       "path": "requirements.txt",
-      "bytes": 15,
-      "sha256": "41b54a6fb2918667ca47a61d73b522629d84490f3d78f0f20b21135faba10d35"
+      "bytes": 31,
+      "sha256": "0d89063abffed441048a3ed94baaa0ad055945be1cb2dba759261c747eebf5ab"
     },
     {
       "path": "scripts/check_portability.py",
@@ -214,8 +224,8 @@
     },
     {
       "path": "scripts/doctor.py",
-      "bytes": 2368,
-      "sha256": "f8b45c804bb05c9a2065dc3ff3ad1ed36dfcc0aa96ab999c64ab314ac188ce55"
+      "bytes": 4895,
+      "sha256": "8011c3e7c815feb61393b20dae3d1f5c92ebe784f9e5cee61b74877e44725023"
     },
     {
       "path": "scripts/package.py",
@@ -224,8 +234,8 @@
     },
     {
       "path": "scripts/run-regression.py",
-      "bytes": 6109,
-      "sha256": "c70d97d83c78dc480e470cdccbdf6859bf4cd43ce32f240c76c99c773fdd183d"
+      "bytes": 7196,
+      "sha256": "4a9d34a6666cd7a4af1134c67767e0306993ae79f122313ad137a8599ae2de1a"
     },
     {
       "path": "scripts/test_package.py",
@@ -244,8 +254,8 @@
     },
     {
       "path": "skills/background-check-research/references/access-policy.md",
-      "bytes": 11613,
-      "sha256": "d74dc5d5f0f0cfda3e522297d86ac6702b90544bd2c1337747c811101ebd5f41"
+      "bytes": 12235,
+      "sha256": "8caed64fa1af49b82b68feb52dff40f19baa24a1ca08db4761c4c4ee10de0909"
     },
     {
       "path": "skills/background-check-research/references/maigret.md",
@@ -404,8 +414,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/scripts/team_merge_audit.py",
-      "bytes": 10011,
-      "sha256": "25c79ff5309f0ddaed16a6b49444dc5b5d3df7fc629cc5fb4c56d859f4a8a798"
+      "bytes": 16243,
+      "sha256": "8c6f2023e3aacc7d6c83e87f00f9569a817329fe427484d8eb689b7c7f803702"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/test_business_risk_gate.py",
@@ -449,8 +459,8 @@
     },
     {
       "path": "skills/web-access/SKILL.md",
-      "bytes": 19083,
-      "sha256": "9152308e649eb75e86e40f71b109bf795e48c603ace1d3e31096d77f6f3fbde9"
+      "bytes": 18759,
+      "sha256": "b0696a51baf4fcc075daff1223346635543800d29d2f39a8ac0a2f4c31904447"
     },
     {
       "path": "skills/web-access/agents/openai.yaml",
@@ -459,8 +469,8 @@
     },
     {
       "path": "skills/web-access/references/cdp-api.md",
-      "bytes": 33153,
-      "sha256": "abdc83729cec0b6628b9140b419deeac8b13bf0b0e28c2a694582f76ac37021e"
+      "bytes": 34345,
+      "sha256": "3c252c674680afe70695de1bdab3205d3b5cdbf49283611c765c881837acbf4d"
     },
     {
       "path": "skills/web-access/references/cdp-session.md",
@@ -509,8 +519,8 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-managed-close-timeout-selftest.mjs",
-      "bytes": 3729,
-      "sha256": "0a08d38666b14418dc00a565b13a169a5ad1888a8fa2222a4311b11b55c04992"
+      "bytes": 4471,
+      "sha256": "521e46c6bbadc9973eea26c0e2b4d40d3c7d9e6cf82c27426268f6e22c09f561"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-http-selftest.mjs",
@@ -519,18 +529,18 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-integration-selftest.mjs",
-      "bytes": 131261,
-      "sha256": "6318569ae32084cd8d22b3cab895d241f02dd02bf8dcb7ed18c873c2882ba72b"
+      "bytes": 131700,
+      "sha256": "8d74cfe867b7158635588abdfbd30bb3d05a546abfd8e10e6be1827e684584c9"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy-selftest.mjs",
-      "bytes": 13650,
-      "sha256": "4a4c95cc0245200a30ddcd497f649a2601c0849a948f195626778335e39355de"
+      "bytes": 14637,
+      "sha256": "26093abdbf9e7d2e3bbf6c3bf36b8486d70a328dbd7c1ae454043577d12b1db2"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy.mjs",
-      "bytes": 170102,
-      "sha256": "bc7f11af1706abd43b9bd82ff8b4a8d92e1cf9f7410286c34d209a38b33090df"
+      "bytes": 173577,
+      "sha256": "dd984974cf029b0e47c82cfb3a5039c9ced64ed1ab2ee161d90d538feefc300f"
     },
     {
       "path": "skills/web-access/scripts/cdp-proxy.ps1",
@@ -559,13 +569,13 @@
     },
     {
       "path": "skills/web-access/scripts/cdp-session-selftest.mjs",
-      "bytes": 14318,
-      "sha256": "ae644d10a642eef99d6dc9a668bca5a45afc8cc286aab97bb5e431ae923cb132"
+      "bytes": 15181,
+      "sha256": "051ad155855f220147cddf7c4417e107152b7b8aaa119c4c94cd865907255024"
     },
     {
       "path": "skills/web-access/scripts/cdp-session.ps1",
-      "bytes": 14073,
-      "sha256": "0b402dd9c58b415c86492509fcf381c1ba0e6e19fb2591406dfae8e35cbb0445"
+      "bytes": 17835,
+      "sha256": "5c8da0667a78ade928ab546d940cef9429077837f987bf63e28270cc53bf61dd"
     },
     {
       "path": "skills/web-access/scripts/cdp-shadow-selftest.mjs",
@@ -609,8 +619,8 @@
     },
     {
       "path": "skills/web-access/scripts/fixed-world.mjs",
-      "bytes": 2355,
-      "sha256": "f5df475d2f1e172107d74f812c45637215df5db29ad49a6d5e2d8a4a6603a35d"
+      "bytes": 2349,
+      "sha256": "ce9de7e2b16520b05e7492db6edeff1a07b54eb7664ad0bc34ebbb424a831901"
     },
     {
       "path": "skills/web-access/scripts/loopback-websocket.mjs",
@@ -629,13 +639,13 @@
     },
     {
       "path": "skills/web-access/scripts/quarantine-lifetime-selftest.mjs",
-      "bytes": 6356,
-      "sha256": "4b45b24551734c4fb310d89105d598311029b9295c600d81ca84e60ec77d8e4f"
+      "bytes": 6377,
+      "sha256": "cab5922352af03a3c84400b2e7dfaff639353f8a633e087a32dcdc96b1e7a9fb"
     },
     {
       "path": "skills/web-access/scripts/research-batch-runtime.mjs",
-      "bytes": 15648,
-      "sha256": "7c2819e38b77585197824b2732634a1ec178c99bbe193116671135eff06a077a"
+      "bytes": 18005,
+      "sha256": "fd97e521df568f38e542a98de3b7c87aeb214012be42c16bdf305be90534bc0b"
     },
     {
       "path": "skills/web-access/scripts/research-batch-selftest.mjs",
@@ -644,8 +654,8 @@
     },
     {
       "path": "skills/web-access/scripts/research-batch.mjs",
-      "bytes": 15837,
-      "sha256": "9bc10f85143048c3a9f96c997edb5155f3198b5cfaa9dafdb173230b9e28124e"
+      "bytes": 18898,
+      "sha256": "6519d7f6e4156ce4957a4ff85534b41dc10de94ae6a779be0b17a3e03a234752"
     },
     {
       "path": "skills/web-access/scripts/research-detail-selftest.mjs",
@@ -659,13 +669,13 @@
     },
     {
       "path": "skills/web-access/scripts/research-dom-recipes-selftest.mjs",
-      "bytes": 27661,
-      "sha256": "93e910f6d80532c709354bf3707d195fe1388d2a5f4639ba0937bfdbe192bd24"
+      "bytes": 29846,
+      "sha256": "bbf5a49ec2b316bf4b4e8a4cd54c942a01f2cbde97d0d1b9ceb420c70389448c"
     },
     {
       "path": "skills/web-access/scripts/research-dom-recipes.mjs",
-      "bytes": 30949,
-      "sha256": "82573e1c76a6132ef888b36e4e2d6198a77ff6b2e023cfabf0ffeca06ed8ad0a"
+      "bytes": 39285,
+      "sha256": "43851dcfc3a5ff354bbaf49c632c5189e76364df3826425ef5293175269e74d3"
     },
     {
       "path": "skills/web-access/scripts/research-recipe-loader-selftest.mjs",
@@ -676,6 +686,11 @@
       "path": "skills/web-access/scripts/research-recipe-loader.mjs",
       "bytes": 2623,
       "sha256": "cee6fe5701e6a951fffd47bbf4eacbaa7fca6f300fbedd9754c4f86a095e9cfd"
+    },
+    {
+      "path": "skills/web-access/scripts/research-viewport-selftest.mjs",
+      "bytes": 15290,
+      "sha256": "9ea3857594723ac065c125c15e1432f95e5410cb35ccf39c4b3be8c567d3a079"
     },
     {
       "path": "skills/web-access/scripts/run-node.ps1",
@@ -723,6 +738,96 @@
       "sha256": "ba92a2b0db9b4e0cff2cb1d5ecf5ccc49b8f20ea60da45d6227d31b8fc119c64"
     },
     {
+      "path": "tests/repair/protocol-startup-diagnostics.mjs",
+      "bytes": 7819,
+      "sha256": "13513770509195acfd378bdd556f1aaf4bf871c4f3342658263fa5e258026c31"
+    },
+    {
+      "path": "tests/repair/test-browser-metadata-isolation.mjs",
+      "bytes": 8428,
+      "sha256": "235e4c3dd43a9f057353638cc622d5d8bb8c154b2e47983f1cc0c06d5675ba3c"
+    },
+    {
+      "path": "tests/repair/test-browser-metadata-protocol.mjs",
+      "bytes": 35342,
+      "sha256": "1c92eb15a5d5d8afce637b16339151ac58cdb0173a4e0a64e4edd57afa8fc666"
+    },
+    {
+      "path": "tests/repair/test-collector-viewport.mjs",
+      "bytes": 12127,
+      "sha256": "7dd2b51acbbcb41e0159aa3c0871a01bcbaf99d4fa38cfa84e274fdda809762c"
+    },
+    {
+      "path": "tests/repair/test-delivery-review-recovery.mjs",
+      "bytes": 28294,
+      "sha256": "9c52f49f516d03208ea5cf91e51709a82f5c6120167650fa0f29e2940577a3d2"
+    },
+    {
+      "path": "tests/repair/test-dom-abort-protocol.mjs",
+      "bytes": 47515,
+      "sha256": "c1d12d330a2c2df94073cc16bb71866e0d78eb35dc810a1dbd7b4b400486d173"
+    },
+    {
+      "path": "tests/repair/test-dom-request-quarantine.mjs",
+      "bytes": 4695,
+      "sha256": "9215e488d65d0e0e541b9bedc9ef2c1d7e3a8a85ed06e97a540d60a1ad0d0fcb"
+    },
+    {
+      "path": "tests/repair/test-protocol-startup-diagnostics.mjs",
+      "bytes": 8019,
+      "sha256": "a37308d88d5b494224ed38c996e6ae76070ffc61bc6f54b0f44258d18ab9fdbd"
+    },
+    {
+      "path": "tests/repair/test-receipt-chat-binding.mjs",
+      "bytes": 15593,
+      "sha256": "bad1026a80cdc4527ea574ba2b0e134c648d49ab6a2f59228620d20cdc09b2de"
+    },
+    {
+      "path": "tests/repair/test-recovery-fixture-contract.mjs",
+      "bytes": 3613,
+      "sha256": "efeac8539650292a004c6ab3693433b66d11dba0012098efcbc82d6ddf726e1a"
+    },
+    {
+      "path": "tests/repair/test-recovery-health-protocol.mjs",
+      "bytes": 37286,
+      "sha256": "3f5637b32bbbb4c6b794fce3c1e3bcdc827267e4a92c41a44770a59789c72be4"
+    },
+    {
+      "path": "tests/repair/test-recovery-health-validation.mjs",
+      "bytes": 13697,
+      "sha256": "b86e6e80f61cb36e7061eaf684520cc0346e8770be1156d9dbc4895952136ef0"
+    },
+    {
+      "path": "tests/repair/test-session-outcome-unknown.mjs",
+      "bytes": 11597,
+      "sha256": "4b6179f751c3da134e8a4e3db6211520d3082d3e78545647b1ab339a8a04ae62"
+    },
+    {
+      "path": "tests/repair/test_compact_reconciliation.py",
+      "bytes": 28441,
+      "sha256": "53f5c6f8114d74e8e6152b54beef1cc50a1c20a05e8e3f4efcc0034689a13d40"
+    },
+    {
+      "path": "tests/repair/test_doctor_runtime.py",
+      "bytes": 7900,
+      "sha256": "45abcd7593d0e723fd8ca8f6591a75b0395e548a52e9170de687fb494fd71456"
+    },
+    {
+      "path": "tests/repair/test_team_visual_contract.py",
+      "bytes": 19496,
+      "sha256": "1408d99a5ca979029509ae5f8779988f86f1bbe1701f75907e6e023dca6042cb"
+    },
+    {
+      "path": "tests/repair/test_workflow_collector.mjs",
+      "bytes": 7392,
+      "sha256": "fd8745d6be273bb4c4927182518a9a764dcf3eb2242893463be462cb8fc71073"
+    },
+    {
+      "path": "tests/repair/test_workflow_watch.py",
+      "bytes": 4534,
+      "sha256": "eb1baf39247e72de33bc83591615ac1e187a6f9b9f9e64e481ff5e8bfb3cd61e"
+    },
+    {
       "path": "tools/edge_cdp_broker/manifest.json",
       "bytes": 3443,
       "sha256": "c051ed1ba0a88f79b780070012385ffbeaee71f06f4cc5efabca05349ccc86eb"
@@ -758,6 +863,11 @@
       "sha256": "60197082bb07115593dccf6b17789ece3ff1af7a9c8144354882732b649a818c"
     },
     {
+      "path": "tools/feishu-codex-bridge/scripts/confirm-special-price.mjs",
+      "bytes": 4929,
+      "sha256": "c53e9bc887065fb6752cb783e9d2a55f61d169af6c6ca6cb54dbcf6b9589e504"
+    },
+    {
       "path": "tools/feishu-codex-bridge/scripts/diagnostic-json.ps1",
       "bytes": 5840,
       "sha256": "6c59ac756d4fa4117113dae813d155d518a2e28848e5f53bdbaf32f897c1794f"
@@ -778,9 +888,24 @@
       "sha256": "0997df81acf6d72e495b251805bb6b24854390822cda20e8ddfe9f45edfd69eb"
     },
     {
+      "path": "tools/feishu-codex-bridge/scripts/read-special-workbook.py",
+      "bytes": 16105,
+      "sha256": "4e1964e2a1ec7027215b2d88e804dff0bc4be6bc5157a3cd5df249c6b22ac793"
+    },
+    {
       "path": "tools/feishu-codex-bridge/scripts/recover-native-handoff-once.mjs",
       "bytes": 3231,
       "sha256": "378c4b1aa4a28913a446cd23a06af7c713b559ce8a199906911ba5cd2fd6ab77"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/render-special-workbook.mjs",
+      "bytes": 2020,
+      "sha256": "72d7852779f6850f74250f01f50e741597e0158f61eb6f8bfe92962c4e2b7f88"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/render-special-workbook.py",
+      "bytes": 13432,
+      "sha256": "8a35559986c04fed1fa312cb12cab1b36dc3616e981833e8439228a6976f05a5"
     },
     {
       "path": "tools/feishu-codex-bridge/scripts/repair-completed-job.mjs",
@@ -796,6 +921,11 @@
       "path": "tools/feishu-codex-bridge/scripts/retry-authorized-preflight-once.mjs",
       "bytes": 2151,
       "sha256": "e574c93ed1ab33c9b65800d9e3409c7fe61734a26c78d6d1ea65063690f78ff6"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/scripts/retry-delivery-review.mjs",
+      "bytes": 3081,
+      "sha256": "964ae84117e2919ecfa87d6fab89ccbc9e7fca6080351c162be426d9b7b0153a"
     },
     {
       "path": "tools/feishu-codex-bridge/scripts/start.ps1",
@@ -829,8 +959,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/acceptance-receipt.mjs",
-      "bytes": 3011,
-      "sha256": "3d6705367938d4971e159f5bfe02fb732d268085b8d2a6b10cbe78bffffc88b2"
+      "bytes": 5698,
+      "sha256": "6ac7e97016873321837ad3ecfdb276dd11fbfa4dab42c99405f0cea85a0e822d"
     },
     {
       "path": "tools/feishu-codex-bridge/src/accounting-client.mjs",
@@ -839,8 +969,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/accounting-ledger.mjs",
-      "bytes": 21064,
-      "sha256": "20f369fd90c124b7fbc245f5b8a06c50456e1bb69b216cfe2b53056148a45ff1"
+      "bytes": 34071,
+      "sha256": "1a100a352bfa53be98ff7b2b80a90ad1d34931a0a2f5a2cb1eb78b2051491145"
     },
     {
       "path": "tools/feishu-codex-bridge/src/accounting-reconciliation.mjs",
@@ -854,8 +984,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/bridge.mjs",
-      "bytes": 28839,
-      "sha256": "9677922010c33cccd8356c5385179ff751d60a687188781df383d2e31b6f7e56"
+      "bytes": 36891,
+      "sha256": "27aa356f373c82be8dac4643fe68b2dd336ab8182e209f392c872478cbade35a"
     },
     {
       "path": "tools/feishu-codex-bridge/src/check-dispatch.mjs",
@@ -879,13 +1009,18 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/codex-runner.mjs",
-      "bytes": 26352,
-      "sha256": "33a5af3af2282c2cbd2a9b025fc487a8caa108b17b178d500aba0072aefea98b"
+      "bytes": 32290,
+      "sha256": "7ada2b7ab3de9e4bca017827a1d12e683e6356bd375f6bc55315bd21463134d4"
     },
     {
       "path": "tools/feishu-codex-bridge/src/commands.mjs",
       "bytes": 2745,
       "sha256": "a44e0d412a04830d02d158cb7fdb6c7686c988c9b5febabe6dd1eb1ee8825376"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/completion-observer.mjs",
+      "bytes": 20260,
+      "sha256": "04ba271f949035f3b29d00c0525a286e8f00c83ae060fd0cea03dec89a8ec6f5"
     },
     {
       "path": "tools/feishu-codex-bridge/src/completion-repair.mjs",
@@ -894,8 +1029,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/config.mjs",
-      "bytes": 4159,
-      "sha256": "c25ce9f4f2b7a5cd9f84943bb90367fbf1bb9de7deb50f58288874b8e9eae25b"
+      "bytes": 4377,
+      "sha256": "eb564e76e8e9bb77643872559fe08af42d898a588a005da6e178a56e843d4a15"
     },
     {
       "path": "tools/feishu-codex-bridge/src/credentials.mjs",
@@ -903,9 +1038,29 @@
       "sha256": "08ae662530d5e10692ed4a506c80405e2f084a7f2d0d77624f69b6c885882d88"
     },
     {
+      "path": "tools/feishu-codex-bridge/src/delivery-policy.mjs",
+      "bytes": 15236,
+      "sha256": "8fa30ce0fe89b0615fb52a2497c6c6bb817ccabd548d40d083e20d1dd0e98bdb"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/delivery-review-retry.mjs",
+      "bytes": 4514,
+      "sha256": "d542c9064f57c7e6276c8bea216c1aaaad97e2f470202914877b82dc157afa2c"
+    },
+    {
       "path": "tools/feishu-codex-bridge/src/delivery-review.mjs",
-      "bytes": 6745,
-      "sha256": "ff84ab770405f03368c0321b31fa5a8fd4df73f965ea8380f04cbd77f4767096"
+      "bytes": 15896,
+      "sha256": "775c4e2854e4c5cd78b67e76b9a182d5bddd5cb7e06babffc2b170a915e8e8f2"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/delivery-router.mjs",
+      "bytes": 21750,
+      "sha256": "75bf8042981d365b041bfcca3159ff0140086e7db41948b05c2eb57326b7dcea"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/delivery-store.mjs",
+      "bytes": 4435,
+      "sha256": "d32c3672273e7d88d7e26a353bc5ec1031528a8d2f74e948d5e3290fa57bc41c"
     },
     {
       "path": "tools/feishu-codex-bridge/src/desktop-native-dispatch.mjs",
@@ -913,14 +1068,34 @@
       "sha256": "5850c1fe8d2ded73d5e7cf1e24dd639c16ee8ebbbdc0e75b617c17fa9a7526cd"
     },
     {
+      "path": "tools/feishu-codex-bridge/src/dispatch-intake-effects.mjs",
+      "bytes": 3925,
+      "sha256": "aa034a717d05bbaef437394ccfb42bb394ecd2fa97431236c261f89476c49109"
+    },
+    {
       "path": "tools/feishu-codex-bridge/src/dispatch-scope.mjs",
-      "bytes": 22443,
-      "sha256": "92d22546111746bda921441190bff4f63c2d54edc87076cb40aaed5ec2f4a4f4"
+      "bytes": 23225,
+      "sha256": "cf562525c3d5ba0f655c7326d5f983b1b9668e44d577f185a9aedf286a22fa0b"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/feishu-delivery-adapters.mjs",
+      "bytes": 50683,
+      "sha256": "4097186fb1d1391f8698c66b26cdb0e252720d6a978a527801d3733fad841a9f"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/feishu-image-transfer.mjs",
+      "bytes": 22800,
+      "sha256": "3248b950d0975c6137d1f42bae0f2c5f67c7bef63976f39c549375ea5c15a5bd"
     },
     {
       "path": "tools/feishu-codex-bridge/src/feishu-poller.mjs",
-      "bytes": 9759,
-      "sha256": "2d164b864c91aedf8bee12b3b08a4ae895087996bf00fb7fdc70fde264b20b46"
+      "bytes": 10698,
+      "sha256": "559a63d3c783308036d4de219b0c6392b763ae279170603a5cc2fc8b0143f559"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/group-policy.mjs",
+      "bytes": 4989,
+      "sha256": "268cf409d74bfd1e078c5d5983c537fe04269324c0705e183076b56ccb0ebd98"
     },
     {
       "path": "tools/feishu-codex-bridge/src/instance-lock.mjs",
@@ -934,8 +1109,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/job-pause.mjs",
-      "bytes": 3618,
-      "sha256": "5ed4ed52683c7b7aea14f6e00e33fbb765cca7d2fa0d7f203dfe6a4b55bd79b9"
+      "bytes": 3636,
+      "sha256": "56b471ce237b8aff77d6fbede0567fa73ff00def83e460356d9cf55b14a5c02e"
     },
     {
       "path": "tools/feishu-codex-bridge/src/job-queue.mjs",
@@ -968,9 +1143,19 @@
       "sha256": "40ea8527a0078fa08399546370673d9d23b9f88eaa6ac24e4cb9d54bbd65fdd7"
     },
     {
+      "path": "tools/feishu-codex-bridge/src/receipt-readback.mjs",
+      "bytes": 7730,
+      "sha256": "a83ae8b17ad1d99adb24d358f33297c887568f440d9dace6328ebce2cb84efe9"
+    },
+    {
       "path": "tools/feishu-codex-bridge/src/redact.mjs",
       "bytes": 277,
       "sha256": "9a552557147901995a8b24181249f36bd7f3556e453ee3c56eecc96c662e9326"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/regular-association.mjs",
+      "bytes": 20822,
+      "sha256": "1923bc74afe508b5ae04ccd4a7c048902f6223bdf52b93ca6c9e4266ada2ec59"
     },
     {
       "path": "tools/feishu-codex-bridge/src/reply-policy.mjs",
@@ -983,14 +1168,59 @@
       "sha256": "51c03bf11d966a22ab90e76dfd86591b7e465724d1f463a8109491a2cce3ab8c"
     },
     {
+      "path": "tools/feishu-codex-bridge/src/risk-merge-journal.mjs",
+      "bytes": 4108,
+      "sha256": "60512cadf13aa579a2b402118ece8cd3e1889a572d150e7b32fb9bc29088e0e6"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/risk-merge-plan.mjs",
+      "bytes": 24687,
+      "sha256": "cb2084ec2002f730f017c7757561404d2b7d91c1756fb76b863cf794ccd39b68"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/shared-delivery-review.mjs",
+      "bytes": 29915,
+      "sha256": "de00e6c175dc4dc58d2f36fefe13efdf3e3a943ca800048be20894aaa9244ef3"
+    },
+    {
       "path": "tools/feishu-codex-bridge/src/shutdown-control.mjs",
       "bytes": 7118,
       "sha256": "6bcba4df9ffd310171f40582a8f9b1a2354caf23fd142254a33756516a97c00d"
     },
     {
+      "path": "tools/feishu-codex-bridge/src/special-accounting.mjs",
+      "bytes": 16484,
+      "sha256": "a9813c743fd8b813510b6f70e46a9904cb9855baa93f885b90671279ca561d0e"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/special-artifacts.mjs",
+      "bytes": 41439,
+      "sha256": "69a124023384aeb173c54503118b011292b42ddac55bb0b83b65ce7504d9fd5b"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/special-delivery-adapter.mjs",
+      "bytes": 16495,
+      "sha256": "7ec3b1608a7e9fd893c203a98d6a3f990c1137a98587d75bdf39fea07a3bccef"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/special-intake.mjs",
+      "bytes": 11206,
+      "sha256": "2de0c9f3eb30f124da4f5b2369171b3ca4154eac9ffe5b10085958b200461418"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/special-preflight.mjs",
+      "bytes": 14444,
+      "sha256": "de0954b8c3d5f6581550113540c01e2b8ebd0ed81b547946bdd43caca9ff2eb4"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/src/special-pricing.mjs",
+      "bytes": 15951,
+      "sha256": "7efaa71077eb598e7e8e3c6d1d0f49534e643e3dea04e0bc5cff4325f83c07ee"
+    },
+    {
       "path": "tools/feishu-codex-bridge/src/store.mjs",
-      "bytes": 21008,
-      "sha256": "f0d0bb5220150725ec58b183e29da22ebd84c2a0bf523d2c586a49b7bab29c0a"
+      "bytes": 25555,
+      "sha256": "61d98c22e8b19a788947490bea36ed05964693ac3e751e3cf5caf820a7bfdb1d"
     },
     {
       "path": "tools/feishu-codex-bridge/src/terminal-observer.mjs",
@@ -1018,14 +1248,24 @@
       "sha256": "b7f7d637a4ce8ef525bccc73857bba021525399675f54fc16599e8b334bd0626"
     },
     {
+      "path": "tools/feishu-codex-bridge/src/workflow-runtime.mjs",
+      "bytes": 8821,
+      "sha256": "e384733989d506400fa0402faf44ba3bad1154153577cd5af80de1e3867f1928"
+    },
+    {
       "path": "tools/feishu-codex-bridge/team_merge_audit.py",
-      "bytes": 10011,
-      "sha256": "25c79ff5309f0ddaed16a6b49444dc5b5d3df7fc629cc5fb4c56d859f4a8a798"
+      "bytes": 16243,
+      "sha256": "8c6f2023e3aacc7d6c83e87f00f9569a817329fe427484d8eb689b7c7f803702"
     },
     {
       "path": "tools/feishu-codex-bridge/test/acceptance-receipt.test.mjs",
-      "bytes": 4506,
-      "sha256": "b379358aa1d1857622cbcadf0b50bcd12a9d2112b1b0c3a8df445f8788f8e62e"
+      "bytes": 6328,
+      "sha256": "c74820d485f186202accb8b052a78d4161464685f7744a9c4238e0d6d59484d6"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/accounting-adjustments.test.mjs",
+      "bytes": 12107,
+      "sha256": "1e99c359a4ac882673410446870ee67e73e74e9825c734ec2ad3128df648651d"
     },
     {
       "path": "tools/feishu-codex-bridge/test/accounting-client.test.mjs",
@@ -1064,13 +1304,18 @@
     },
     {
       "path": "tools/feishu-codex-bridge/test/codex-runner.test.mjs",
-      "bytes": 17751,
-      "sha256": "ff0745e94dcf9c24041dc6f85c655947f5e0611220729c4d3b77f70ecf638b36"
+      "bytes": 17923,
+      "sha256": "b04971dbe6b3bd6d13776750c1b387abdc1190aebf9435665d2323e030b3fa39"
     },
     {
       "path": "tools/feishu-codex-bridge/test/commands.test.mjs",
       "bytes": 2808,
       "sha256": "85761d2749e17b43d4516bafd64eed00a75ed10733a86f2deaac7de4bdf7fedb"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/completion-observer.test.mjs",
+      "bytes": 21018,
+      "sha256": "a8d0cab22b92731a47a426203c20baf91f3bb65f25248f189b5a1784bc385830"
     },
     {
       "path": "tools/feishu-codex-bridge/test/completion-repair.test.mjs",
@@ -1081,6 +1326,11 @@
       "path": "tools/feishu-codex-bridge/test/delivery-review.test.mjs",
       "bytes": 5575,
       "sha256": "12667cd771868beef12fafd9bdbe1ed46c77e1eedb786e3369b64104f030dbcd"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/delivery-router.test.mjs",
+      "bytes": 25130,
+      "sha256": "33dd0b7ee206813c9135229b9df76e9f914cee18b7badb08fe8fca5a9c61c2b8"
     },
     {
       "path": "tools/feishu-codex-bridge/test/desktop-native-dispatch.test.mjs",
@@ -1101,6 +1351,16 @@
       "path": "tools/feishu-codex-bridge/test/dispatch-scope.test.mjs",
       "bytes": 11242,
       "sha256": "1e4a02fd2530a2267ca786823b8988bd3e2264566171788a95f86f8c01e07eb7"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/feishu-delivery-adapters.test.mjs",
+      "bytes": 32932,
+      "sha256": "90a3788ddcf890321cb6716b482e82d8c2ed87e4865f02c5f896fda45887b857"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/feishu-image-transfer.test.mjs",
+      "bytes": 17021,
+      "sha256": "4d197611638e0f0679bae2e0573c736eac1b3202936a6df988eb54b240100814"
     },
     {
       "path": "tools/feishu-codex-bridge/test/feishu-poller.test.mjs",
@@ -1133,6 +1393,11 @@
       "sha256": "641485f6b8e7d0618bc5d5c7f2b3889e100822af0826060cea86bda92be9de90"
     },
     {
+      "path": "tools/feishu-codex-bridge/test/group-policy.test.mjs",
+      "bytes": 3924,
+      "sha256": "2f2d09d9127caa5b65086b2f6b3390e0446c4c659c7f41d694328338ab279bc9"
+    },
+    {
       "path": "tools/feishu-codex-bridge/test/instance-lock.test.mjs",
       "bytes": 10258,
       "sha256": "219f6cc35865a33fa4b0623998394f33a13ae3ac02cf83509fb38bb1ae8f9a55"
@@ -1148,6 +1413,11 @@
       "sha256": "2d7022250407f1d7b6fd99d82763e662782170f5d02c680dfd25e4c491d62597"
     },
     {
+      "path": "tools/feishu-codex-bridge/test/multigroup-intake.test.mjs",
+      "bytes": 6878,
+      "sha256": "9690c3670340b18d6c98e4d58b4e5fe52d0d65d0ce480de6f44e169fe9dca029"
+    },
+    {
       "path": "tools/feishu-codex-bridge/test/preflight-model.test.mjs",
       "bytes": 4835,
       "sha256": "42a65c4ac2b2b046f2d23406a5ba87e4da8b7c3beeb30b3fdec21c79d22e2ea2"
@@ -1156,6 +1426,11 @@
       "path": "tools/feishu-codex-bridge/test/quiet-feishu-client.test.mjs",
       "bytes": 1062,
       "sha256": "8e4b0b44aeecd7e894d7907466a3391a77bc2bc6d3b4965d79eb4efda9482089"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/regular-association.test.mjs",
+      "bytes": 18466,
+      "sha256": "67c9fe4ca5c4eb64ba9c89cded7a619c9aed96f786c7f0edffd91381a26c0975"
     },
     {
       "path": "tools/feishu-codex-bridge/test/reply-policy.test.mjs",
@@ -1173,6 +1448,21 @@
       "sha256": "00b01717b53b1478b86ac8929bc8ce4ba79ced73e24fb543e887d716eaccc6d0"
     },
     {
+      "path": "tools/feishu-codex-bridge/test/risk-merge-journal.test.mjs",
+      "bytes": 3997,
+      "sha256": "29df4e549ac5cd835e420942fa3db80d33a11b0c1b93f6aa65750577cadbf6a8"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/risk-merge-plan.test.mjs",
+      "bytes": 18978,
+      "sha256": "bb165f9c445c55812695d9ccbec440f818ccc27e8b1d929e49fe5b9dd8a07f48"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/shared-delivery-review.test.mjs",
+      "bytes": 8716,
+      "sha256": "0bc4bf060f6ca28670371461036ed8076b85f44d979341ddd74802478fd04ae0"
+    },
+    {
       "path": "tools/feishu-codex-bridge/test/shutdown-control.test.mjs",
       "bytes": 2708,
       "sha256": "2859bab17b0a9c69ba0951f7f7e4fcb48b3ea5440a4c3cbbf47b44f5e579d983"
@@ -1181,6 +1471,36 @@
       "path": "tools/feishu-codex-bridge/test/shutdown-integration.test.mjs",
       "bytes": 8441,
       "sha256": "2fbbbcc72f0a23c748688c29af859ba8114dc4ac27a0df7a16f6a68ff964ad14"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/special-accounting.test.mjs",
+      "bytes": 19736,
+      "sha256": "582239918ed93efedd098279148261e0fa6556082c735aa665526bc115a9bfae"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/special-artifacts.test.mjs",
+      "bytes": 18875,
+      "sha256": "a438980933a283445ecae8dbc22a78d75cc70b3c27b6e9dfa5e358b88655037a"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/special-delivery-adapter.test.mjs",
+      "bytes": 23315,
+      "sha256": "b88646308308cd77aa62f106a191041befba4b2bcef1e471bcd4ce0ace162fec"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/special-intake.test.mjs",
+      "bytes": 10491,
+      "sha256": "684e8866731967a0b4eb68b4ba426b08c64d38cbcc2bfcb7c1c0eb701e7b5d1f"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/special-preflight.test.mjs",
+      "bytes": 9302,
+      "sha256": "29db8b5143bdbd327f5ba40da9bc57c1073e0955be6d306f9250a8a450dc4eea"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/special-pricing.test.mjs",
+      "bytes": 12829,
+      "sha256": "becb1dabe3e5a95f6d72a6ff662ee40ac81b429e8c0be2eea92a2ba9c18c4bd0"
     },
     {
       "path": "tools/feishu-codex-bridge/test/store.test.mjs",
@@ -1206,6 +1526,11 @@
       "path": "tools/feishu-codex-bridge/test/visible-thread-bootstrap.test.mjs",
       "bytes": 16083,
       "sha256": "1025372ab3030f99d9f9053196c716050bfd8b13d66db20ec8527b9e78fa4aa3"
+    },
+    {
+      "path": "tools/feishu-codex-bridge/test/workflow-runtime.test.mjs",
+      "bytes": 21442,
+      "sha256": "a7da0f23b694e7dd1f6e2de788fe1f528c72cc76b6d064826f77edef7fb5ee91"
     },
     {
       "path": "tools/research-batch/README.md",
@@ -1254,13 +1579,13 @@
     },
     {
       "path": "tools/research-batch/pipeline/compact.py",
-      "bytes": 17316,
-      "sha256": "ae36b2fbf917956c877772e62a57d16289be40490570cf2b249b496245a08b71"
+      "bytes": 35596,
+      "sha256": "692f4a5a5e22b34b667bcbb2214f27f104238bb8b0a04781aae280707f19268d"
     },
     {
       "path": "tools/research-batch/pipeline/prepare.py",
-      "bytes": 44932,
-      "sha256": "a4e23ee791813253081a1dce466ef215b5618e29c6a939026733307f1ff8dcae"
+      "bytes": 45457,
+      "sha256": "98b4d5600122c7de2644626a9e2d0cb52e0b8539d5b88341a344bc2d4c7607a4"
     },
     {
       "path": "tools/research-batch/test/coverage/test_validate.py",

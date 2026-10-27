@@ -13,6 +13,7 @@ async function scenario(method,owned=false) {
   const context={pending,managedTabs,closingTargets,quarantinedTargets,destroyedTargets:new Map(),
     leases:new Map(),trackDerivedTaskTarget(){},activeTaskPageCount:()=>managedTabs.size,MAX_ACTIVE_TASK_PAGES:5,
     targetsBySession:new Map([['parent-session','parent']]),commandId:0,lastCdpTimeout:null,
+    metadataHealthProbe:null,connectionState:'connected',edgeCdpVersion:value=>value?.userAgent?.includes('Edg/'),
     BUDGETS:{metadata:15},setTimeout,clearTimeout,Date,Math,Number,Promise,
     assertCdpMethodAllowed(){},positiveInteger:(v,d)=>Number(v)||d,methodTimeout:()=>15,
     deadlineAfter:()=>({remaining:()=>100}),isOpen:socket=>socket?.readyState===1,
@@ -25,6 +26,7 @@ async function scenario(method,owned=false) {
   context.browserSocket={readyState:1,send(raw){
     sent++; const message=JSON.parse(raw);
     if(message.method==='Runtime.callFunctionOn')setTimeout(()=>pending.get(message.id)?.resolve({ok:true}),35);
+    if(message.method==='Browser.getVersion')setTimeout(()=>pending.get(message.id)?.resolve({userAgent:'Edg/152.0.0.0'}),1);
   }};
   vm.createContext(context);vm.runInContext(code,context);
   const unrelated=context.sendCdp('Runtime.callFunctionOn',{}, {sessionId:'parent-session',timeoutMs:100});
@@ -32,7 +34,8 @@ async function scenario(method,owned=false) {
   if(owned) await assert.rejects(context.closeOverflowDerivedTarget('popup'),error=>error.code==='cdp_timeout');
   else await assert.rejects(context.sendCdp(method,{}, {targetId:'unknown',timeoutMs:15}),error=>error.code==='cdp_timeout');
   const other=await observedUnrelated;
-  assert.equal(retired,owned?0:1);
+  const readonlyMetadata=method==='Target.getTargets'||method==='Target.getTargetInfo';
+  assert.equal(retired,owned||readonlyMetadata?0:1);
   if(owned){
     assert.equal(other.value?.ok,true,'owned popup timeout must not cancel unrelated parent command');
     assert.equal(managedTabs.has('popup'),true,'unknown close remains accounted for');
@@ -44,10 +47,15 @@ async function scenario(method,owned=false) {
     };
     await assert.rejects(context.sweepUnclaimedDerivedTargets({remaining:()=>100}),error=>error.code==='derived_target_unresolved');
     assert.equal(managedTabs.has('popup'),true);
+  } else if(readonlyMetadata) {
+    assert.equal(other.value?.ok,true,'healthy read-only metadata timeout must preserve the other target');
+    assert.equal(sent,3,'one failed metadata request, one health check, one unrelated request');
+    assert.equal(context.lastCdpTimeout.connectionHealthCheck.status,'healthy');
   } else assert.ok(other.error,'unscoped timeout still retires the generation');
 }
 await scenario('Target.closeTarget',true);
 await scenario('Target.closeTarget',false);
 await scenario('Target.attachToTarget',false);
 await scenario('Target.getTargets',false);
-console.log('PASS managed close timeout isolation, retained quarantine/capacity, no close replay, unscoped and attach generation safeguards');
+await scenario('Target.getTargetInfo',false);
+console.log('PASS managed close timeout isolation, retained quarantine/capacity, no close replay, bounded metadata health check, unscoped and attach generation safeguards');

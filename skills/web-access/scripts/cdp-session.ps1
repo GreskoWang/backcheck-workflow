@@ -19,9 +19,13 @@ $script:Target = $null
 $script:OwnsPage = $false
 $script:HasLease = $false
 $script:CreationUnknown = $false
+$script:RequestCorrelationId = $null
 $script:SessionExitCode = 0
 $script:StopReason = 'eof'
 $allowedActions = @('query', 'scroll', 'navigate', 'info', 'activate', 'recover', 'click', 'clickAt', 'shot', 'finish')
+$recoverableStartupCodes = @('cdp_timeout', 'request_timeout', 'request_aborted', 'outcome_unknown',
+  'operation_pending', 'target_still_marked', 'invalid_response', 'request_process_failed', 'request_failed',
+  'connection_lost', 'connection_closed')
 $allowedClickErrorReasons = @('not_found', 'not_visible', 'text_mismatch', 'not_visible_or_changed', 'occluded', 'traversal_limit', 'shadow_host_not_found', 'shadow_root_unavailable')
 $requestExecutable = (Get-Process -Id $PID).Path
 
@@ -41,8 +45,34 @@ function Write-Public {
   [Console]::Out.Flush()
 }
 
+function Select-PublicErrorDetails {
+  param($Details)
+  $safe = @{}
+  if ($null -eq $Details) { return $safe }
+  # Copy typed, bounded diagnostics only. Never forward arbitrary response data,
+  # URLs, identifiers or capability-bearing messages from the request process.
+  foreach ($name in @('outcomeUnknown', 'quarantined', 'connectionRetired')) {
+    $value = $Details.$name
+    if ($value -is [bool]) { $safe[$name] = $value }
+  }
+  foreach ($name in @('budgetMs', 'timeoutMs', 'elapsedMs')) {
+    $value = $Details.$name
+    if (($value -is [int] -or $value -is [long] -or $value -is [double] -or $value -is [decimal]) -and
+        $value -ge 0 -and $value -le 3600000) { $safe[$name] = $value }
+  }
+  $methods = @('Input.dispatchMouseEvent', 'Browser.getVersion', 'Page.captureScreenshot', 'Page.bringToFront',
+    'Page.createIsolatedWorld', 'Page.enable', 'Page.getFrameTree', 'Page.navigate', 'Runtime.callFunctionOn',
+    'Target.attachToTarget', 'Target.closeTarget', 'Target.createTarget', 'Target.detachFromTarget',
+    'Target.getTargetInfo', 'Target.getTargets', 'Target.setDiscoverTargets')
+  if ($Details.method -is [string] -and $Details.method -in $methods) { $safe.method = $Details.method }
+  $phases = @('connect', 'metadata', 'queue', 'attach', 'context', 'read', 'capture', 'navigation', 'recovery', 'cleanup', 'request', 'send', 'receive')
+  if ($Details.phase -is [string] -and $Details.phase -in $phases) { $safe.phase = $Details.phase }
+  return $safe
+}
+
 function Invoke-SessionRequest {
   param([string]$Method, [string]$Path, [string]$Body = '', [string]$OutFile)
+  $requestClock = [Diagnostics.Stopwatch]::StartNew()
   $process = [Diagnostics.Process]::new()
   $start = [Diagnostics.ProcessStartInfo]::new()
   $start.FileName = $requestExecutable
@@ -65,7 +95,8 @@ function Invoke-SessionRequest {
     if (!$process.WaitForExit($RequestTimeoutMilliseconds)) {
       try { $process.Kill($true) } catch {}
       [void]$process.WaitForExit(2000)
-      return @{ ok = $false; unknown = $true; code = 'request_timeout'; exitCode = $null; data = $null }
+      return @{ ok = $false; unknown = $true; code = 'request_timeout'; exitCode = $null; data = $null;
+        details = @{ phase = 'request'; budgetMs = $RequestTimeoutMilliseconds; elapsedMs = $requestClock.ElapsedMilliseconds } }
     }
     $stdout = $stdoutTask.GetAwaiter().GetResult()
     [void]$stderrTask.GetAwaiter().GetResult()
@@ -76,14 +107,17 @@ function Invoke-SessionRequest {
       }
     }
     if ($process.ExitCode -ne 0) {
-      $code = if ($data.error.code -match '^[a-z][a-z0-9_]{1,80}$') { [string]$data.error.code } else { 'request_failed' }
+      $code = if ($data.error.code -is [string] -and $data.error.code -match '^[a-z][a-z0-9_]{1,80}$') { [string]$data.error.code } else { 'request_failed' }
       $reason = if ($code -eq 'element_not_found' -and $data.error.details.reason -in $allowedClickErrorReasons) { [string]$data.error.details.reason } else { $null }
-      return @{ ok = $false; unknown = ($null -eq $data -or $code -in @('operation_pending', 'target_still_marked'));
-        code = $code; reason = $reason; exitCode = $process.ExitCode; data = $null }
+      $diagnostics = Select-PublicErrorDetails $data.error.details
+      $explicitUnknown = $data.error.details.outcomeUnknown -is [bool] -and $data.error.details.outcomeUnknown -eq $true
+      return @{ ok = $false; unknown = ($null -eq $data -or $explicitUnknown -or $code -in @('outcome_unknown', 'operation_pending', 'target_still_marked'));
+        code = $code; reason = $reason; exitCode = $process.ExitCode; details = $diagnostics; data = $null }
     }
     return @{ ok = $true; unknown = $false; code = $null; exitCode = 0; data = $data }
   } catch {
-    return @{ ok = $false; unknown = $true; code = 'request_process_failed'; exitCode = $null; data = $null }
+    return @{ ok = $false; unknown = $true; code = 'request_process_failed'; exitCode = $null; data = $null;
+      details = @{ phase = 'request'; budgetMs = $RequestTimeoutMilliseconds; elapsedMs = $requestClock.ElapsedMilliseconds } }
   } finally { $process.Dispose() }
 }
 
@@ -142,8 +176,9 @@ function Invoke-SessionCommand {
   if (!$result.ok) {
     $publicError = @{ code = $result.code; exitCode = $result.exitCode }
     if ($result.reason) { $publicError.reason = $result.reason }
+    if ($result.details -and $result.details.Count) { $publicError.details = $result.details }
     Write-Public @{ ok = $false; action = $Command.action; targetId = $script:Target; sessionAlive = $true;
-      error = $publicError }
+      outcomeUnknown = [bool]$result.unknown; requestCorrelationId = $script:RequestCorrelationId; error = $publicError }
     return
   }
   if ($Command.action -eq 'shot') {
@@ -174,21 +209,30 @@ try {
     [void](Read-SessionCommand $firstLine)
   }
   $env:CDP_REQUEST_ID = [guid]::NewGuid().ToString('N')
+  # Public correlation is one-way; the capability-bearing replay key stays private.
+  $script:RequestCorrelationId = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
+    [Text.Encoding]::UTF8.GetBytes($env:CDP_REQUEST_ID))).ToLowerInvariant()
   $createPath = if ($ExistingTarget) { '/acquire?target=' + $ExistingTarget } else { '/new?activate=true&url=' + [uri]::EscapeDataString($InitialUrl) }
   $created = $null
   for ($attempt = 0; $attempt -lt 2; $attempt++) {
     $result = Invoke-SessionRequest -Method POST -Path $createPath
     $validExisting = $ExistingTarget -and $result.data.targetId -eq $ExistingTarget -and $result.data.leaseToken
     $validNew = !$ExistingTarget -and $result.data.ready -eq $true -and $result.data.targetId -and $result.data.leaseToken -and $result.data.manageToken
-    if ($result.ok -and ($validExisting -or $validNew)) { $created = $result.data; break }
-    $script:CreationUnknown = $result.unknown -or ($result.ok -and !$validExisting -and !$validNew)
-    # Only an unknown response receives one recovery. Identical key and route.
-    if (!$script:CreationUnknown) { break }
+    if ($result.ok -and ($validExisting -or $validNew)) { $created = $result.data; $script:CreationUnknown = $false; break }
+    $attemptUnknown = $result.unknown -or ($result.ok -and !$validExisting -and !$validNew)
+    # A later rejection does not prove that an earlier unknown creation never
+    # happened. Preserve that uncertainty while obeying the latest rejection.
+    $script:CreationUnknown = $script:CreationUnknown -or $attemptUnknown
+    # Only known transport/pending failures or an invalid success envelope may
+    # receive one recovery. Permission/ownership refusals never enter a retry.
+    if (!$attemptUnknown -or (!$result.ok -and $result.code -notin $recoverableStartupCodes)) { break }
   }
   if ($null -eq $created) {
     $script:SessionExitCode = 1
-    Write-Public @{ ok = $false; type = 'startup_error'; created = $false; creationUnknown = $script:CreationUnknown;
-      error = @{ code = $(if ($script:CreationUnknown) { 'creation_unconfirmed' } else { 'creation_failed' }) } }
+    $startupError = @{ code = $(if ($script:CreationUnknown) { 'creation_unconfirmed' } else { 'creation_failed' }); causeCode = $result.code }
+    if ($result.details -and $result.details.Count) { $startupError.details = $result.details }
+    Write-Public @{ ok = $false; type = 'startup_error'; created = $(if ($script:CreationUnknown) { $null } else { $false }); creationUnknown = $script:CreationUnknown;
+      requestCorrelationId = $script:RequestCorrelationId; error = $startupError }
   } else {
     $env:CDP_LEASE = [string]$created.leaseToken
     if (!$ExistingTarget) { $env:CDP_MANAGE = [string]$created.manageToken }
@@ -199,12 +243,12 @@ try {
     if ($ExistingTarget) {
       $verified = Invoke-SessionRequest -Method GET -Path "/info?target=$script:Target"
       if (!$verified.ok -or $verified.data.page.url -cne $ExpectedUrl) {
-        Write-Public @{ type = 'resume_verification_failed'; ok = $false; targetId = $script:Target; recoveryAttemptsUsed = $RecoveryAttemptsUsed; error = @{ code = $(if (!$verified.ok) { $verified.code } else { 'resume_url_mismatch' }) } }
+        Write-Public @{ type = 'resume_verification_failed'; ok = $false; targetId = $script:Target; recoveryAttemptsUsed = $RecoveryAttemptsUsed; error = @{ code = $(if (!$verified.ok) { $verified.code } else { 'resume_url_mismatch' }); details = $verified.details } }
         throw 'existing target URL not verified'
       }
       Write-Public @{ type = 'resume_verified'; targetId = $script:Target; data = $verified.data; recoveryAttemptsUsed = $RecoveryAttemptsUsed }
     }
-    Write-Public @{ type = 'ready'; ready = $true; owner = $Owner; targetId = $script:Target; pid = $PID; existingTarget = [bool]$ExistingTarget; recoveryAttemptsUsed = $RecoveryAttemptsUsed }
+    Write-Public @{ type = 'ready'; ready = $true; requestCorrelationId = $script:RequestCorrelationId; owner = $Owner; targetId = $script:Target; pid = $PID; existingTarget = [bool]$ExistingTarget; recoveryAttemptsUsed = $RecoveryAttemptsUsed }
     :commandLoop while ($true) {
       $line = if ($null -ne $firstLine) { $firstLine } else { [Console]::ReadLine() }
       $firstLine = $null
@@ -232,15 +276,15 @@ try {
       $closed = $cleanup.ok -and $cleanup.data.closed -eq $true
       if (!$closed) { $script:SessionExitCode = 1 }
       Write-Public @{ type = 'cleanup'; targetId = $script:Target; reason = $script:StopReason; closed = [bool]$closed;
-        error = $(if ($closed) { $null } else { @{ code = 'cleanup_unconfirmed' } }) }
+        error = $(if ($closed) { $null } else { @{ code = 'cleanup_unconfirmed'; causeCode = $cleanup.code; details = $cleanup.details } }) }
     } elseif ($script:HasLease) {
       $cleanup = Invoke-SessionRequest -Method POST -Path "/release?target=$script:Target"
       $released = $cleanup.ok -and $cleanup.data.released -eq $true
       if (!$released) { $script:SessionExitCode = 1 }
       Write-Public @{ type = 'cleanup'; targetId = $script:Target; reason = $script:StopReason; released = [bool]$released; closed = $false; recoveryAttemptsUsed = $RecoveryAttemptsUsed;
-        error = $(if ($released) { $null } else { @{ code = 'cleanup_unconfirmed' } }) }
+        error = $(if ($released) { $null } else { @{ code = 'cleanup_unconfirmed'; causeCode = $cleanup.code; details = $cleanup.details } }) }
     } elseif ($script:CreationUnknown) {
-      Write-Public @{ type = 'cleanup'; closed = $false; reason = 'creation_unconfirmed'; error = @{ code = 'cleanup_unconfirmed' } }
+      Write-Public @{ type = 'cleanup'; closed = $false; requestCorrelationId = $script:RequestCorrelationId; reason = 'creation_unconfirmed'; error = @{ code = 'cleanup_unconfirmed' } }
     }
   } finally {
     Remove-Item Env:CDP_LEASE, Env:CDP_MANAGE, Env:CDP_REQUEST_ID -ErrorAction SilentlyContinue

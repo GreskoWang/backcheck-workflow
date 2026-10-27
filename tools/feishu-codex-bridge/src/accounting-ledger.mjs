@@ -2,6 +2,7 @@ import { localConfig, assertAccountingReady } from '../../../config/backcheck-co
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createSpecialPricingRegistry } from './special-pricing.mjs';
 
 // Existing team workbook. The month is selected by the source message's
 // Shanghai calendar date. Missing months copy a validated existing template.
@@ -14,6 +15,115 @@ const PRICES = Object.freeze({ A: 200, B: 600, C: 600, D: 50,
   E: 200, F: 600, G: 50, H: 600 });
 const COLUMNS = Object.keys(PRICES);
 const confirmedRevisions = new WeakMap();
+const accountingStates = new WeakMap();
+const copiedSpecialContexts = new WeakMap();
+// Only these two explicitly priced items may carry the approved +100 adjustment.
+const ADJUSTED_SUBJECTS = new Set([
+  'TGA 2025节点B站视频调研（700元）', '单机游戏热门视频调研（700元）',
+]);
+
+export function bindAccountingState(client, stateDir) {
+  if (!client || !path.isAbsolute(stateDir || '')) throw new Error('accounting state binding requires an absolute directory');
+  accountingStates.set(client, stateDir);
+}
+
+export async function withAccountingLock(stateDir, operation) {
+  if (!path.isAbsolute(stateDir || '') || typeof operation !== 'function') throw new Error('accounting lock arguments are invalid');
+  fs.mkdirSync(stateDir, { recursive: true });
+  const lockPath = path.join(stateDir, 'accounting-ledger.lock');
+  let fd;
+  try { fd = fs.openSync(lockPath, 'wx'); }
+  catch (cause) { const error = new Error('accounting ledger is busy or its prior operation needs review'); error.code = 'ACCOUNTING_BUSY'; throw error; }
+  try {
+    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }));
+    return await operation();
+  } finally { fs.closeSync(fd); fs.unlinkSync(lockPath); }
+}
+
+function specialApprovals(client, sheetId) {
+  const stateDir = accountingStates.get(client);
+  if (!stateDir) return [];
+  const effectiveSheet = copiedSpecialContexts.get(client)?.get(sheetId) || sheetId;
+  const ledger = readLedger(path.join(stateDir, 'accounting-ledger.json'));
+  const registry = createSpecialPricingRegistry({ stateDir });
+  return Object.values(ledger.entries || {}).filter(entry => entry.category === 'special_confirmed' && entry.sheetId === effectiveSheet).map(entry => {
+    const order = registry.getOrder(entry.specialOrderId);
+    if (order.status !== 'price_confirmed' || order.requestId !== entry.requestId ||
+        order.sourceMessageId !== entry.sourceMessageId || order.chatId !== entry.chatId ||
+        order.pricing.amountMinor !== entry.amountMinor || order.pricing.confirmationId !== entry.confirmationId ||
+        entry.column !== 'B' || entry.cellText !== entry.subject ||
+        typeof entry.cellText !== 'string' || entry.cellText.length > 240 || /["\r\n]/u.test(entry.cellText) ||
+        !entry.cellText.startsWith(`${order.orderId} | CNY ${order.pricing.amount} | `)) {
+      throw new Error('special accounting approval no longer matches its exact confirmed order');
+    }
+    return { orderId: order.orderId, subject: entry.cellText, amountMinor: entry.amountMinor, status: entry.status };
+  });
+}
+
+function differenceText(amountMinor) {
+  const difference = amountMinor - 60000;
+  return difference % 100 === 0 ? String(difference / 100) : (difference / 100).toFixed(2);
+}
+
+export function parseAccountingFormula(value, column, lastDataRow, { specialPriceApprovals = [] } = {}) {
+  if (typeof value !== 'string' || value.length > (specialPriceApprovals.length ? 65536 : 2048) || !COLUMNS.includes(column)) return null;
+  const base = value.match(/^=COUNTA\(([A-H])([1-9]\d*):\1([1-9]\d*)\)\*(\d+)/u);
+  if (!base || base[1] !== column) return null;
+  const startRow = Number(base[2]), endRow = Number(base[3]), rate = Number(base[4]);
+  // Native insertion above the first item shifts the range start as well as IF references.
+  if (!Number.isSafeInteger(startRow) || startRow < 2 || startRow > endRow ||
+      !Number.isSafeInteger(endRow) || endRow > lastDataRow ||
+      !Number.isSafeInteger(rate)) return null;
+  const adjustments = [];
+  const specialAdjustments = [];
+  let tail = value.slice(base[0].length);
+  if (tail && (column !== 'B' || rate !== 600)) return null;
+  while (tail) {
+    const term = tail.match(/^\+IF\(B([1-9]\d*)="([^"]+)",100,0\)/u);
+    if (!term || !ADJUSTED_SUBJECTS.has(term[2])) {
+      const specific = tail.match(/^\+IF\(B([1-9]\d*)="([^"\r\n]+)",(-?\d+(?:\.\d{2})?),0\)/u);
+      if (!specific || specialAdjustments.length >= 200) return null;
+      const row = Number(specific[1]);
+      const matches = specialPriceApprovals.filter(approval => approval.subject === specific[2] &&
+        Number.isSafeInteger(approval.amountMinor) && approval.amountMinor > 0 &&
+        differenceText(approval.amountMinor) === specific[3]);
+      if (matches.length !== 1 || row < 2 || row > lastDataRow ||
+          [...adjustments, ...specialAdjustments].some(a => a.row === row || a.subject === specific[2])) return null;
+      specialAdjustments.push({ row, subject: specific[2], amountMinor: matches[0].amountMinor, orderId: matches[0].orderId });
+      tail = tail.slice(specific[0].length);
+      continue;
+    }
+    if (adjustments.length === 2) return null;
+    const row = Number(term[1]);
+    if (!Number.isSafeInteger(row) || row < 2 || row > lastDataRow ||
+        [...adjustments, ...specialAdjustments].some(a => a.row === row || a.subject === term[2])) return null;
+    adjustments.push({ row, subject: term[2] });
+    tail = tail.slice(term[0].length);
+  }
+  if (adjustments.length && adjustments.length !== ADJUSTED_SUBJECTS.size) return null;
+  return { column, startRow, endRow, rate, adjustments,
+    ...(specialAdjustments.length ? { specialAdjustments } : {}) };
+}
+
+function totalFormula(column, endRow, rate, adjustments = [], specialAdjustments = []) {
+  return `=COUNTA(${column}2:${column}${endRow})*${rate}` + adjustments
+    .map(a => `+IF(B${a.row}="${a.subject}",100,0)`).join('') + specialAdjustments
+    .map(a => `+IF(B${a.row}="${a.subject}",${differenceText(a.amountMinor)},0)`).join('');
+}
+
+export function specialAccountingTotalFormula(client, sheetId, snapshot, { row, cellText, orderId }) {
+  const approvals = specialApprovals(client, sheetId);
+  const approved = approvals.filter(item => item.orderId === orderId && item.subject === cellText);
+  if (approved.length !== 1 || !Number.isSafeInteger(row) || row < 2 || row > snapshot.totalIndex) throw new Error('exact special accounting formula approval is missing');
+  const parts = formulaParts(snapshot, 1, { specialPriceApprovals: approvals });
+  if (parts.rate !== 600) throw new Error('special accounting base rate requires the reviewed 600 formula');
+  const prior = parts.specialAdjustments || [];
+  if (prior.some(item => item.orderId === orderId && (item.row !== row || item.subject !== cellText))) throw new Error('special accounting formula order already has another target');
+  const terms = prior.some(item => item.orderId === orderId) ? prior : [...prior, { ...approved[0], row }];
+  const formula = totalFormula('B', snapshot.totalIndex, 600, parts.adjustments, terms);
+  if (!parseAccountingFormula(formula, 'B', snapshot.totalIndex, { specialPriceApprovals: approvals })) throw new Error('special accounting formula exceeds its approved grammar or capacity');
+  return formula;
+}
 
 function rememberRevision(client, sheetId, revision) {
   const number = Number(revision);
@@ -123,6 +233,7 @@ async function listSheets(client) {
 }
 
 export async function ensureMonthlySheet(client, title, stateDir) {
+  bindAccountingState(client, stateDir);
   let sheets = await listSheets(client);
   const matches = sheets.filter((sheet) => sheet.title === title);
   if (matches.length > 1) throw new Error(`accounting monthly sheet is duplicated: ${title}`);
@@ -177,6 +288,9 @@ export async function ensureMonthlySheet(client, title, stateDir) {
   if (current.length !== 1) throw new Error('accounting month copy is uncertain; do not copy twice');
   const sheetId = current[0].sheet_id;
   if (creation.sheetId && creation.sheetId !== sheetId) throw new Error('accounting created month identity changed');
+  let copied = copiedSpecialContexts.get(client);
+  if (!copied) { copied = new Map(); copiedSpecialContexts.set(client, copied); }
+  copied.set(sheetId, creation.templateSheetId);
   let snapshot = await readSheet(client, sheetId);
   if (snapshot.totalIndex !== creation.totalIndex) throw new Error('accounting new month structure changed');
   for (let r = 1; r < snapshot.totalIndex; r += 1) {
@@ -199,7 +313,9 @@ export async function ensureMonthlySheet(client, title, stateDir) {
   if (snapshot.rows.slice(1, snapshot.totalIndex).some(row => row.some(v => v != null && v !== ''))) {
     throw failed || new Error('accounting new month clearing was not verified');
   }
-  await normalizeFormulaRates(client, sheetId, snapshot);
+  // A copied blank month must not inherit the previous month's item-specific price approvals.
+  await normalizeFormulaRates(client, sheetId, snapshot, { clearItemAdjustments: true });
+  copied.delete(sheetId);
   ledger = readLedger(ledgerPath);
   ledger.months ||= {};
   ledger.months[title] = { ...creation, sheetId, status: 'ready', verifiedAt: new Date().toISOString() };
@@ -234,14 +350,15 @@ export async function readSheet(client, sheetId) {
   }
   if (!Array.isArray(valueRange?.values)) throw new Error('accounting sheet values are missing');
   const rows = valueRange.values;
+  const formulaOptions = { specialPriceApprovals: specialApprovals(client, sheetId) };
   if (HEADERS.some((header, i) => rows[0]?.[i] !== header)) {
     throw new Error('accounting sheet headings changed');
   }
   const totalIndices = rows.flatMap((row, i) =>
-    (/^=COUNTA\(A2:A\d+\)\*\d+$/u.test(String(row?.[0] || '')) ||
+    (parseAccountingFormula(row?.[0], 'A', i, formulaOptions) ||
       (typeof row?.[0] === 'number' && row.slice(0, 8).length === 8 &&
         row.slice(0, 8).every((v, c) => Number.isFinite(v) ||
-          new RegExp(`^=COUNTA\\(${COLUMNS[c]}2:${COLUMNS[c]}\\d+\\)\\*\\d+$`, 'u').test(String(v))))) ? [i] : []);
+          parseAccountingFormula(v, COLUMNS[c], i, formulaOptions)))) ? [i] : []);
   if (totalIndices.length !== 1) throw new Error('accounting total row is missing or duplicated');
   const totalIndex = totalIndices[0];
   if (totalIndex < 2) throw new Error('accounting total row is above the data area');
@@ -249,22 +366,41 @@ export async function readSheet(client, sheetId) {
     const column = COLUMNS[i];
     const expression = String(rows[totalIndex]?.[i] || '');
     if (!Number.isFinite(rows[totalIndex]?.[i]) &&
-        !new RegExp(`^=COUNTA\\(${column}2:${column}\\d+\\)\\*\\d+$`, 'u').test(expression)) {
+        !parseAccountingFormula(expression, column, totalIndex, formulaOptions)) {
       throw new Error(`accounting total formula changed in column ${column}`);
     }
   }
-  return { rows, totalIndex, revision: valueRange.revision };
+  const marked = rows.slice(1, totalIndex).filter(row => /^SP-[A-F0-9]{32} \| /u.test(String(row?.[1] || '')));
+  if (marked.some(row => !formulaOptions.specialPriceApprovals.some(item => item.subject === row[1]))) {
+    throw new Error('special accounting row has no confirmed local price approval');
+  }
+  if (marked.length && typeof rows[totalIndex][1] !== 'string') throw new Error('numeric special accounting total is ambiguous');
+  const specialTerms = parseAccountingFormula(rows[totalIndex][1], 'B', totalIndex, formulaOptions)?.specialAdjustments || [];
+  for (let index = 1; index < totalIndex; index++) {
+    if (!/^SP-[A-F0-9]{32} \| /u.test(String(rows[index]?.[1] || ''))) continue;
+    if (specialTerms.filter(term => term.row === index + 1 && term.subject === rows[index][1]).length !== 1) {
+      throw new Error('special accounting row is missing its exact confirmed price formula');
+    }
+  }
+  if (!copiedSpecialContexts.get(client)?.has(sheetId) && formulaOptions.specialPriceApprovals.some(approval =>
+    approval.status === 'recorded' && rows.slice(1, totalIndex).filter(row => row?.[1] === approval.subject).length !== 1)) {
+    throw new Error('recorded special accounting row changed or is missing');
+  }
+  return { rows, totalIndex, revision: valueRange.revision, formulaOptions };
 }
 
-function formulaRate(snapshot, index) {
+function formulaParts(snapshot, index, options = snapshot.formulaOptions || {}) {
   const value = snapshot.rows[snapshot.totalIndex][index];
-  const formula = String(value).match(/\*(\d+)$/u);
-  if (formula) return Number(formula[1]);
+  if (typeof value === 'string') {
+    const parsed = parseAccountingFormula(value, COLUMNS[index], snapshot.totalIndex, options);
+    if (!parsed) throw new Error(`accounting total formula changed in column ${COLUMNS[index]}`);
+    return parsed;
+  }
   const count = snapshot.rows.slice(1, snapshot.totalIndex)
     .filter(row => row[index] != null && row[index] !== '').length;
   const rate = count ? Number(value) / count : PRICES[COLUMNS[index]];
   if (!Number.isSafeInteger(rate) || rate < 0) throw new Error('numeric accounting total rate is ambiguous');
-  return rate;
+  return { rate, adjustments: [] };
 }
 
 async function writeValue(client, sheetId, cell, value) {
@@ -313,14 +449,63 @@ export async function verifiedWrite(client, sheetId, cell, value) {
   throw lastError || new Error(`accounting write ${cell} did not verify`);
 }
 
-export async function normalizeFormulaRates(client, sheetId, snapshot) {
+// The caller must persist a mutation intent before invoking this. There is no
+// automatic mutation retry: an uncertain result is resolved by reads only.
+export async function writeAccountingCellOnce(client, sheetId, cell, value, expectedSnapshot) {
+  assertAccountingReady();
+  if (!/^B[1-9]\d*$/u.test(cell)) throw new Error('special accounting writes are restricted to column B');
+  const before = await readSheet(client, sheetId);
+  if (!expectedSnapshot || before.totalIndex !== expectedSnapshot.totalIndex ||
+      JSON.stringify(before.rows) !== JSON.stringify(expectedSnapshot.rows) ||
+      (before.revision != null && expectedSnapshot.revision != null && before.revision !== expectedSnapshot.revision)) {
+    const error = new Error('accounting sheet changed before the authorized mutation');
+    error.code = 'SPECIAL_ACCOUNTING_CONFLICT'; throw error;
+  }
+  const row = Number(cell.slice(1));
+  if (row < 2 || row > before.totalIndex + 1) throw new Error('special accounting cell is outside its reviewed area');
+  const previous = parseAccountingFormula(before.rows[before.totalIndex][1], 'B', before.totalIndex, before.formulaOptions);
+  if (row === before.totalIndex + 1) {
+    const next = parseAccountingFormula(value, 'B', before.totalIndex, before.formulaOptions);
+    if (!previous || !next || next.rate !== 600 || next.startRow !== 2 || next.endRow !== before.totalIndex ||
+        JSON.stringify(previous.adjustments) !== JSON.stringify(next.adjustments) ||
+        (previous.specialAdjustments || []).some(term => !(next.specialAdjustments || []).some(other => JSON.stringify(other) === JSON.stringify(term)))) {
+      throw new Error('special accounting total mutation is not an approved additive formula');
+    }
+  } else if ((before.rows[row - 1]?.[1] != null && before.rows[row - 1][1] !== '') ||
+      !(previous?.specialAdjustments || []).some(term => term.row === row && term.subject === value) ||
+      before.rows.slice(1, before.totalIndex).some(values => values?.[1] === value)) {
+    throw new Error('special accounting item mutation is not an empty uniquely approved target');
+  }
+  let failure;
+  try { await writeValue(client, sheetId, cell, value); } catch (error) { failure = error; }
+  const snapshot = await readSheet(client, sheetId);
+  const actual = snapshot.rows[Number(cell.slice(1)) - 1]?.[1];
+  if (actual === value) {
+    const expectedRows = structuredClone(before.rows);
+    expectedRows[Number(cell.slice(1)) - 1][1] = value;
+    if (snapshot.totalIndex !== before.totalIndex || JSON.stringify(snapshot.rows) !== JSON.stringify(expectedRows)) {
+      const error = new Error('accounting sheet changed concurrently with the authorized mutation');
+      error.code = 'SPECIAL_ACCOUNTING_CONFLICT'; throw error;
+    }
+    return snapshot;
+  }
+  const error = new Error('special accounting mutation was not confirmed; read back before any further action');
+  error.code = 'SPECIAL_ACCOUNTING_UNCERTAIN';
+  error.cause = failure;
+  throw error;
+}
+
+export async function normalizeFormulaRates(client, sheetId, snapshot, { clearItemAdjustments = false } = {}) {
   // Normalize four owned rates and all ranges. Other multipliers are retained.
   const rowNumber = snapshot.totalIndex + 1;
   let changed = false;
   for (const [i, column] of COLUMNS.entries()) {
     const old = String(snapshot.rows[snapshot.totalIndex][i]);
-    const rate = ['A', 'D', 'E', 'G'].includes(column) ? PRICES[column] : formulaRate(snapshot, i);
-    const expected = `=COUNTA(${column}2:${column}${rowNumber - 1})*${rate}`;
+    const parts = formulaParts(snapshot, i);
+    const rate = ['A', 'D', 'E', 'G'].includes(column) ? PRICES[column] : parts.rate;
+    const expected = totalFormula(column, rowNumber - 1, rate,
+      clearItemAdjustments ? [] : parts.adjustments,
+      clearItemAdjustments ? [] : parts.specialAdjustments || []);
     if (old !== expected) {
       await verifiedWrite(client, sheetId, `${column}${rowNumber}`, expected);
       changed = true;
@@ -332,7 +517,7 @@ export async function normalizeFormulaRates(client, sheetId, snapshot) {
 export async function insertBeforeTotal(client, sheetId, snapshot) {
   assertAccountingReady();
   const formerTotalRow = snapshot.totalIndex + 1;
-  const oldRates = COLUMNS.map((_, index) => formulaRate(snapshot, index));
+  const oldParts = COLUMNS.map((_, index) => formulaParts(snapshot, index));
   let failed;
   try { const result = await client.request({
     url: `/open-apis/sheets/v2/spreadsheets/${ACCOUNTING_SPREADSHEET_TOKEN}/insert_dimension_range`,
@@ -348,8 +533,18 @@ export async function insertBeforeTotal(client, sheetId, snapshot) {
     throw failed || new Error('accounting row insertion could not be verified; do not retry blindly');
   }
   for (const [index, column] of COLUMNS.entries()) {
-    const multiplier = oldRates[index];
-    const desired = `=COUNTA(${column}2:${column}${formerTotalRow})*${column === 'E' ? PRICES.E : multiplier}`;
+    const current = formulaParts(after, index);
+    if (JSON.stringify(current.adjustments.map(a => a.subject).sort()) !==
+        JSON.stringify(oldParts[index].adjustments.map(a => a.subject).sort())) {
+      throw new Error(`accounting item adjustments changed during insertion in column ${column}`);
+    }
+    if (JSON.stringify((current.specialAdjustments || []).map(a => [a.orderId, a.subject, a.amountMinor]).sort()) !==
+        JSON.stringify((oldParts[index].specialAdjustments || []).map(a => [a.orderId, a.subject, a.amountMinor]).sort())) {
+      throw new Error(`special accounting price approvals changed during insertion in column ${column}`);
+    }
+    // Use references returned by the sheet after insertion, never stale row addresses.
+    const desired = totalFormula(column, formerTotalRow,
+      column === 'E' ? PRICES.E : oldParts[index].rate, current.adjustments, current.specialAdjustments || []);
     if (after.rows[after.totalIndex][index] !== desired) {
       await verifiedWrite(client, sheetId, `${column}${formerTotalRow + 1}`, desired);
     }
@@ -358,6 +553,11 @@ export async function insertBeforeTotal(client, sheetId, snapshot) {
 }
 
 export async function recordDispatchAccounting({ client, stateDir, job, scope }) {
+  if (localConfig.accounting?.enabled !== true) return { status: 'disabled', recorded: 0 };
+  return withAccountingLock(stateDir, () => recordDispatchAccountingUnlocked({ client, stateDir, job, scope }));
+}
+
+async function recordDispatchAccountingUnlocked({ client, stateDir, job, scope }) {
   if (localConfig.accounting?.enabled !== true) return { status: 'disabled', recorded: 0 };
   const items = accountingItems(job, scope);
   if (items.length === 0) return { status: 'not_applicable', recorded: 0 };

@@ -1,6 +1,6 @@
 // Only caches broker-created execution-context metadata, never page data.
 // A fresh frame tree is checked before every use. No caller can choose a world.
-export function createFixedWorldResolver({sendCdp, makeError, metadataTimeoutMs = 2000, worldTimeoutMs = 5000}) {
+export function createFixedWorldResolver({sendCdp, makeError, frameTimeoutMs = 5000, worldTimeoutMs = 5000}) {
   const states = new Map();
   function invalidate(targetId, expectedSessionId = null) {
     const state = states.get(targetId);
@@ -18,7 +18,7 @@ export function createFixedWorldResolver({sendCdp, makeError, metadataTimeoutMs 
         throw makeError('isolated_context_changed', 'Execution context changed before fixed query.', {targetId}, 409);
       }
     };
-    const tree = await sendCdp('Page.getFrameTree', {}, {sessionId, targetId, timeoutMs:metadataTimeoutMs, deadline});
+    const tree = await sendCdp('Page.getFrameTree', {}, {sessionId, targetId, timeoutMs:frameTimeoutMs, deadline});
     unchanged();
     const frame = tree.frameTree?.frame;
     if (!frame?.id) throw makeError('main_frame_unavailable', '无法定位页面主 frame。', {targetId}, 502);

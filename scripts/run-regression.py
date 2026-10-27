@@ -8,19 +8,22 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--node',default=shutil.which('node'))
     parser.add_argument('--pwsh',default=shutil.which('pwsh'))
-    parser.add_argument('--group',choices=['all','browser','bridge','python','uat'],default='all')
+    parser.add_argument('--group',choices=['all','browser','bridge','python','uat','repair'],default='all')
     parser.add_argument('--match',help='Run only test group names containing this string')
+    parser.add_argument('--bridge-test',help='Run one named bridge *.test.mjs file')
     args=parser.parse_args()
     if not args.node or not args.pwsh:parser.error('Node.js and PowerShell 7 are required')
     stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     out=ROOT/'reports/local'/f'regression-{stamp}-{args.group}'
     out.mkdir(parents=True,exist_ok=False)
-    isolated=Path(tempfile.mkdtemp(prefix='backcheck-regression-',dir=ROOT/'.local/temp'))
+    # Do not nest test fixtures under a potentially deep checkout. Windows
+    # filename budgets must not depend on where the repository was cloned.
+    isolated=Path(tempfile.mkdtemp(prefix='bc-reg-'))
     cfg={'schema_version':1,'app_id':'cli_offline_fixture','target_chat_id':'','template_document_token':'OFFLINE_TEMPLATE_FIXTURE',
          'template_read_verified':False,'listener_enabled':False,'acceptance_replies_enabled':False,
          'accounting':{'enabled':True,'rules_reviewed':True,'spreadsheet_token':'OFFLINE_SPREADSHEET_FIXTURE'}}
     config=isolated/'fixture-config.json';config.write_text(json.dumps(cfg),encoding='utf-8')
-    env={k:v for k,v in os.environ.items() if not k.upper().startswith(('CODEX_','CDP_','FEISHU_','LARK_','APP_SECRET','APP_ID'))}
+    env={k:v for k,v in os.environ.items() if not k.upper().startswith(('CODEX_','CDP_','FEISHU_','LARK_','APP_SECRET','APP_ID')) and k.lower() not in {'http_proxy','https_proxy','all_proxy','node_use_env_proxy'}}
     env.update({'CODEX_HOME':str(isolated/'codex'),'BACKCHECK_CONFIG_PATH':str(config),'BACKGROUND_CHECK_WORKSPACE':str(ROOT),
         'RESEARCH_WORKSPACE':str(ROOT),'BACKCHECK_SKILLS_ROOT':str(ROOT/'skills'),'RESEARCH_PYTHON':sys.executable,
         'FEISHU_REVIEW_PYTHON':sys.executable,'RESEARCH_BATCH_TEST_PYTHON':sys.executable,
@@ -28,15 +31,20 @@ def main():
         'FEISHU_REVIEW_AUDITOR':str(ROOT/'skills/review-feishu-background-check/scripts/audit_feishu_snapshot.py'),
         'FEISHU_CREDENTIAL_DIR':str(isolated/'credentials'),'CDP_PROXY_TOKEN_DIR':str(isolated/'cdp'),
         'FEISHU_MCP_ROOT':str(ROOT/'external/feishu-mcp'),'FEISHU_LOCALAPPDATA':str(isolated/'profile'),
-        'TEMP':str(isolated),'TMP':str(isolated),'PYTHONUTF8':'1','PYTHONDONTWRITEBYTECODE':'1'})
+        'NO_PROXY':'127.0.0.1,localhost,::1','no_proxy':'127.0.0.1,localhost,::1','TEMP':str(isolated),'TMP':str(isolated),'PYTHONUTF8':'1','PYTHONDONTWRITEBYTECODE':'1'})
     env['PATH']=os.pathsep.join([str(Path(args.node).parent),str(Path(args.pwsh).parent),env.get('PATH','')])
     commands=[]
     if args.group in ('all','browser'):
         for script in sorted((ROOT/'skills/web-access/scripts').glob('*selftest.mjs')):
-            commands.append(('browser-'+script.stem,[args.node,str(script)],script.parent,240 if script.name=='cdp-session-selftest.mjs' else 120))
+            commands.append(('browser-'+script.stem,[args.node,str(script)],script.parent,240 if script.name in {'cdp-session-selftest.mjs','cdp-proxy-integration-selftest.mjs'} else 120))
     if args.group in ('all','bridge'):
         cwd=ROOT/'tools/feishu-codex-bridge'
-        commands.append(('bridge',[args.node,'--test','--test-concurrency=2',*map(str,sorted((cwd/'test').glob('*.test.mjs')))],cwd,180))
+        tests=sorted((cwd/'test').glob('*.test.mjs'))
+        if args.bridge_test:
+            tests=[test for test in tests if test.name==args.bridge_test]
+            if len(tests)!=1:parser.error('Unknown bridge test file')
+        name='bridge-'+Path(args.bridge_test).stem if args.bridge_test else 'bridge'
+        commands.append((name,[args.node,'--test','--test-concurrency=2',*map(str,tests)],cwd,180))
     if args.group in ('all','python'):
         commands.append(('python-package',[sys.executable,'-m','unittest','discover','-s',str(ROOT/'scripts'),'-p','test_package.py'],ROOT,60))
         for group in ('coverage','media','pipeline'):
@@ -47,7 +55,8 @@ def main():
             commands.append(('python-'+skill,[sys.executable,'-m','unittest','discover','-s',str(cwd),'-p','test_*.py'],cwd,120))
         for skill,script in [('deliver-feishu-background-check','validate_feishu_document.py'),('deliver-feishu-background-check','validate_research_payload.py'),('review-feishu-background-check','audit_feishu_snapshot.py')]:
             cwd=ROOT/'skills'/skill/'scripts'
-            commands.append((script.removesuffix('.py'),[sys.executable,str(cwd/script),'--self-test'],cwd,300 if script=='validate_research_payload.py' else 120))
+            budget={'validate_research_payload.py':600,'validate_feishu_document.py':300}.get(script,120)
+            commands.append((script.removesuffix('.py'),[sys.executable,str(cwd/script),'--self-test'],cwd,budget))
     if args.group in ('all','uat'):
         p=ROOT/'external/feishu-mcp/scripts/test-uat-recovery.ps1'
         commands.append(('uat-recovery',[args.pwsh,'-NoProfile','-File',str(p)],p.parent,60))
@@ -55,6 +64,11 @@ def main():
         for name in ('x-readiness','x-bulk'):
             p=ROOT/'skills/web-access/scripts'/f'test-{name}.ps1'
             commands.append((name,[args.pwsh,'-NoProfile','-File',str(p)],p.parent,30))
+    if args.group in ('all','repair'):
+        for script in sorted((ROOT/'tests/repair').glob('test*')):
+            if script.suffix not in ('.mjs','.py'):continue
+            executable=args.node if script.suffix=='.mjs' else sys.executable
+            commands.append(('repair-'+script.stem,[executable,str(script),'--repo',str(ROOT)],ROOT,300))
     if args.match:commands=[command for command in commands if args.match in command[0]]
     if not commands:parser.error('No regression checks matched')
     results=[]

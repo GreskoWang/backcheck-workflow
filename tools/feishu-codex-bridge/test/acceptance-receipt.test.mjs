@@ -5,7 +5,7 @@ import { sendAcceptanceReceiptOnce } from '../src/acceptance-receipt.mjs';
 import { formatAcceptanceReply } from '../src/codex-runner.mjs';
 
 const requestId = 'RQ-20261006-NEW';
-const groupId = 'oc_dispatch_92ed04';
+const groupId = 'oc_6589cfd31f18a0298c93602b6592ed04';
 const acceptanceFromMs = Date.parse('2026-10-06T15:30:00Z');
 
 function fixture() {
@@ -38,7 +38,7 @@ function fixture() {
     },
   };
   const options = {
-    store, requestId, scope, enabled: true, acceptanceFromMs,
+    store, requestId, scope, enabled: true, acceptanceFromMs, allowedChatId: groupId,
     maxChars: 6000, formatText: formatAcceptanceReply,
     now: () => new Date('2026-10-06T15:31:00Z'),
   };
@@ -103,4 +103,34 @@ test('a too-long allocation list is not truncated or sent', async () => {
   assert.equal(result.status, 'preparation_failed');
   assert.equal(job.acceptanceSendAttemptAt, undefined);
   assert.match(job.acceptancePreparationError, /above the 10-character limit/u);
+});
+
+test('special group sends only with its own explicit policy and keeps one receipt', async () => {
+  const { job, options } = fixture();
+  job.chatId = 'oc_19936593f3ad5a63b1e86ee0f8c44fc8';
+  options.policy = { chatId: job.chatId, role: 'special_dispatch', enabled: true,
+    activationFromMs: acceptanceFromMs, acceptanceFromMs, acceptanceRepliesEnabled: true };
+  let calls = 0;
+  options.send = async (item) => { calls += 1; assert.equal(item.chatId, job.chatId); return 'om_special_receipt'; };
+  assert.equal((await sendAcceptanceReceiptOnce(options)).status, 'sent');
+  assert.equal((await sendAcceptanceReceiptOnce(options)).status, 'already_attempted');
+  assert.equal(calls, 1);
+});
+
+test('similar suffix, delivery-only, missing cutoff and held orders never gain receipt permission', async () => {
+  for (const kind of ['suffix', 'delivery', 'cutoff', 'held', 'wrong_policy']) {
+    const { job, store, options } = fixture();
+    options.send = async () => { throw new Error('unexpected send'); };
+    if (kind === 'suffix') { job.chatId = 'oc_other_92ed04'; store.getBinding = () => ({ chatId: job.chatId }); }
+    else {
+      options.policy = { chatId: job.chatId, role: 'special_dispatch', enabled: true,
+        activationFromMs: acceptanceFromMs, acceptanceFromMs, acceptanceRepliesEnabled: true };
+      if (kind === 'delivery') options.policy.role = 'regular_delivery';
+      if (kind === 'cutoff') options.policy.acceptanceFromMs = null;
+      if (kind === 'held') job.intakeHold = { reason: 'review' };
+      if (kind === 'wrong_policy') options.policy.chatId = 'oc_another';
+    }
+    assert.equal((await sendAcceptanceReceiptOnce(options)).status, 'ineligible');
+    assert.equal(job.acceptanceSendAttemptAt, undefined);
+  }
 });

@@ -153,6 +153,13 @@ for (const raw of xhsPrivateOrUnknownRoutes) {
 // Reproduce public identity/search locators lost by the former YouTube-only
 // query allowlist. DOM links and broker responses must use the same registry.
 const publicQueryRoutes = [
+  ['https://pbs.twimg.com/media/EXAMPLEpublicPhoto?format=jpg&name=large&token=secret', 'https://pbs.twimg.com/media/EXAMPLEpublicPhoto?format=jpg&name=large'],
+  ['https://pbs.twimg.com/media/EXAMPLEpublicPhoto?format=secret&name=token', 'https://pbs.twimg.com/media/EXAMPLEpublicPhoto'],
+  ['https://pbs.twimg.com/auth/EXAMPLEpublicPhoto?format=jpg&name=large', 'https://pbs.twimg.com/[redacted]/EXAMPLEpublicPhoto'],
+  ['https://pbs.twimg.com.evil.test/media/EXAMPLEpublicPhoto?format=jpg', 'https://pbs.twimg.com.evil.test/media/EXAMPLEpublicPhoto'],
+  ['https://www.youtube.com/post/UgkxEXAMPLEpublicCommunityPost123456789?token=secret', 'https://www.youtube.com/post/UgkxEXAMPLEpublicCommunityPost123456789'],
+  ['https://www.youtube.com/auth/UgkxEXAMPLEpublicCommunityPost123456789', 'https://www.youtube.com/[redacted]/[redacted]'],
+  ['https://www.youtube.com.evil.test/post/UgkxEXAMPLEpublicCommunityPost123456789', 'https://www.youtube.com.evil.test/post/[redacted]'],
   ['https://space.bilibili.com/319623712/search?keyword=LS-4.4B&token=secret', 'https://space.bilibili.com/319623712/search?keyword=LS-4.4B'],
   ['https://space.bilibili.com/319623712/search/dynamic?keyword=LS-4.4B&session=secret', 'https://space.bilibili.com/319623712/search/dynamic?keyword=LS-4.4B'],
   ['https://space.bilibili.com/319623712/search?keyword=token%3Dsecret', 'https://space.bilibili.com/319623712/search'],

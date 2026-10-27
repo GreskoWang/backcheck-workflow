@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PAUSABLE_JOB_STATUSES = new Set(['queued', 'running', 'recovery_required']);
+const PAUSABLE_JOB_STATUSES = new Set(['queued', 'running', 'recovery_required', 'review_pending']);
 
 function normalized(value) {
   return String(value || '').trim();

@@ -17,6 +17,7 @@
 !/external/
 !/config/
 !/scripts/
+!/tests/
 !/docs/
 !/reports/
 !/package-manifest.json

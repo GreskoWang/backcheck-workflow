@@ -11,7 +11,6 @@ import { readFeishuCredential } from './credentials.mjs';
 import { acquireInstanceLock } from './instance-lock.mjs';
 import { createLogger } from './log.mjs';
 import {
-  formatAcceptanceReply,
   isThreadRecoveryError,
   runBackgroundCheck,
 } from './codex-runner.mjs';
@@ -19,7 +18,8 @@ import { BridgeStore } from './store.mjs';
 import { commitResearchHandoff } from './research-handoff.mjs';
 import { FeishuMessagePoller } from './feishu-poller.mjs';
 import { isNewDispatchMessage } from './activation-boundary.mjs';
-import { sendAcceptanceReceiptOnce } from './acceptance-receipt.mjs';
+import { applyResolvedIntake } from './dispatch-intake-effects.mjs';
+import { readAcceptanceReceiptOutcome } from './receipt-readback.mjs';
 import {
   canResumeDeliveryReview,
   readLatestFeishuRevision,
@@ -34,15 +34,36 @@ import { recordScopePreflightFailure } from './preflight-failure.mjs';
 import { createJobQueue } from './job-queue.mjs';
 import { sendFeishuPrivateText, sendUserAlertOnce } from './user-alert.mjs';
 import { capturePrivateChallengeEvent } from './user-alert-inbox.mjs';
-import { recordDispatchAccounting } from './accounting-ledger.mjs';
-import { assertAccountingConfirmed } from './intake-accounting-gate.mjs';
+import { recordDispatchAccounting, withAccountingLock } from './accounting-ledger.mjs';
 import { accountingClient } from './accounting-client.mjs';
 import { createQuietFeishuClient, silentFeishuLogger } from './quiet-feishu-client.mjs';
 import { redactSecrets } from './redact.mjs';
 import { processAccountingReconciliation } from './accounting-reconciliation.mjs';
+import { activeGroupPolicies, getGroupPolicy, acceptsGroupMessage } from './group-policy.mjs';
+import { DeliveryStore } from './delivery-store.mjs';
+import { createCompletionObserver } from './completion-observer.mjs';
+import { defaultCodexSessionsRoot } from './desktop-native-dispatch.mjs';
+import { createSpecialPricingRegistry } from './special-pricing.mjs';
+import { prepareSpecialIncoming } from './special-preflight.mjs';
+import { createWorkflowRuntime } from './workflow-runtime.mjs';
+import { createFeishuDeliveryAdapters } from './feishu-delivery-adapters.mjs';
+import { createSpecialDeliveryAdapters } from './special-delivery-adapter.mjs';
 
-assertListenerReady();
+const groupPolicies = assertListenerReady();
 const store = new BridgeStore(config.stateDir);
+const deliveryStore = new DeliveryStore(config.stateDir);
+const pricingRegistry = createSpecialPricingRegistry({ stateDir: config.stateDir });
+let deliveryAdapters;
+let resolveMessageRoutingReady;
+const messageRoutingReady = new Promise(resolve => { resolveMessageRoutingReady = resolve; });
+const completionObserver = createCompletionObserver({
+  workspace: config.workspace, stateDir: config.stateDir,
+  sessionsRoot: config.codexSessionsRoot || defaultCodexSessionsRoot(),
+  readLatestRevision: (token) => readLatestFeishuRevision(reviewClient, token),
+  verifyReports: verifyJobReports,
+});
+const workflow = createWorkflowRuntime({ config, groupPolicies, store, deliveryStore, pricingRegistry,
+  getAdapters: () => deliveryAdapters, completionObserver });
 const activationFromMs = Number(store.getRuntime().acceptNewMessagesFromMs);
 const acceptanceFromMs = Number(store.getRuntime().acceptanceRepliesFromMs);
 if (!Number.isSafeInteger(activationFromMs) || activationFromMs <= 0) {
@@ -61,9 +82,18 @@ let instanceLock;
 let shutdownControl;
 let shuttingDown = false;
 let outboxTimer;
+let completionTimer;
 let outboxFlushing = false;
 let preflightReady = false;
 let activePreflightModel = null;
+async function verifyJobReports(options) {
+  const job = { ...options.job, finalResponse: options.finalResponse };
+  if (job.deliveryReviewMode === 'special_artifacts_v1' && job.workflowKind === 'special_research') {
+    const reviewed = await deliveryAdapters.verifySpecialArtifacts({ job });
+    return reviewed.receipts;
+  }
+  return verifyCompletedReports(options);
+}
 const repliesInFlight = new Set();
 const runQueue = createJobQueue({
   canRun: () => !shuttingDown && preflightReady,
@@ -230,9 +260,18 @@ async function bindGroup(msg, code) {
 }
 
 async function routeMessage(msg) {
-  if (!isNewDispatchMessage(msg, activationFromMs)) return;
+  const policy = getGroupPolicy(groupPolicies, msg.chatId);
+  if (!acceptsGroupMessage(policy, msg)) return;
+  // WebSocket callbacks may arrive while connect() is resolving. Do not let a
+  // delivery event reach its identity check until the real adapters exist.
+  await messageRoutingReady;
+  const extension = await workflow.routeExtension(msg);
+  if (extension.handled) {
+    if (extension.status === 'queued') void runQueue();
+    if (extension.status === 'held') logger.warn('configured workflow held', { messageId: msg.messageId, reason: extension.reason });
+    return;
+  }
   const binding = store.getBinding();
-  if (binding && msg.chatId !== binding.chatId) return;
   if (!binding && !msg.mentionedBot) return;
   if (store.getJobBySourceMessageId(msg.messageId)) return;
   const alreadySeen = store.isMessageSeen(msg.messageId);
@@ -296,6 +335,7 @@ async function routeMessage(msg) {
       sourceMessageId: msg.messageId,
       sourceMessageCreatedAtMs: Number(msg.createTime),
       scopeOnly: Boolean(command.scopeOnly),
+      deliveryKind: 'regular',
       createdAt: new Date().toISOString(),
       codexThreadId: null,
       codexThreadRequestId: requestId,
@@ -303,6 +343,10 @@ async function routeMessage(msg) {
     const acceptance = store.addJobForMessage(msg.messageId, job);
     if (!acceptance.job) return;
     const acceptedJob = acceptance.job;
+    if (acceptance.held) {
+      logger.warn('cross-group intake held for source review', { requestId: acceptedJob.requestId });
+      return;
+    }
     if (acceptance.added) {
       logger.info('background-check request queued', { requestId: acceptedJob.requestId });
     }
@@ -318,13 +362,52 @@ async function runJob(job) {
   const startedAt = new Date().toISOString();
 
   try {
-    const executionJob = store.prepareExecutionJob(job.requestId);
-    const resumingReview = canResumeDeliveryReview(executionJob);
+    const initialCheckpoint = store.getJob(job.requestId);
+    if (['paused', 'handed_off', 'completed', 'transferred', 'cancelled'].includes(initialCheckpoint?.status) ||
+        initialCheckpoint?.handoffEvidence) return;
+    const policy = getGroupPolicy(groupPolicies, job.chatId);
+    if (!policy?.researchEnabled || !acceptsGroupMessage(policy, {
+      chatId: job.chatId, createTime: job.sourceMessageCreatedAtMs,
+    })) {
+      store.updateJob(job.requestId, { status: 'intake_held', stage: 'group_policy_hold' });
+      return;
+    }
+    if (job.workflowKind === 'special_research' && !job.specialIntake) {
+      if (initialCheckpoint?.stage === 'verifying_delivery') {
+        const missing = new Error('special review checkpoint has no original intake evidence');
+        missing.code = 'review_evidence_invalid'; missing.reviewStatus = 'BLOCKED';
+        throw missing;
+      }
+      store.updateJob(job.requestId, { stage: 'special_preflight' });
+      const prepared = await prepareSpecialIncoming({ message: job.sourceMessage,
+        groupPolicy: policy, stateDir: config.stateDir, client: reviewClient,
+        createCodex: createLocalCodex, preflightModel: activePreflightModel });
+      if (prepared.status !== 'ready') {
+        store.updateJob(job.requestId, { status: 'intake_held', stage: 'special_intake_hold',
+          specialIntakeReasons: prepared.reasons });
+        return;
+      }
+      store.updateJob(job.requestId, { specialIntake: prepared.specialIntake || prepared,
+        specialOwnership: prepared.specialOwnership, sourceMediaKeys: prepared.sourceMediaKeys,
+        requestText: prepared.requestText || job.requestText,
+        pricingStatus: prepared.pricing?.status || 'pending_pricing',
+        preflightModelUsed: prepared.preflightModelUsed });
+      job = store.getJob(job.requestId);
+    }
+    const checkpoint = store.getJob(job.requestId);
+    const reviewOnly = checkpoint?.stage === 'verifying_delivery';
+    const executionJob = reviewOnly
+      ? store.prepareDeliveryReview(job.requestId, { workspace: config.workspace })
+      : store.prepareExecutionJob(job.requestId);
+    const resumingReview = reviewOnly && canResumeDeliveryReview(executionJob);
     if (executionJob.stage === 'verifying_delivery' && !resumingReview) {
       throw new Error('delivery review checkpoint has incomplete thread ownership or report evidence');
     }
     if (resumingReview) {
-      store.updateJob(job.requestId, { status: 'running', stage: 'verifying_delivery' });
+      store.updateJob(job.requestId, {
+        status: 'running', stage: 'verifying_delivery',
+        reviewStatus: 'RUNNING', reviewInputFingerprint: executionJob.reviewInputFingerprint,
+      });
       logger.info('background-check delivery review resumed', { requestId: job.requestId });
     } else {
       store.updateJob(job.requestId, { status: 'running', stage: 'scope_preflight', startedAt });
@@ -339,64 +422,20 @@ async function runJob(job) {
       testOnly: false,
     } : await runBackgroundCheck(executionJob, {
       ...config,
+      groupPolicies,
       codexPreflightModel: activePreflightModel,
     }, {
       async onScopeResolved(scope, metadata) {
-        store.updateJob(job.requestId, {
-          intakeDispatchScope: scope,
-          dispatchScope: scope,
-          preflightModelUsed: metadata?.preflightModel || null,
-          stage: job.scopeOnly
-            ? 'scope_test_resolved'
-            : scope.decision === 'execute' ? 'scope_resolved' : 'stopped_by_scope',
-          dispatchResolvedAt: new Date().toISOString(),
+        return applyResolvedIntake({ job, scope, metadata, policy, store, pricingRegistry,
+          logger, safeError, acceptanceFromMs, maxChars: config.maxReplyChars,
+          recordAccounting: ({ job: resolvedJob, scope: resolvedScope }) => recordDispatchAccounting({
+            client: accountingClient(reviewClient, alertAppId), stateDir: config.stateDir,
+            job: resolvedJob, scope: resolvedScope,
+          }),
+          send: item => sendTextReplyIdempotent(channel, item),
+          readback: (item, options) => readAcceptanceReceiptOutcome(channel, item, { ...options, botAppId: alertAppId }),
+          onReceiptUncertain: requestId => queueUserAlert('receipt_uncertain', requestId),
         });
-        if (!job.scopeOnly && scope.decision === 'execute') {
-          try {
-            const accounting = await recordDispatchAccounting({
-              client: accountingClient(reviewClient, alertAppId),
-              stateDir: config.stateDir, job, scope,
-            });
-            store.updateJob(job.requestId, {
-              accountingStatus: accounting.status,
-              accountingRecorded: accounting.recorded,
-              accountingBlocked: accounting.blocked || [],
-              accountingCheckedAt: new Date().toISOString(),
-            });
-            if (accounting.status === 'partial') {
-              store.setRuntime({ operatorAttentionRequired: true });
-              logger.warn('accounting has unresolved entries', {
-                requestId: job.requestId, blocked: accounting.blocked.length,
-              });
-            }
-          } catch (error) {
-            const summary = safeError(error);
-            store.updateJob(job.requestId, {
-              accountingStatus: 'blocked',
-              accountingError: summary,
-              accountingCheckedAt: new Date().toISOString(),
-            });
-            store.setRuntime({ operatorAttentionRequired: true });
-            logger.error('dispatch accounting blocked', { requestId: job.requestId, error: summary });
-          }
-          if (scope.requestMode === 'team_dispatch') assertAccountingConfirmed(store.getJob(job.requestId));
-          const receipt = await sendAcceptanceReceiptOnce({
-            store,
-            requestId: job.requestId,
-            scope,
-            enabled: config.feishuAcceptanceRepliesEnabled,
-            acceptanceFromMs,
-            maxChars: config.maxReplyChars,
-            formatText: formatAcceptanceReply,
-            send: (item) => sendTextReplyIdempotent(channel, item),
-          });
-          if (receipt.status === 'uncertain') {
-            logger.error('allocation receipt outcome uncertain; no automatic retry', {
-              requestId: job.requestId,
-            });
-            queueUserAlert('receipt_uncertain', job.requestId);
-          }
-        }
       },
       onExecutionStarting(_scope, metadata) {
         store.updateJob(job.requestId, {
@@ -445,6 +484,13 @@ async function runJob(job) {
       });
     }
     if (result.handedOff) {
+      if (result.deliveryReviewMode) store.updateJob(job.requestId, {
+        deliveryReviewMode: result.deliveryReviewMode, deliveryReviewStatus: result.deliveryReviewStatus,
+      });
+      if (result.deliveryEligible === false) store.updateJob(job.requestId, {
+        deliveryEligible: false, deliveryReviewStatus: result.deliveryReviewStatus,
+        remainingDeliveryGate: result.remainingDeliveryGate,
+      });
       const persisted = store.getJob(job.requestId);
       if (persisted?.status !== 'handed_off' ||
           persisted?.codexThreadId !== result.threadId ||
@@ -459,19 +505,51 @@ async function runJob(job) {
       return;
     }
     let reviewReceipts = [];
+    if (result.deliveryEligible === false) {
+      store.updateJob(job.requestId, { status: 'review_pending', stage: 'special_artifact_review_pending',
+        finalResponse: result.finalResponse, dispatchScope: result.dispatchScope,
+        deliveryReviewStatus: result.deliveryReviewStatus });
+      return;
+    }
     if (!result.testOnly && !result.skipped) {
       store.updateJob(job.requestId, {
         stage: 'verifying_delivery',
         finalResponse: result.finalResponse,
         dispatchScope: result.dispatchScope,
       });
-      reviewReceipts = await verifyCompletedReports({
+      if (result.deliveryReviewMode) store.updateJob(job.requestId, { deliveryReviewMode: result.deliveryReviewMode });
+      const persistedReview = store.getJob(job.requestId);
+      // Each delivery mode retains its original validator and input format.
+      const reviewCheckpoint = store.prepareDeliveryReview(job.requestId, { workspace: config.workspace });
+      const reviewBinding = value => JSON.stringify({ requestId: value.requestId,
+        codexThreadId: value.codexThreadId, codexThreadRequestId: value.codexThreadRequestId,
+        finalResponse: value.finalResponse, dispatchScope: value.dispatchScope,
+        deliveryReviewMode: value.deliveryReviewMode, specialOwnership: value.specialOwnership,
+        workflowKind: value.workflowKind, scopeVersion: value.scopeVersion });
+      store.updateJob(job.requestId, {
+        reviewStatus: 'RUNNING',
+        reviewInputFingerprint: reviewCheckpoint.reviewInputFingerprint,
+      });
+      reviewReceipts = await verifyJobReports({
+        job: persistedReview,
         requestId: job.requestId,
         finalResponse: result.finalResponse,
         stateDir: config.stateDir,
         workspace: config.workspace,
         readLatestRevision: (token) => readLatestFeishuRevision(reviewClient, token),
       });
+      // A pause, ownership update, or evidence edit during asynchronous review
+      // must not be overwritten by a stale PASS.
+      const currentReview = store.prepareDeliveryReview(job.requestId, { workspace: config.workspace });
+      if (currentReview.status !== 'running' || currentReview.stage !== 'verifying_delivery' ||
+          currentReview.intakeHold || currentReview.duplicateOfRequestId ||
+          reviewBinding(currentReview) !== reviewBinding(reviewCheckpoint) ||
+          currentReview.reviewInputFingerprint !== reviewCheckpoint.reviewInputFingerprint) {
+        const changed = new Error('delivery review checkpoint changed during verification');
+        changed.code = 'review_checkpoint_changed';
+        changed.reviewStatus = 'BLOCKED';
+        throw changed;
+      }
     }
     const completedAt = new Date().toISOString();
     store.updateJob(job.requestId, {
@@ -482,17 +560,40 @@ async function runJob(job) {
       finalResponse: result.finalResponse,
       usage: result.usage,
       reviewReceipts,
+      reviewStatus: reviewReceipts.length ? 'PASS' : null,
+      reviewErrorCode: null, errorSummary: null,
     });
     logger.info('background-check request completed', {
       requestId: job.requestId,
       skipped: result.skipped,
     });
+    try { await workflow.onCompleted(store.getJob(job.requestId)); }
+    catch (error) { logger.error('completed research delivery held', { requestId: job.requestId, error: safeError(error) }); }
   } catch (error) {
     const errorSummary = safeError(error);
     const persistedJob = store.getJob(job.requestId);
-    if (persistedJob?.status === 'paused') {
-      logger.warn('bridge observation stopped after explicit pause; Codex Desktop state needs review', {
+    if (['paused', 'handed_off', 'completed', 'transferred', 'cancelled'].includes(persistedJob?.status) ||
+        persistedJob?.handoffEvidence) {
+      logger.warn('bridge review cannot change a paused, handed-off, or terminal job', {
         requestId: job.requestId,
+      });
+      return;
+    }
+    if (persistedJob?.stage === 'verifying_delivery' &&
+        !persistedJob.handoffEvidence &&
+        persistedJob.codexThreadCreationMode !== 'desktop_native_handoff_v1') {
+      const reviewFailure = {
+        status: error.reviewStatus || error.verdict || 'ERROR', code: error.code || 'delivery_review_failed',
+        inputFingerprint: persistedJob.reviewInputFingerprint || null,
+        failedAt: new Date().toISOString(), errorSummary,
+      };
+      store.updateJob(job.requestId, {
+        status: 'review_pending', stage: 'verifying_delivery', completedAt: null,
+        reviewStatus: reviewFailure.status, reviewErrorCode: reviewFailure.code,
+        reviewLastFailure: reviewFailure, errorSummary,
+      });
+      logger.error('delivery review requires evidence or an explicit retry; research was not restarted', {
+        requestId: job.requestId, code: reviewFailure.code,
       });
       return;
     }
@@ -538,6 +639,7 @@ async function shutdown(signal) {
     store.setRuntime({ state: 'stopping', signal });
     poller?.stop();
     if (outboxTimer) clearInterval(outboxTimer);
+    if (completionTimer) clearInterval(completionTimer);
     await shutdownVisibleThreadBootstraps(signal);
     shutdownCliExecutions();
     await shutdownControl?.close();
@@ -586,7 +688,7 @@ async function main() {
     logger: silentFeishuLogger,
     source: 'codex-background-check-bridge',
     policy: {
-      groupAllowlist: binding ? [binding.chatId] : undefined,
+      groupAllowlist: activeGroupPolicies(groupPolicies).map(policy => policy.chatId),
       dmMode: 'open',
       requireMention: false,
       respondToMentionAll: false,
@@ -647,11 +749,18 @@ async function main() {
   reviewClient = pollingClient;
   alertClient = pollingClient;
   alertAppId = credential.appId;
+  const baseDeliveryAdapters = createFeishuDeliveryAdapters({ appClient: pollingClient, appId: credential.appId,
+    config: config.delivery, deliveryStore, stateDir: config.stateDir, workspace: config.workspace,
+    botOpenId: channel.botIdentity?.openId, reviewModel: () => activePreflightModel });
+  deliveryAdapters = createSpecialDeliveryAdapters({ baseAdapters: baseDeliveryAdapters, appClient: pollingClient,
+    appId: credential.appId, config, deliveryStore, stateDir: config.stateDir, workspace: config.workspace,
+    botOpenId: channel.botIdentity?.openId, dependencies: { getReviewModel: () => activePreflightModel } });
+  resolveMessageRoutingReady();
   credential.appSecret = undefined;
   try {
-    const accounting = await processAccountingReconciliation({
+    const accounting = await withAccountingLock(config.stateDir, () => processAccountingReconciliation({
       client: accountingClient(reviewClient, alertAppId), stateDir: config.stateDir,
-    });
+    }));
     if (accounting) {
       store.setRuntime({ lastAccountingReconciliationAt: new Date().toISOString(),
         lastAccountingReconciliationStatus: accounting.status,
@@ -671,6 +780,7 @@ async function main() {
     client: pollingClient,
     botIdentity: channel.botIdentity,
     getBinding: () => store.getBinding(),
+    getPolicies: () => groupPolicies,
     onMessage: routeMessage,
     logger,
     intervalMs: config.pollIntervalSeconds * 1000,
@@ -685,6 +795,7 @@ async function main() {
     pid: process.pid,
     botName,
     boundChatName: binding?.chatName || null,
+    activeGroups: activeGroupPolicies(groupPolicies).map(({ chatId, role }) => ({ chatId, role })),
     pairingRequired: !binding,
     pollingState: 'active',
     groupRepliesEnabled: config.feishuGroupRepliesEnabled,
@@ -707,6 +818,11 @@ async function main() {
   outboxTimer.unref?.();
   void flushOutbox();
   poller.start();
+  completionTimer = setInterval(() => {
+    if (!shuttingDown && preflightReady) void workflow.observeCompletions().catch(error =>
+      logger.error('completion observation failed', safeError(error)));
+  }, 30000);
+  completionTimer.unref?.();
   store.setRuntime({ preflightStatus: 'checking', preflightCheckedAt: new Date().toISOString() });
   try {
     const check = await validatePreflightCompatibility({
@@ -722,6 +838,7 @@ async function main() {
       preflightError: null,
     });
     logger.info('structured dispatch preflight ready', { model: check.model });
+    void workflow.retryPendingDeliveries().catch(error => logger.error('pending delivery held', safeError(error)));
     void runQueue();
   } catch (error) {
     const summary = safeError(error);
@@ -765,6 +882,7 @@ main().catch(async (error) => {
   try {
     poller?.stop();
     if (outboxTimer) clearInterval(outboxTimer);
+    if (completionTimer) clearInterval(completionTimer);
     await shutdownControl?.close();
     await channel?.disconnect();
   } catch (shutdownError) {

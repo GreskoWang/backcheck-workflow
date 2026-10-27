@@ -10,7 +10,101 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = 'team-merge-1.0.0'
+VERSION = 'team-merge-1.1.0'
+
+
+def audit_team_visual(visual, requirements, *, request_id, token, revision,
+                      subjects, assigned_fingerprint):
+    """Validate a scoped viewing record; saving an image is a separate requirement."""
+    errors, blocked = [], []
+
+    def block(code, message):
+        blocked.append({'code': code, 'location': 'review_context.visual_check',
+                        'actual': message, 'expected': 'current assigned-section visual evidence'})
+
+    def fail(code, message):
+        errors.append({'code': code, 'location': 'review_context.visual_check',
+                       'actual': message, 'expected': 'all observed layout checks pass'})
+
+    if not isinstance(visual, dict):
+        block('VISUAL_CONTEXT', 'visual record is missing or invalid')
+        visual = {}
+    mode = visual.get('mode')
+    if visual.get('status') == 'FAIL':
+        fail('VISUAL_FAILED', 'the recorded visual inspection failed')
+    elif visual.get('status') != 'PASS':
+        block('VISUAL_STATUS', 'a completed visual PASS is required')
+    if mode not in ('fresh', 'reuse_layout'):
+        block('VISUAL_MODE', 'fresh or reuse_layout is required')
+    if visual.get('token') != token or type(visual.get('revision_id')) is not int or visual.get('revision_id') != revision:
+        block('VISUAL_REVISION', 'record must bind the current document and exact revision')
+    # The containing team contract already binds a fresh record to the assigned
+    # subject. Reject conflicting explicit bindings without breaking old fresh
+    # records that did not repeat the outer contract.
+    bindings = {'requestId': request_id, 'scope': 'assigned_subject_only', 'subjects': subjects}
+    if any(key in visual and visual[key] != value for key, value in bindings.items()):
+        block('VISUAL_SCOPE', 'visual record conflicts with the current task or assigned subject')
+    if not isinstance(visual.get('method'), str) or not visual['method'].strip():
+        block('VISUAL_METHOD', 'viewing method is required')
+    try:
+        timestamp = visual.get('checked_at')
+        if not isinstance(timestamp, str) or 'T' not in timestamp:
+            raise ValueError('timestamp')
+        datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+    except ValueError:
+        block('VISUAL_TIME', 'a valid ISO-8601 viewing timestamp is required')
+
+    checks = visual.get('checks', {})
+    if not isinstance(checks, dict):
+        block('VISUAL_CHECKS', 'provided checks must be an object')
+        checks = {}
+    required_checks = ('heading_levels', 'cards_and_grids', 'visible_platform_numbers', 'spacing', 'images')
+    for key in required_checks:
+        if checks.get(key) is False:
+            fail('VISUAL_CHECK_FAILED', f'observed layout check failed: {key}')
+    if mode == 'fresh':
+        for key in required_checks:
+            if checks.get(key) is not True and checks.get(key) is not False:
+                block('VISUAL_CHECK_MISSING', f'actual viewing result is missing: {key}')
+    elif mode == 'reuse_layout':
+        receipt = visual.get('baseline_receipt')
+        if not isinstance(receipt, dict):
+            block('VISUAL_BASELINE', 'an earlier scoped team PASS receipt is required')
+        else:
+            expected = {'verdict': 'PASS', 'token': token, 'requestId': request_id,
+                        'scope': 'assigned_subject_only', 'subjects': subjects,
+                        'whole_team_complete': False}
+            if any(receipt.get(key) != value for key, value in expected.items()):
+                block('VISUAL_BASELINE_SCOPE', 'baseline task, document, subject or verdict does not match')
+            previous_revision = receipt.get('revision_id')
+            if type(previous_revision) is not int or not 0 < previous_revision < revision:
+                block('VISUAL_BASELINE_REVISION', 'baseline must refer to an earlier positive revision')
+            if not receipt.get('reviewer_id') or not receipt.get('evidence_sha256'):
+                block('VISUAL_BASELINE_RECEIPT', 'baseline lacks its audit provenance')
+            if receipt.get('assigned_layout_fingerprint') != assigned_fingerprint:
+                block('VISUAL_LAYOUT_CHANGED', 'assigned section layout differs or the old receipt has no scoped fingerprint')
+
+    if requirements is None:
+        requirements = {}
+    if not isinstance(requirements, dict):
+        block('VISUAL_REQUIREMENTS', 'visual requirements must be an object')
+        requirements = {}
+    required = requirements.get('screenshots_required', False)
+    if type(required) is not bool:
+        block('VISUAL_REQUIREMENTS', 'screenshots_required must be boolean')
+    elif required:
+        if requirements.get('requestId') != request_id or not isinstance(requirements.get('instruction_source'), str) or not requirements['instruction_source'].strip():
+            block('VISUAL_REQUIREMENT_BINDING', 'required screenshots need this task and its instruction source')
+        if mode != 'fresh':
+            block('VISUAL_SCREENSHOTS_REQUIRE_FRESH', 'explicit current-task screenshot requirement needs a fresh record')
+        shots = visual.get('screenshots')
+        try:
+            present = isinstance(shots, list) and bool(shots) and all(isinstance(p, str) and bool(p) and Path(p).is_file() for p in shots)
+        except (OSError, ValueError):
+            present = False
+        if not present:
+            block('VISUAL_FILES', 'explicitly required screenshot files are missing')
+    return {'errors': errors, 'blocked': blocked, 'mode': mode}
 
 def audit_team(payload, single_audit, helpers):
     errors, blocked = [], []
@@ -21,6 +115,8 @@ def audit_team(payload, single_audit, helpers):
     fingerprint = helpers['layout_fingerprint'](items) if items else ''
     source_result = None
     own_count = 0
+    assigned_fingerprint = ''
+    visual_mode = None
 
     def require(value, code, message):
         if not value:
@@ -76,7 +172,11 @@ def audit_team(payload, single_audit, helpers):
         require(rc.get('document_mode') == 'team_merge', 'MODE', 'explicit team merge mode required')
         require(rc.get('review_scope') == 'assigned_subject_only', 'SCOPE', 'assigned subject scope required')
         require(rc.get('overall_document_completion', '').startswith('NOT_ASSERTED'), 'SCOPE_CLAIM', 'must not claim whole team complete')
-        require(isinstance(revision, int) and revision > 0 and payload.get('before_revision') == revision == payload.get('after_revision'), 'REVISION', 'stable current revision required')
+        require(type(revision) is int and revision > 0
+                and type(payload.get('before_revision')) is int
+                and type(payload.get('after_revision')) is int
+                and payload['before_revision'] == revision == payload['after_revision'],
+                'REVISION', 'stable positive integer current revision required')
         contract = rc.get('team_merge_evidence', {})
         subject = contract.get('subject')
         require(isinstance(subject, str) and subject and rc.get('assigned_subjects') == [subject], 'SUBJECT', 'one explicit assigned subject required')
@@ -113,27 +213,36 @@ def audit_team(payload, single_audit, helpers):
         require(normalized(by, current_ids[a + 1:b]) == expected, 'COPIED_CONTENT', 'assigned section differs from the approved complete source')
         disclaimer = helpers['audit_disclaimer_review'](meta, items, payload.get('raw_content'), rc.get('disclaimer_review'))
         require(not disclaimer['errors'] and not disclaimer['blocked'], 'FULL_TEXT_REVIEW', 'current whole-document disclaimer semantic review required')
-        visual = rc.get('visual_check', {})
-        require(visual.get('status') == 'PASS' and visual.get('mode') == 'fresh' and visual.get('token') == token and visual.get('revision_id') == revision, 'VISUAL_REVISION', 'fresh actual visual pass for this shared revision required')
-        require(visual.get('method') and visual.get('checked_at'), 'VISUAL_RECORD', 'viewing method and time required')
-        require(all(visual.get('checks', {}).get(k) is True for k in ('heading_levels', 'cards_and_grids', 'visible_platform_numbers', 'spacing', 'images')), 'VISUAL_CHECKS', 'all assigned-section layout checks required')
-        require(visual.get('screenshots') and all(Path(s).is_file() for s in visual['screenshots']), 'VISUAL_FILES', 'actual screenshots required')
+        # Include root child order: hashing only the descendant blocks would miss
+        # reordered sibling sections because layout_fingerprint sorts block ids.
+        assigned_root = copy.deepcopy(root)
+        assigned_root['children'] = current_ids[a:b]
+        assigned_layout = {'root': helpers['layout_fingerprint']([assigned_root]),
+                           'blocks': helpers['layout_fingerprint']([item for item in items if item['block_id'] in own])}
+        assigned_fingerprint = hashlib.sha256(json.dumps(assigned_layout, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        visual_result = audit_team_visual(rc.get('visual_check'), rc.get('visual_requirements'),
+                                          request_id=payload['requestId'], token=token, revision=revision,
+                                          subjects=rc['assigned_subjects'], assigned_fingerprint=assigned_fingerprint)
+        errors.extend(visual_result['errors']); blocked.extend(visual_result['blocked'])
+        visual_mode = visual_result['mode']
         require(rc.get('reviewer_id'), 'REVIEWER', 'reviewer id required')
     except (ValueError, KeyError, TypeError, IndexError) as exc:
         errors.append({'code': 'TEAM_MERGE', 'location': 'team_merge_evidence', 'actual': str(exc), 'expected': 'verified complete assigned section and unchanged outside blocks'})
 
-    verdict = 'FAIL' if errors else 'PASS'
+    verdict = 'FAIL' if errors else 'BLOCKED' if blocked else 'PASS'
     result = {'schema_version': 1, 'script_version': VERSION, 'verdict': verdict,
         'document': {'title': meta.get('title'), 'token': token, 'revision_id': revision},
         'scope': {'kind': 'assigned_subject_only', 'subjects': rc.get('assigned_subjects'), 'whole_team_complete': False},
         'stats': {'blocks': len(items), 'assigned_blocks': own_count, 'platform_titles': 14 if not errors else 0, 'errors': len(errors), 'blocked': len(blocked)},
-        'visual': {'verdict': verdict, 'mode': 'fresh', 'layout_fingerprint': fingerprint},
+        'visual': {'verdict': verdict, 'mode': visual_mode, 'layout_fingerprint': fingerprint,
+                   'assigned_layout_fingerprint': assigned_fingerprint},
         'errors': errors, 'blocked': blocked, 'info': ['Other members are preserved, not certified.']}
     if source_result: result['source_audit'] = {k: source_result.get(k) for k in ('verdict', 'document', 'business_risk_review')}
-    if not errors:
+    if verdict == 'PASS':
         result['receipt'] = {'token': token, 'revision_id': revision, 'verdict': 'PASS', 'script_version': VERSION,
             'reviewer_id': rc['reviewer_id'], 'layout_fingerprint': fingerprint, 'scope': 'assigned_subject_only',
             'subjects': rc['assigned_subjects'], 'whole_team_complete': False,
+            'requestId': payload['requestId'], 'assigned_layout_fingerprint': assigned_fingerprint,
             'evidence_sha256': hashlib.sha256(json.dumps(rc['team_merge_evidence'], sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
             'generated_at': datetime.now(timezone.utc).isoformat()}
     return result

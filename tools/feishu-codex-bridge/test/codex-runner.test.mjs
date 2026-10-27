@@ -94,15 +94,18 @@ test('only resumes a thread whose persisted owner is the same request id', () =>
 });
 
 test('acceptance is the only group-facing job message and lists every owned request', () => {
-  const text = formatAcceptanceReply({
+  const scope = {
     decision: 'execute',
+    requestMode: 'team_dispatch',
     assignments: [
       { code: 'TS', itemNumbers: ['1'], subject: '合成主体020' },
       { code: 'TS1', itemNumbers: ['1'], subject: "she's green" },
       { code: '临A', itemNumbers: ['3'], subject: '合成主体002' },
       { code: '临H', itemNumbers: ['3'], subject: '合成主体016' },
     ],
-  }, 'RQ-ACCEPT');
+  };
+  scope.receiptAssignments = scope.assignments.map(item => ({ ...item }));
+  const text = formatAcceptanceReply(scope, 'RQ-ACCEPT');
   assert.match(text, /^已接单：RQ-ACCEPT/);
   assert.match(text, /全组派单（代号 → 编号 → 对象）：/);
   assert.match(text, /TS → 1 → 合成主体020/);
@@ -115,6 +118,7 @@ test('acceptance is the only group-facing job message and lists every owned requ
 test('acceptance lists the full team map while execution assignments remain owned-only', () => {
   const scope = {
     decision: 'execute',
+    requestMode: 'team_dispatch',
     assignments: [{ code: 'TS', itemNumbers: ['1'], subject: '合成主体020' }],
     receiptAssignments: [
       { code: 'TS', itemNumbers: ['1'], subject: '合成主体020' },

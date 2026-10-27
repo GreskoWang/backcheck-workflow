@@ -34,7 +34,7 @@ function fixture() {
     detachSessionOrRetire:async()=>({status:'detached'}),
     clearSessionByTarget:id=>context.sessions.delete(id),
     invalidateTargetIdempotency:()=>{}, trackDerivedTaskTarget:()=>{}, reserveAuthenticOrphanTargets:()=>{},
-    callFixedFunctionUnlocked:async()=>({result:{value:{ready:'complete'}}}),
+    callFixedFunctionUnlocked:async()=>({result:{value:{title:'Fixture page',ready:'complete'}}}),
     sendCdp:async()=>({targetInfos:[]}),
   };
   context.leases.set('page',{owner:'owner',token:'test-lease',lastUsedAt:Date.now()});

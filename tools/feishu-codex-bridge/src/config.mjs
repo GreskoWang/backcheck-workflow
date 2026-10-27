@@ -16,6 +16,9 @@ function positiveInteger(name, fallback) {
 }
 
 export const config = Object.freeze({
+  groups: localConfig.groups || [],
+  delivery: localConfig.delivery || { regular: { enabled: false }, special: { enabled: false } },
+  specialArtifactReview: localConfig.special_artifact_review || { enabled: false },
   workspace:
     process.env.BACKGROUND_CHECK_WORKSPACE || path.resolve(bridgeRoot, '..', '..'),
   credentialReader:

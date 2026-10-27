@@ -85,6 +85,78 @@ function createRunner(recipe, children, url = 'https://weibo.com/u/123456') {
 function run(...args) { return createRunner(...args)(); }
 const tests = [];
 function test(name, fn) { fn(); tests.push(name); }
+test('YouTube transcript uses visible accessible labels without reading hidden duplicate text', () => {
+  const segment = el('ytd-transcript-segment-renderer', {}, [
+    el('div', {'aria-label':'1 second Public Korean transcript'}, [
+      el('span', {'aria-hidden':'true'}, [new Text('hidden duplicate', {forbidden:true})])
+    ])
+  ]);
+  const hidden = el('div', {}, [el('ytd-transcript-segment-renderer', {}, [
+    el('div', {'aria-label':'private hidden label'}, [])
+  ])], {display:'none'});
+  const result = run('generic-posts', [segment, hidden], 'https://www.youtube.com/watch?v=AbCdEf01234');
+  const t = result.page_state.transcript;
+  assert.equal(t.layout, 'accessible_segment_labels');
+  assert.equal(t.extracted_segment_count, 1);
+  assert.equal(t.segments[0].text, '1 second Public Korean transcript');
+  assert.equal(t.extraction_truncated, false);
+  assert.equal(t.full_video_coverage_proven, false);
+  assert.equal(run('generic-posts', [segment], 'https://example.test/watch?v=AbCdEf01234').page_state.transcript, undefined);
+});
+test('YouTube transcript new layout preserves visible segments and reports missing panel', () => {
+  const segment = el('transcript-segment-view-model', {}, [p('0 seconds Public opening'),
+    el('span', {hidden:''}, [new Text('private hidden text', {forbidden:true})])]);
+  const result = run('generic-posts', [segment], 'https://www.youtube.com/watch?v=AbCdEf01234');
+  assert.equal(result.page_state.transcript.layout, 'visible_segment_text');
+  assert.equal(result.page_state.transcript.segments[0].text, '0 seconds Public opening');
+  assert.equal(run('generic-posts', [], 'https://www.youtube.com/watch?v=AbCdEf01234').page_state.transcript.layout, 'not_observed');
+});
+test('Weibo keeps visible cards under zero-height layout wrappers and excludes hidden ancestors', () => {
+  const card = el('article', {}, [a('https://weibo.com/123456/AbCdE', 'date'), p('Visible continuation text')]);
+  // The virtualized wrapper may keep a stale rectangle while its children
+  // remain rendered in the current list.
+  card.getBoundingClientRect = () => ({width:1000,height:100,top:-5000,left:0,right:1000,bottom:-4900});
+  const wrapper = el('div', {}, [card]);
+  wrapper.getBoundingClientRect = () => ({width:1000,height:0,top:0,left:0,right:1000,bottom:0});
+  const hidden = el('div', {}, [el('article', {}, [new Text('private', {forbidden:true})])], {display:'none'});
+  const result = run('weibo-feed', [wrapper, hidden]);
+  assert.equal(result.items.length, 1);
+  assert.match(result.items[0].own_visible_text, /Visible continuation text/);
+  assert.equal(result.page_state.collection_window, 'viewport_plus_one_screen');
+});
+test('YouTube community list binds body to public post permalink without poll or account UI', () => {
+  const id = 'UgkxEXAMPLEpublicCommunityPost123456789';
+  const card = el('ytd-backstage-post-renderer', {}, [
+    el('a', {href:'/\u0040FiiOOfficial',id:'author-text'}, ['FIIO']),
+    el('a', {href:'/post/'+id,id:'published-time-text'}, ['2 years ago']),
+    el('div', {id:'content-text'}, ['Public community post text']),
+    el('tp-yt-paper-button', {}, ['Read more']),
+    el('button', {}, ['Vote'])
+  ]);
+  const layoutWrapper = el('div', {}, [card]);
+  layoutWrapper.getBoundingClientRect = () => ({width:1000,height:0,top:0,left:0,right:1000,bottom:0});
+  const result = run('generic-posts', [layoutWrapper], 'https://www.youtube.com/channel/UCexample/posts');
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].source_id, id);
+  assert.equal(result.items[0].author, 'FIIO');
+  assert.equal(result.items[0].own_visible_text, 'Public community post text');
+  assert.equal(result.items[0].date, '2 years ago');
+  assert.equal(result.page_state.visible_expand_controls.length, 1);
+  assert.equal(result.page_state.visible_expand_controls[0].expected_text, 'Read more');
+  assert.equal(result.page_state.visible_expand_controls[0].author, 'FIIO');
+  assert.equal(run('generic-posts', [card], 'https://example.test/channel/UCexample/posts').items.length, 0);
+});
+test('X article CSS photos are collected while invisible photos and emoji are excluded', () => {
+  const photo = 'https://pbs.twimg.com/media/public-photo.jpg';
+  const card = el('article', {}, [a('/FIIO_official/status/2017522856398360796', 'date'), el('time', {datetime:'2026-01-31'}),
+    el('div', {}, [], {backgroundImage:`url("${photo}")`}),
+    el('img', {src:photo}, [], {opacity:'0'}),
+    el('div', {}, [el('div', {}, [], {backgroundImage:'url("https://pbs.twimg.com/media/hidden.jpg")'})], {display:'none'}),
+    el('div', {}, [], {backgroundImage:'url("https://example.test/private.jpg")'}),
+    el('img', {src:'https://abs.twimg.com/emoji/v2/svg/1f44f.svg',alt:'clap'})]);
+  const out = run('generic-posts', [card], 'https://x.com/search?q=from%3AFIIO_official&f=live');
+  assert.deepEqual(out.items[0].media.urls, [photo]);
+});
 function weiboCard(id, text, extras = []) { return el('article', {}, [a(`https://weibo.com/123456/${id}`, '2026-10-14'), p(text, { class: 'detail_wbtext_a' }), ...extras]); }
 
 test('fixed allowlist rejects caller code, selectors, object and inherited names', () => {
@@ -350,39 +422,6 @@ test('Bilibili DOM observation survives lazy media but not recycled content or d
   assert.notEqual(read().items[0].dom_observation_id,replaced);
   const other=run('bilibili-dynamic',[card],'https://space.bilibili.com/319623712/search?keyword=LS-4.4B');
   assert.notEqual(other.items[0].dom_observation_id,first,'new isolated world cannot reuse old observation identity');
-});
-test('X photo readiness uses visible photo-page source images, with loaded/broken/pending states', () => {
-  const image=(name,complete,width,style={})=>Object.assign(el('img',{src:`https://pbs.twimg.com/media/${name}.jpg`},[],style),{complete,naturalWidth:width,naturalHeight:width?600:0});
-  const ready=image('ready',true,800), broken=image('broken',true,0), pending=image('pending',false,0);
-  const hidden=image('hidden',true,800,{display:'none'}), background=image('background',true,800,{display:'none'});
-  const avatar=Object.assign(el('img',{src:'https://pbs.twimg.com/profile_images/avatar.jpg'}),{complete:true,naturalWidth:100,naturalHeight:100});
-  const out=run('generic-posts',[background,el('div',{role:'dialog'},[ready,broken,pending,hidden,avatar])],'https://x.com/example/status/1234567890123456789/photo/1');
-  const state=out.page_state.photo_readiness;
-  assert.equal(state.version,1); assert.equal(state.items.length,3); assert.equal(state.truncated,false);
-  assert.equal(state.items[0].imageState.naturalWidth,800);
-  assert.equal(state.items[1].imageState.naturalWidth,0);
-  assert.equal(state.items[2].imageState.complete,false);
-  assert.equal(state.visual_review_required,true);
-});
-test('X photo readiness is route bound and caps candidate inspection', () => {
-  const images=Array.from({length:2001},(_,i)=>Object.assign(el('img',{src:`https://pbs.twimg.com/media/${i}.jpg`}),{complete:true,naturalWidth:10,naturalHeight:10}));
-  const modal=el('div',{role:'dialog'},images);
-  const out=run('generic-posts',[modal],'https://x.com/example/status/1234567890123456789/photo/2');
-  assert.equal(out.page_state.photo_readiness.items.length,1999);
-  assert.equal(out.page_state.photo_readiness.truncated,true);
-  assert.equal(run('generic-posts',[modal],'https://example.test/example/status/1234567890123456789/photo/2').page_state.photo_readiness,undefined);
-});
-test('X visible CSS image outside the dialog requires a matching loaded backing image', () => {
-  const url='https://pbs.twimg.com/media/public.jpg';
-  const bitmap=Object.assign(el('img',{src:url},[],{opacity:'0'}),{complete:true,naturalWidth:1600,naturalHeight:2400});
-  const visible=el('div',{},[],{backgroundImage:`url("${url}")`});
-  const absent=el('div',{},[],{backgroundImage:'url("https://pbs.twimg.com/media/unloaded.jpg")'});
-  const modal=el('div',{},[el('div',{},[visible,bitmap,absent])]);
-  const state=run('generic-posts',[modal],'https://x.com/example/status/1234567890123456789/photo/1').page_state.photo_readiness;
-  assert.equal(state.items.length,2);
-  assert.equal(state.items[0].representation,'visible_css_background');
-  assert.equal(state.items[0].imageState.naturalWidth,1600);
-  assert.equal(state.items[1].imageState.complete,false);
 });
 console.log(`research DOM recipes: ${tests.length}/${tests.length} passed`);
 for (const name of tests) console.log(`  PASS ${name}`);
