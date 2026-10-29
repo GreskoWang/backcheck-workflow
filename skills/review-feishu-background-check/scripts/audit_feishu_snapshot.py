@@ -38,7 +38,7 @@ PLATFORMS = [
     "境外其他网站",
 ]
 
-SCRIPT_VERSION = "1.11.3"
+SCRIPT_VERSION = "1.11.3+writing.20261030"
 DOMESTIC_TAIL = "其他境内平台暂未发现相关账号或相关内容的负面及敏感信息。"
 FOREIGN_TAIL = "其他境外平台暂未发现相关账号或相关内容的负面及敏感信息。"
 # Read the same approved template as the uploader; synthetic fixtures remain offline-only.
@@ -1197,16 +1197,41 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                             mark_blocked("RISK_GROUP_EVIDENCE", f"review_context.risk_groups[{n - 1}]", [], "at least one matching platform risk item")
                         for evidence_index, item in enumerate(group_items, 1):
                             expected_fact = item.get("fact_text")
-                            if cursor >= len(risk_root) or risk_root[cursor].get("block_type") != 2 or text_of(risk_root[cursor]) != expected_fact:
-                                fail("RISK_FACT", f"举例{n} evidence {evidence_index}", text_of(risk_root[cursor]) if cursor < len(risk_root) else "missing", str(expected_fact))
+                            if "top_fact_text" in item:
+                                top_fact = item.get("top_fact_text")
+                                if not isinstance(top_fact, str) or not top_fact.strip():
+                                    fail("TOP_FACT_SCHEMA", f"举例{n} evidence {evidence_index}", top_fact, "nonempty reviewed top fact")
+                                else:
+                                    if top_fact != expected_fact:
+                                        reviewed = item.get("top_fact_review")
+                                        required = {"status": "PASS", "fact_text": expected_fact,
+                                                    "top_fact_text": top_fact, "token": document_token,
+                                                    "revision_id": revision_id}
+                                        if not isinstance(reviewed, dict) or any(reviewed.get(k) != v for k, v in required.items()) or not reviewed.get("reviewer_id") or not reviewed.get("checked_at"):
+                                            mark_blocked("TOP_FACT_REVIEW", f"举例{n} evidence {evidence_index}", reviewed, "current document-bound semantic review of the exact body and top facts")
+                                    expected_fact = top_fact
+                            top_location = item.get("top_fact_location", "block")
+                            if top_location == "highlight":
+                                # A reviewed explanation in the pin needs no duplicate paragraph below it.
+                                if len(pin_children) != 1 or text_of(pin_children[0]) != expected_fact:
+                                    fail("RISK_FACT", f"举例{n} evidence {evidence_index}",
+                                         [text_of(child) for child in pin_children], str(expected_fact))
+                                    break
+                            elif top_location == "block":
+                                if cursor >= len(risk_root) or risk_root[cursor].get("block_type") != 2 or text_of(risk_root[cursor]) != expected_fact:
+                                    fail("RISK_FACT", f"举例{n} evidence {evidence_index}", text_of(risk_root[cursor]) if cursor < len(risk_root) else "missing", str(expected_fact))
+                                    break
+                                cursor += 1
+                            else:
+                                fail("TOP_FACT_LOCATION", f"举例{n} evidence {evidence_index}", top_location, "block or highlight")
                                 break
-                            cursor += 1
                             image_count = item.get("image_count")
                             if not isinstance(image_count, int) or image_count < 1:
                                 mark_blocked("RISK_IMAGE_SCHEMA", f"review_context.platforms.*.risk_items[{evidence_index - 1}].image_count", image_count, "integer >= 1")
                                 continue
                             actual_images = 0
-                            while cursor < len(risk_root) and risk_root[cursor].get("block_type") == 27:
+                            while (cursor < len(risk_root) and risk_root[cursor].get("block_type") == 27
+                                   and actual_images < image_count):
                                 actual_images += 1
                                 cursor += 1
                             if actual_images != image_count:
@@ -2509,6 +2534,84 @@ def self_test() -> int:
     if complete_second["verdict"] != "PASS":
         print(json.dumps(complete_second, ensure_ascii=False, indent=2))
         return 1
+    # The pin may carry the explanation itself; body evidence and semantic review still bind it.
+    def highlight_fixture(source: dict[str, Any], explanation: str) -> dict[str, Any]:
+        candidate = copy.deepcopy(source)
+        candidate_items = candidate["block_list"]["items"]
+        page = next(block for block in candidate_items if block.get("block_type") == 1)
+        removed = {"risk-top-fact", "risk-top-fact-2"}
+        candidate_items[:] = [block for block in candidate_items if block.get("block_id") not in removed]
+        page["children"][:] = [bid for bid in page["children"] if bid not in removed]
+        pin_text = next(block for block in candidate_items if block.get("block_id") == "risk-top-pin-text")
+        pin_text["text"]["elements"][0]["text_run"]["content"] = explanation
+        context = candidate["review_context"]
+        context["risk_groups"][0]["highlight_text"] = explanation
+        for item in context["platforms"]["X"]["risk_items"]:
+            item.update({"top_fact_location": "highlight", "top_fact_text": explanation})
+            if item["fact_text"] != explanation:
+                item["top_fact_review"] = {
+                    "status": "PASS", "token": "9.12-test", "revision_id": 1,
+                    "fact_text": item["fact_text"], "top_fact_text": explanation,
+                    "reviewer_id": "self-test-synthetic-review", "checked_at": "2026-10-30T00:00:00Z",
+                }
+        context["visual_check"]["jump_checks"][0]["jump_fingerprint"] = jump_fingerprint(
+            candidate_items, "9.12-test", "risk-top-pin-text", "risk-platform-fact")
+        return candidate
+
+    shared_explanation = highlight_fixture(risk_fixture, risk_fact)
+    combined_explanation = highlight_fixture(second_evidence, risk_fact + second_fact)
+    for candidate in (shared_explanation, combined_explanation):
+        checked = _fixture_audit(candidate)
+        if checked["verdict"] != "PASS":
+            raise AssertionError(json.dumps(checked, ensure_ascii=False))
+    for mutation in ("missing_review", "stale_review", "wrong_location", "unmatched_pin", "missing_image", "missing_body"):
+        invalid = copy.deepcopy(combined_explanation)
+        item = invalid["review_context"]["platforms"]["X"]["risk_items"][1]
+        if mutation == "missing_review":
+            item.pop("top_fact_review")
+        elif mutation == "stale_review":
+            item["top_fact_review"]["revision_id"] = 0
+        elif mutation == "wrong_location":
+            item["top_fact_location"] = "skip"
+        elif mutation == "unmatched_pin":
+            item["top_fact_text"] = second_fact
+            item["top_fact_review"]["top_fact_text"] = second_fact
+        else:
+            removed_id = "risk-top-image-2" if mutation == "missing_image" else "risk-platform-fact-2"
+            invalid["block_list"]["items"][:] = [block for block in invalid["block_list"]["items"] if block.get("block_id") != removed_id]
+            next(block for block in invalid["block_list"]["items"] if block.get("block_type") == 1)["children"].remove(removed_id)
+        if _fixture_audit(invalid)["verdict"] == "PASS":
+            raise AssertionError(f"invalid highlight explanation passed: {mutation}")
+
+    # A legacy fact block can precede a fact carried by the shared pin.
+    mixed_explanation = copy.deepcopy(combined_explanation)
+    mixed_items = mixed_explanation["block_list"]["items"]
+    mixed_page = next(block for block in mixed_items if block.get("block_type") == 1)
+    legacy_fact = copy.deepcopy(next(block for block in second_evidence["block_list"]["items"]
+                                    if block.get("block_id") == "risk-top-fact"))
+    mixed_items.append(legacy_fact)
+    mixed_page["children"].insert(mixed_page["children"].index("risk-top-image"), "risk-top-fact")
+    mixed_first = mixed_explanation["review_context"]["platforms"]["X"]["risk_items"][0]
+    for key in ("top_fact_location", "top_fact_text", "top_fact_review"):
+        mixed_first.pop(key, None)
+    mixed_explanation["review_context"]["visual_check"]["jump_checks"][0]["jump_fingerprint"] = jump_fingerprint(
+        mixed_items, "9.12-test", "risk-top-pin-text", "risk-platform-fact")
+    mixed_result = _fixture_audit(mixed_explanation)
+    if mixed_result["verdict"] != "PASS":
+        raise AssertionError(json.dumps(mixed_result, ensure_ascii=False))
+    extra_image_fixture = copy.deepcopy(mixed_explanation)
+    extra_items = extra_image_fixture["block_list"]["items"]
+    extra_image = copy.deepcopy(next(block for block in extra_items if block.get("block_id") == "risk-top-image-2"))
+    extra_image["block_id"] = "risk-top-image-extra"
+    extra_items.append(extra_image)
+    extra_page = next(block for block in extra_items if block.get("block_type") == 1)
+    extra_page["children"].insert(extra_page["children"].index("risk-top-image-2") + 1, extra_image["block_id"])
+    extra_image_fixture["review_context"]["visual_check"]["jump_checks"][0]["jump_fingerprint"] = jump_fingerprint(
+        extra_items, "9.12-test", "risk-top-pin-text", "risk-platform-fact")
+    extra_image_result = _fixture_audit(extra_image_fixture)
+    if not any(error["code"] == "RISK_EXTRA_BLOCKS" for error in extra_image_result["errors"]):
+        raise AssertionError("unmanifested image in mixed top layout was not rejected")
+
     wrong_first_target = copy.deepcopy(second_evidence)
     wrong_first_target["review_context"]["risk_groups"][0]["target_block_id"] = "risk-platform-fact-2"
     wrong_pin_text = next(item for item in wrong_first_target["block_list"]["items"] if item.get("block_id") == "risk-top-pin-text")
