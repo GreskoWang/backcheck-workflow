@@ -38,7 +38,7 @@ PLATFORMS = [
     "境外其他网站",
 ]
 
-SCRIPT_VERSION = "1.11.3+writing.20261030"
+SCRIPT_VERSION = "1.11.4+writing.20261030"
 DOMESTIC_TAIL = "其他境内平台暂未发现相关账号或相关内容的负面及敏感信息。"
 FOREIGN_TAIL = "其他境外平台暂未发现相关账号或相关内容的负面及敏感信息。"
 # Read the same approved template as the uploader; synthetic fixtures remain offline-only.
@@ -60,6 +60,7 @@ NAMED_SUSPECTED_HOME_PREFIX_RE = re.compile(r"^（\d+）(.+?)(?:疑似主页|疑
 X_TIME_RE = re.compile(r"^背调时间：(19|20)\d{2}年(?:[1-9]|1[0-2])月—至今$")
 RESTRICTED_SOURCE_KIND = "restricted_source"
 RESTRICTED_SOURCE_REASON = "minor_sexual_content_safety"
+PLATFORM_REVIEW_ENTRY_SOURCE_KIND = "platform_review_entry"
 
 # These expressions describe collection mechanics and reviewer limitations. They
 # belong in the working record, never in the user-facing document. URLs are
@@ -254,9 +255,9 @@ def risk_highlight_links_match(
     expected_text: str,
     document_token: str,
     target_block_id: str,
-    group_fact_block_ids: set[str],
+    allowed_target_block_ids: set[str],
 ) -> bool:
-    """Verify that the highlight has one internal destination: the first platform fact."""
+    """Verify that the highlight has one exact internal destination allowed by its group."""
 
     if not highlight_elements or any(not isinstance(element, dict) or not isinstance(element.get("text_run"), dict) for element in highlight_elements):
         return False
@@ -269,7 +270,52 @@ def risk_highlight_links_match(
     actual_links = [link_url_of_run(run) for run in highlight_runs]
     expected_url = f"https://my.feishu.cn/docx/{document_token}#{target_block_id}"
     linked_urls = {url for url in actual_links if url is not None}
-    return linked_urls == {expected_url} and target_block_id in group_fact_block_ids
+    return linked_urls == {expected_url} and target_block_id in allowed_target_block_ids
+
+
+def _table_row_text(items_by_id: dict[str, dict[str, Any]], target_block_id: str) -> str | None:
+    """Return the complete visible text of the table row containing one target text block."""
+
+    target = items_by_id.get(target_block_id)
+    if not isinstance(target, dict):
+        return None
+    cell = items_by_id.get(str(target.get("parent_id", "")))
+    if not isinstance(cell, dict) or cell.get("block_type") != 32:
+        return None
+    table = items_by_id.get(str(cell.get("parent_id", "")))
+    table_payload = table.get("table") if isinstance(table, dict) else None
+    if not isinstance(table_payload, dict) or table.get("block_type") != 31:
+        return None
+    cells = table_payload.get("cells")
+    property_data = table_payload.get("property")
+    column_size = property_data.get("column_size") if isinstance(property_data, dict) else None
+    if not isinstance(cells, list) or not isinstance(column_size, int) or column_size < 1:
+        return None
+    cell_id = str(cell.get("block_id", ""))
+    try:
+        cell_index = [str(value) for value in cells].index(cell_id)
+    except ValueError:
+        return None
+    row_start = (cell_index // column_size) * column_size
+    row_cell_ids = [str(value) for value in cells[row_start:row_start + column_size]]
+    parts: list[str] = []
+    pending = list(row_cell_ids)
+    seen: set[str] = set()
+    while pending:
+        block_id = pending.pop(0)
+        if block_id in seen:
+            continue
+        seen.add(block_id)
+        block = items_by_id.get(block_id)
+        if not isinstance(block, dict):
+            continue
+        value = text_of(block)
+        if value:
+            parts.append(value)
+        children = block.get("children")
+        if isinstance(children, list):
+            pending.extend(str(child) for child in children)
+    return "\n".join(parts)
 
 
 def link_url_of_run(run: dict[str, Any]) -> str | None:
@@ -467,6 +513,88 @@ def _validated_restricted_source(platform: str, risk_item: dict[str, Any],
     if not declared_record:
         return False, "the restricted source record must be declared by the actual X module evidence", None
     return True, "restricted local evidence and safe public derivative verified", direct_url
+
+
+def _validated_platform_review_entry(platform: str, risk_item: dict[str, Any],
+                                     modules: list[dict[str, Any]], reviewer_id: Any) -> tuple[bool, str]:
+    """Validate one public review entry when the platform exposes only a stable reviews-page URL."""
+
+    if platform != "Facebook" or risk_item.get("source_kind") != PLATFORM_REVIEW_ENTRY_SOURCE_KIND:
+        return False, "platform_review_entry is registered only for Facebook"
+    risk_url = risk_item.get("url")
+    try:
+        parsed = urlsplit(risk_url) if isinstance(risk_url, str) else None
+        if (parsed is None or parsed.scheme != "https" or parsed.username is not None
+                or parsed.password is not None or parsed.port not in (None, 443)
+                or (parsed.hostname or "").lower() not in {"facebook.com", "www.facebook.com"}
+                or re.fullmatch(r"/[A-Za-z0-9._-]+/reviews/?", parsed.path or "") is None
+                or parsed.query or parsed.fragment or risk_url != risk_url.strip()):
+            return False, "an exact public Facebook Page reviews URL is required"
+    except ValueError:
+        return False, "invalid Facebook reviews URL"
+    proof = risk_item.get("review_entry_evidence")
+    required = {"record_path", "record_sha256", "screenshot_path", "screenshot_sha256",
+                "reviewer_id", "checked_at"}
+    if not isinstance(proof, dict) or not required.issubset(proof):
+        return False, "complete review_entry_evidence metadata is required"
+    if not isinstance(reviewer_id, str) or not reviewer_id or proof.get("reviewer_id") != reviewer_id:
+        return False, "review entry reviewer must match the current review context"
+    try:
+        timestamp = datetime.fromisoformat(str(proof.get("checked_at", "")).replace("Z", "+00:00"))
+        if timestamp.tzinfo is None:
+            raise ValueError("timezone required")
+    except ValueError:
+        return False, "review entry checked_at must be ISO-8601 with timezone"
+    for key in ("record_sha256", "screenshot_sha256"):
+        if not isinstance(proof.get(key), str) or re.fullmatch(r"[0-9a-f]{64}", proof[key]) is None:
+            return False, "review entry hashes must be lowercase SHA-256"
+    try:
+        record_path = _restricted_local_file(proof.get("record_path"), {".json"}, 2 * 1024 * 1024)
+        screenshot_path = _restricted_local_file(
+            proof.get("screenshot_path"), {".jpg", ".jpeg", ".png", ".webp"}, 10 * 1024 * 1024)
+        if _file_sha256(record_path) != proof["record_sha256"]:
+            return False, "review entry record hash mismatch"
+        if _file_sha256(screenshot_path) != proof["screenshot_sha256"]:
+            return False, "review entry screenshot hash mismatch"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+        return False, "review entry evidence cannot be verified: " + str(exc)
+    record_required = {"page_url", "author", "published_at", "text", "screenshot_path", "screenshot_sha256"}
+    if not isinstance(record, dict) or not record_required.issubset(record):
+        return False, "review entry record must contain page, author, date, text, and screenshot fields"
+    if record.get("page_url") != risk_url:
+        return False, "review entry record page URL does not match the displayed reviews URL"
+    if (not isinstance(record.get("author"), str) or not record["author"].strip()
+            or not isinstance(record.get("text"), str) or len(record["text"].strip()) < 10):
+        return False, "review entry author and exact public text are required"
+    try:
+        published = datetime.strptime(str(record.get("published_at", "")), "%Y-%m-%d")
+    except ValueError:
+        return False, "review entry published_at must be YYYY-MM-DD"
+    date_marker = f"{published.year}年{published.month}月{published.day}日"
+    if date_marker not in str(risk_item.get("fact_text", "")):
+        return False, "review risk fact must retain the entry date"
+    try:
+        if (Path(str(record.get("screenshot_path", ""))).resolve(strict=True) != screenshot_path
+                or record.get("screenshot_sha256") != proof["screenshot_sha256"]):
+            return False, "review entry screenshot fields do not match the declared file"
+    except (OSError, ValueError):
+        return False, "review entry screenshot path cannot be resolved"
+    declared: set[str] = set()
+    for module in modules:
+        if not isinstance(module, dict):
+            continue
+        evidence = module.get("fact_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        if isinstance(evidence.get("source_locator"), str):
+            declared.add(evidence["source_locator"])
+        for source in evidence.get("source_locators", []) if isinstance(evidence.get("source_locators"), list) else []:
+            if isinstance(source, dict) and isinstance(source.get("locator"), str):
+                declared.add(source["locator"])
+    if str(record_path) not in declared:
+        return False, "the review entry record must be declared by the actual Facebook module evidence"
+    return True, "content-bound Facebook review entry evidence verified"
 
 
 def _validated_search_index_summary(platform: str, risk_item: dict[str, Any],
@@ -959,14 +1087,19 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
         for platform_context in expected_platforms.values():
             if isinstance(platform_context, dict) and isinstance(platform_context.get("risk_items"), list):
                 context_risk_items_all.extend(item for item in platform_context["risk_items"] if isinstance(item, dict))
+    expected_group_indices = set(range(1, len(expected_risk_groups) + 1))
+    document_target_group_indices = {
+        index for index, group in enumerate(expected_risk_groups, 1)
+        if isinstance(group, dict) and group.get("target_kind") == "document_block"
+    }
+    expected_platform_group_indices = expected_group_indices - document_target_group_indices
     if context_risk_items_all and not expected_risk_groups:
         mark_blocked("TOP_RISK_GROUP_REQUIRED", "review_context.risk_groups", [], "at least one top risk group for platform risk_items")
-    if expected_risk_groups and not context_risk_items_all:
-        mark_blocked("PLATFORM_RISK_REQUIRED", "review_context.platforms", "no risk_items", "platform risk_items corresponding to every top risk group")
-    expected_group_indices = set(range(1, len(expected_risk_groups) + 1))
+    if expected_platform_group_indices and not context_risk_items_all:
+        mark_blocked("PLATFORM_RISK_REQUIRED", "review_context.platforms", "no risk_items", "platform risk_items corresponding to each platform-backed top risk group")
     actual_group_indices = {item.get("group_index") for item in context_risk_items_all if isinstance(item.get("group_index"), int)}
-    if context_risk_items_all and actual_group_indices != expected_group_indices:
-        mark_blocked("RISK_GROUP_MAPPING", "review_context.platforms.*.risk_items.group_index", sorted(actual_group_indices), f"cover exactly groups {sorted(expected_group_indices)}")
+    if actual_group_indices != expected_platform_group_indices:
+        mark_blocked("RISK_GROUP_MAPPING", "review_context.platforms.*.risk_items.group_index", sorted(actual_group_indices), f"cover exactly platform-backed groups {sorted(expected_platform_group_indices)}")
     writer_id = review_context.get("writer_id")
     reviewer_id = review_context.get("reviewer_id")
     if not writer_id or not reviewer_id:
@@ -1134,6 +1267,20 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 for n, group in enumerate(expected_risk_groups, 1):
                     if not isinstance(group, dict) or not required_group_keys.issubset(group):
                         mark_blocked("RISK_GROUP_SCHEMA", f"review_context.risk_groups[{n - 1}]", group, f"object with {sorted(required_group_keys)}")
+                        continue
+                    target_kind = group.get("target_kind", "platform_fact")
+                    if target_kind not in {"platform_fact", "document_block"}:
+                        mark_blocked("RISK_TARGET_KIND", f"review_context.risk_groups[{n - 1}].target_kind", target_kind, "platform_fact or document_block")
+                    if target_kind == "document_block":
+                        if not isinstance(group.get("target_text"), str) or not group["target_text"].strip():
+                            mark_blocked("RISK_DOCUMENT_TARGET_TEXT", f"review_context.risk_groups[{n - 1}].target_text", group.get("target_text"), "nonempty exact destination text")
+                        row_contains = group.get("target_row_contains")
+                        if (not isinstance(row_contains, list) or len(row_contains) < 2
+                                or any(not isinstance(value, str) or not value.strip() for value in row_contains)):
+                            mark_blocked("RISK_DOCUMENT_TARGET_ROW", f"review_context.risk_groups[{n - 1}].target_row_contains", row_contains, "at least two nonempty strings binding the collaboration row's review and source")
+                        top_evidence = group.get("top_evidence")
+                        if not isinstance(top_evidence, list) or not top_evidence:
+                            mark_blocked("RISK_DOCUMENT_TOP_EVIDENCE", f"review_context.risk_groups[{n - 1}].top_evidence", top_evidence, "nonempty top-evidence list")
                 expected_summaries = [f"{n}：{group.get('summary', '')}" for n, group in enumerate(expected_risk_groups, 1) if isinstance(group, dict)]
                 if child_texts[1:] != expected_summaries:
                     fail("RISK_SUMMARY_CONTEXT", risk_callout.get("block_id", ""), child_texts[1:], expected_summaries)
@@ -1165,38 +1312,70 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                             highlight_elements = elements(pin_children[0])
                             actual_links = [link_url_of_run(r) for r in runs(pin_children[0])]
                             expected_internal_url = f"https://my.feishu.cn/docx/{document_token}#{group['target_block_id']}"
-                            group_risk_facts = {str(item.get("fact_text")) for item in context_risk_items_all if item.get("group_index") == n}
-                            platform_root = root[section_indices["背调详情"] + 1:] if "背调详情" in section_indices else []
-                            group_fact_blocks = [block for block in platform_root if block.get("block_type") == 2 and text_of(block) in group_risk_facts]
-                            group_fact_block_ids = {str(block.get("block_id")) for block in group_fact_blocks}
-                            first_fact_id = str(group_fact_blocks[0].get("block_id")) if group_fact_blocks else None
-                            if str(group["target_block_id"]) != first_fact_id:
-                                fail("RISK_FIRST_PLATFORM_TARGET", f"举例{n}", group["target_block_id"], f"first platform risk fact block {first_fact_id}")
+                            target_kind = group.get("target_kind", "platform_fact")
+                            all_platform_group_items = [
+                                item for item in context_risk_items_all
+                                if item.get("group_index") == n
+                            ]
+                            top_platform_group_items = [
+                                item for item in all_platform_group_items
+                                if item.get("include_in_top", True) is not False
+                            ]
+                            target_block = by_id.get(str(group["target_block_id"]))
+                            target_valid = False
+                            allowed_target_block_ids: set[str] = set()
+                            if target_kind == "document_block":
+                                target_text = group.get("target_text")
+                                row_contains = group.get("target_row_contains")
+                                row_text = _table_row_text(by_id, str(group["target_block_id"]))
+                                if target_block is None or text_of(target_block) != target_text:
+                                    fail("RISK_DOCUMENT_TARGET_BLOCK", str(group["target_block_id"]), text_of(target_block) if target_block else "missing", f"existing exact destination text {target_text}")
+                                elif row_text is None:
+                                    fail("RISK_DOCUMENT_TARGET_ROW", str(group["target_block_id"]), "not in a table row", "a collaboration-table destination row")
+                                elif not isinstance(row_contains, list) or any(value not in row_text for value in row_contains if isinstance(value, str)):
+                                    fail("RISK_DOCUMENT_TARGET_ROW", str(group["target_block_id"]), row_text, f"row containing {row_contains}")
+                                else:
+                                    target_valid = True
+                                    allowed_target_block_ids = {str(group["target_block_id"])}
+                            else:
+                                group_risk_facts = {str(item.get("fact_text")) for item in top_platform_group_items}
+                                platform_root = root[section_indices["背调详情"] + 1:] if "背调详情" in section_indices else []
+                                group_fact_blocks = [block for block in platform_root if block.get("block_type") == 2 and text_of(block) in group_risk_facts]
+                                group_fact_block_ids = {str(block.get("block_id")) for block in group_fact_blocks}
+                                first_fact_id = str(group_fact_blocks[0].get("block_id")) if group_fact_blocks else None
+                                if str(group["target_block_id"]) != first_fact_id:
+                                    fail("RISK_FIRST_PLATFORM_TARGET", f"举例{n}", group["target_block_id"], f"first selected platform risk fact block {first_fact_id}")
+                                if target_block is None or str(group["target_block_id"]) not in group_fact_block_ids:
+                                    fail("RISK_LINK_TARGET_BLOCK", str(group["target_block_id"]), text_of(target_block) if target_block else "missing", "existing selected platform risk fact block declared in this group's risk_items")
+                                else:
+                                    target_valid = True
+                                    allowed_target_block_ids = group_fact_block_ids
                             if not risk_highlight_links_match(
                                 highlight_elements,
                                 group["highlight_text"],
                                 document_token,
                                 str(group["target_block_id"]),
-                                group_fact_block_ids,
+                                allowed_target_block_ids,
                             ):
                                 fail("RISK_INTERNAL_LINK", pin_children[0].get("block_id", ""), actual_links, f"one internal destination {expected_internal_url} on the pin sentence")
-                            target_block = by_id.get(str(group["target_block_id"]))
-                            if target_block is None or str(group["target_block_id"]) not in group_fact_block_ids:
-                                fail("RISK_LINK_TARGET_BLOCK", str(group["target_block_id"]), text_of(target_block) if target_block else "missing", "existing platform risk fact block declared in this group's risk_items")
-                            else:
+                            if target_valid:
                                 blocked.extend(audit_internal_jump(items, document_token, str(pin_children[0].get("block_id", "")),
                                                                    str(group["target_block_id"]), visual_check.get("jump_checks")))
                         cursor += 1
-                        group_items: list[dict[str, Any]] = []
-                        for platform in PLATFORMS:
-                            platform_context = expected_platforms.get(platform)
-                            if not isinstance(platform_context, dict) or not isinstance(platform_context.get("risk_items"), list):
-                                continue
-                            group_items.extend(item for item in platform_context["risk_items"] if isinstance(item, dict) and item.get("group_index") == n)
+                        if group.get("target_kind", "platform_fact") == "document_block":
+                            group_items = [item for item in group.get("top_evidence", []) if isinstance(item, dict)]
+                        else:
+                            group_items = [
+                                item for item in context_risk_items_all
+                                if item.get("group_index") == n and item.get("include_in_top", True) is not False
+                            ]
                         if not group_items:
-                            mark_blocked("RISK_GROUP_EVIDENCE", f"review_context.risk_groups[{n - 1}]", [], "at least one matching platform risk item")
+                            mark_blocked("RISK_GROUP_EVIDENCE", f"review_context.risk_groups[{n - 1}]", [], "at least one selected top-evidence item")
                         for evidence_index, item in enumerate(group_items, 1):
                             expected_fact = item.get("fact_text")
+                            if not isinstance(expected_fact, str) or not expected_fact.strip():
+                                mark_blocked("RISK_TOP_EVIDENCE_SCHEMA", f"举例{n} evidence {evidence_index}", item, "nonempty fact_text and positive image_count")
+                                continue
                             if "top_fact_text" in item:
                                 top_fact = item.get("top_fact_text")
                                 if not isinstance(top_fact, str) or not top_fact.strip():
@@ -1392,6 +1571,8 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 expected_keys = required_risk_item_keys | source_keys
                 if not isinstance(risk_item, dict) or not expected_keys.issubset(risk_item):
                     mark_blocked("RISK_ITEM_SCHEMA", f"review_context.platforms.{platform}.risk_items[{risk_index}]", risk_item, f"object with {sorted(expected_keys)}")
+                elif "include_in_top" in risk_item and not isinstance(risk_item.get("include_in_top"), bool):
+                    mark_blocked("RISK_ITEM_TOP_SELECTION", f"review_context.platforms.{platform}.risk_items[{risk_index}].include_in_top", risk_item.get("include_in_top"), "boolean when supplied")
             if not isinstance(context_blocks, list) or not all(isinstance(entry, dict) and entry.get("kind") in {"text", "url", "image"} for entry in context_blocks):
                 mark_blocked("EXPECTED_BLOCKS", f"review_context.platforms.{platform}.expected_blocks", context_blocks, "complete ordered list of text, url, and image entries excluding the trailing spacer")
                 context_blocks = []
@@ -1442,6 +1623,11 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     index_ok, index_reason = _validated_search_index_summary(platform, risk_item, context_modules)
                     if not index_ok:
                         fail("RISK_INDEX_SUMMARY_EVIDENCE", location, index_reason, "content-bound registered index-only source evidence")
+                    continue
+                if risk_item.get("source_kind") == PLATFORM_REVIEW_ENTRY_SOURCE_KIND:
+                    review_ok, review_reason = _validated_platform_review_entry(platform, risk_item, context_modules, reviewer_id)
+                    if not review_ok:
+                        fail("RISK_REVIEW_ENTRY_EVIDENCE", location, review_reason, "content-bound public review entry evidence")
                     continue
                 route_key = _url_route_key(risk_url)
                 if route_key in module_urls or _is_search_url(risk_url) or _is_profile_or_home_url(platform, risk_url):

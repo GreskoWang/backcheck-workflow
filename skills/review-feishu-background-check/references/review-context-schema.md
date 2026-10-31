@@ -125,11 +125,17 @@
 - 仅`境内其他内容`和`境外其他网站`的具名疑似主页可使用`（N）平台名疑似主页：URL`。该模块须以`platform_name`登记研究事实中的实际平台名，例如`"platform_name":"SoundCloud"`，并与正文标签精确相同；缺失或不匹配为BLOCKED。它仍须提供`confirmed_homepage_count:0`和大于零的`suspected_homepage_count`，不能把候选改成确认主页或无主页。该分支不放宽其他十二个平台的固定主页标签、关键词搜索或零结果要求。
 - `fact_evidence`：沿用当前调查记录，必须有 `source_type`、`source_locator`、`checked_at`、`summary`。搜索模块带 `related_result_count`，主页带 `confirmed_homepage_count`，超话／主题贴吧带 `related_topic_count`；B站搜索另带 `checked_surfaces:["video","article"]`。
 - `expected_blocks`：平台主管标题之后、唯一尾随空白块之前的完整顺序；类型为 `text`、`url`、`image`。
-- `risk_items` 与 `risk_groups`：有风险时各平台 `risk_items` 按正文出现顺序列出 `{group_index, fact_text, image_count, url}`；顶部每个 `risk_group` 记录 `{title, summary, highlight_text, target_block_id}`。摘要是短风险名，图钉解释可以复用正文核心段落；顶部覆盖全部入选事实及对应图片，不要求在图钉下再复制正文。`target_block_id` 必须是本组正文首个风险事实区块。H4 不加链接，只有图钉高亮句链接到该目标。无风险时两处均为空数组。唯一例外是下述严格受限来源：它省略 `url`，改用 `source_kind:"restricted_source"` 和 `restricted_source` 证据对象。
+- `risk_items` 与 `risk_groups`：有风险时各平台 `risk_items` 按正文出现顺序列出 `{group_index, fact_text, image_count, url}`；顶部每个 `risk_group` 记录 `{title, summary, highlight_text, target_block_id}`。摘要是短风险名，图钉解释可以复用正文核心段落；顶部只覆盖明确入选事实及对应图片，不要求在图钉下再复制正文。平台主管中保留但不进入顶部的事实设置 `include_in_top:false`；未填时默认为入选。普通 `target_kind:"platform_fact"`（可省略）要求 `target_block_id` 是本组首个入选平台主管事实区块。H4 不加链接，只有图钉高亮句链接到该目标。无风险时两处均为空数组。严格受限来源省略 `url`，改用 `source_kind:"restricted_source"` 和 `restricted_source` 证据对象；公开评价只有稳定评论页而无可保留单条直链时使用下述 `platform_review_entry` 严格证据分支。
+
+用户明确要求联动风险在平台主管只写“联动风险见联动部分”、不重复展开时，风险组使用 `target_kind:"document_block"`，将 `target_block_id` 指向联动表格该行的对象文字块，并增加：`target_text`（该目标块的精确文字）、`target_row_contains`（至少包含该行联动风评和一个实际来源 URL 的字符串列表）、`top_evidence`（顶部实际展示的 `{fact_text,image_count,top_fact_location}` 列表）。校验器验证目标确实位于表格行、该行包含声明的风评与来源，图钉只链接这个目标；不会再要求在十四平台主管复制同一联动风险。`top_evidence` 只描述顶部结构，不代替业务风险、来源和表格正文复核。
 
 顶部使用简写时，对应 `risk_items` 增加 `top_fact_text`。与正文不同的简写还需 `top_fact_review`，含 `status:"PASS"`、当前 `token`／`revision_id`、精确 `fact_text`／`top_fact_text`、`reviewer_id` 和 `checked_at`。实际语义审阅须确认两段属于同一事实，归属与关键限定未变；这些字段只是保存审阅结果，不能自动生成语义判断。缺失或过期时为 BLOCKED。没有简写字段时保留原来的逐字镜像检查，全部事实、截图数量、来源与跳转检查仍执行。
 
 自2026-10-30支持 `top_fact_location:"highlight"`：该事实由图钉解释承载，不在图钉下另放相同事实块。`top_fact_text`（未填时使用 `fact_text`）必须精确等于本组实际 `highlight_text`；不同于正文时仍须上述逐条语义审阅，确认该条正文事实被解释准确涵盖。一个图钉解释可涵盖同一事件的多条事实，每条都独立绑定审阅结果，不能用一条记录豁免其余事实。对应图片依正文事实顺序排列并按各项 `image_count` 核对，原帖 URL、跳转及业务门禁保持。省略位置或使用 `"block"` 时兼容原独立事实块；未知位置直接失败。该字段不允许仅靠一个笼统标题省去事实说明。
+
+### 公开评价条目只有稳定评论页 URL
+
+仅当 Facebook Page 的公开 reviews 页面已实际定位到一条具名、具日、可见全文的评价，但平台不给出可保留的单条公开 URL 时，风险项可设置 `source_kind:"platform_review_entry"`。成品仍显示精确 reviews 页面 URL；`review_entry_evidence` 必须绑定任务目录内的 JSON 记录和真实页面截图，记录含 `page_url`、`author`、`published_at`、逐字 `text`、`screenshot_path`、`screenshot_sha256`。证据对象另含记录／截图的 SHA-256、当前 `reviewer_id` 与带时区 `checked_at`，且该记录路径必须由实际 Facebook 模块 `fact_evidence.source_locator` 或 `source_locators[].locator` 声明。校验器实际读取文件、核对哈希、页面 URL、日期和正文风险事实，不接受主页、搜索页、空白截图或只填非空字段。该分支不能用于普通帖子、可取得单帖链接的评价或其他平台。
 
 ### 已存在但当前空内容的微博超话
 

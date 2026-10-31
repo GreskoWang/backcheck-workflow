@@ -5,6 +5,8 @@ description: Use when Codex needs robust web research, source verification, webp
 
 ## 配置与模板
 
+本节的背调初始化与飞书模板要求仅适用于背调项目；其他项目的网页访问直接使用下文对应入口。
+
 先在工作区执行 `Setup-Backcheck.ps1`，再加载 `recovery-session-env.ps1`。本机路径与账号配置分别位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`，不得复制另一台机器的凭证或运行状态。跨机器安装步骤见工作区 `docs/INSTALL.md`。
 
 业务与写作方法保留在本 Skill 的 references 中。正式云模板由当前配置的 `template_document_token` 指定，在当前账号下只读核验后使用。`SYNTHETICDOC`、合成主体和内置 fixture 只用于离线回归，不是线上模板或真实调查记录。随包的 DOCX 保留既有版式参考，不代替当前飞书 API 模板核验。
