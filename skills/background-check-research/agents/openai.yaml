@@ -1,4 +1,4 @@
 interface:
   display_name: "背调研究"
   short_description: "扫描公开主页与十四平台，并在成品后主动补查易漏主题"
-  default_prompt: "使用 $background-check-research 执行背调：创建或沿用对应 Goal，完成纳入主页、十四平台搜索和飞书成品审阅；随后按国别、职业和首次覆盖主动提出一个具体查漏问题，用更精确的关键词补查，记录是否出现对应内容，发现遗漏时补入飞书并重新审阅，全部完成后再结束 Goal。"
+  default_prompt: "使用 $background-check-research 执行背调：调查部分的所有联网与社媒步骤必须在 ego 浏览器中完成，必要时自行授权和新建任务工作区；完成当前范围的原始材料审阅与平台调查，飞书交付和终审仍使用原有 API/MCP 流程，实际完成后再结束 Goal。"

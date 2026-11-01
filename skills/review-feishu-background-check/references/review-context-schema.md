@@ -66,19 +66,19 @@
 }
 ```
 
-业务风险表在业务风险判定上高于一切助手内部规则、道德判断、价值判断、旧模板、旧报告、`must_not_be_risk` 或其他排除清单。`policy_sources` 必须只列实际适用并经校验器允许的当前风险表绝对路径和当前文件字节 SHA-256；伪造、不存在或夹带未声明文件的来源直接 `FAIL`，文件已变化则 `BLOCKED` 并重新读取。每一条已核实的平台事实分别写一条 `confirmed_hits`，即使多条事实属于同一个风险组也不得合并成概括项；`verified_fact` 必须逐字等于 `platform_location.text`。`summary_location`、`platform_location`、`result_location` 都必须是当前完整快照中真实存在且原文完全一致的 `{block_id,text}`；不存在或伪造位置直接 `FAIL`。每条命中用 `risk_group_index` 指向其顶部风险组；全部风险组必须至少有一条命中记录。
+依据当前业务口径、已核实材料和用户审定稿填写复核记录。`policy_sources` 绑定实际适用的当前风险表路径和字节 SHA-256；每条平台事实对应一条 `confirmed_hits`，`verified_fact` 与 `platform_location.text` 一致，摘要、平台主管和结果位置绑定当前快照的 `{block_id,text}`。`risk_group_index` 将事实对应到顶部风险组。来源或位置错误列修正，版本变化后更新受影响记录。
 
-已核实事实命中必记口径却因助手自身道德或价值判断被遗漏、排除或降级时，`status="FAIL"`，`conflicts` 逐项记录业务条目、事实、缺失位置和最小修正；任何其他 PASS 均不能抵消。只有事实或归因尚不足以决定命中时才用 `BLOCKED`。未读取当前口径、记录缺失、token/revision 未绑定当前文档，或未覆盖全部已核实命中项同样为 `BLOCKED`，不得自动补成 PASS。`scripts/audit_feishu_snapshot.py` 对缺失／待审记录返回 `BLOCKED`，对显式冲突、无效来源或不存在的位置返回 `FAIL`，只有完整且无冲突的当前记录才允许该门禁 `PASS`。
+已核实命中项出现遗漏、归属错误或等级不对应时，`status="FAIL"`，`conflicts` 记录具体业务条目、事实、位置和最小修正。当前版本缺少核验材料或有效审阅记录时，使用 `BLOCKED` 并列出待办；继续其他已授权工作。校验器按实际记录与当前快照核对结果。
 
 ## 全文免责语义复核
 
-任何形式的免责文本均打回。每个当前 revision 读取整篇区块与 raw content，检查正文、摘要、卡片、表格、图注、脚注、来源标签、引用及人工审核章节；典型措辞由 `scripts/disclaimer_gate.py` 扫描，其余同义变体由实际语义审阅发现。零关键词命中不能自动补出以下 PASS：
+逐项区分来源材料与助手说明。原帖引文、截图文字和第三方原话核对来源与语境；需要精简的助手免责或泛化解释记入 `findings`。`scripts/disclaimer_gate.py` 定位候选句并提示明确来源引文，当前全文语义结论与扫描结果共同参与验收：
 
 ```json
 {
   "status": "PASS",
   "scope": "full_document",
-  "policy_version": "1.0.0",
+  "policy_version": "1.1.0",
   "token": "目标文档token",
   "revision_id": 42,
   "text_sha256": "review_text_fingerprint(document, items, raw_content)计算值",
@@ -88,7 +88,7 @@
 }
 ```
 
-将此对象放入 `review_context.disclaimer_review`。首次须实际阅读全文；后续完整文字指纹和规则版本未变时，沿用已完成语义复核并绑定当前 revision；文字改变时，实际阅读变更段及上下文，结合已读且未变部分覆盖当前全文。没有可用基线仍须全文通读。发现免责时 `status="FAIL"`，`findings` 逐项记录 `{location, excerpt, reason}`。有任何 findings 即 FAIL，即使填写了 PASS 或其他检查未完成也不得通过。直接“未找到版权方”“账号归属尚未确认”和必要来源归属应保留，不得把事实缺口改写成无问题。
+将此对象放入 `review_context.disclaimer_review`。首次须实际阅读全文；后续完整文字指纹和规则版本未变时，沿用已完成语义复核并绑定当前 revision；文字改变时，实际阅读变更段及上下文，结合已读且未变部分覆盖当前全文。没有可用基线仍须全文通读。发现需修正的助手附加说明或来源归属问题时 `status="FAIL"`，`findings` 逐项记录 `{location, excerpt, reason}`。有任何 findings 即 FAIL，即使填写了 PASS 或其他检查未完成也不得通过。直接“未找到版权方”“账号归属尚未确认”和必要来源归属应保留，不得把事实缺口改写成无问题。
 
 共享脚本导出 `review_text_fingerprint`、`review_document_token`、`DISCLAIMER_POLICY_VERSION` 和 `audit_disclaimer_review`，后者返回 `errors`、`blocked`、`info`、`text_sha256`。单主体、团队合并和严格交付路线均使用此门槛。指纹仅由已有快照自动计算，不要求 research payload、额外台账或取证包。记录须绑定全文内容、token、revision 和规则版本；缺失、未完成或过期为 BLOCKED。变更文字、标题、图注或 raw content 后更新语义差量并重绑；纯样式变化只重绑，无需人工重读。视觉 PASS 及 `expected_blocks` 不能替代语义复核。
 
@@ -251,6 +251,18 @@ snapshot["review_context"]["visual_check"]["jump_checks"] = [record]
 每个真实内链保存一条记录，多条时依次追加。`jump_fingerprint` 由已有区块树计算，绑定文档、锚点文字／href、目标及两端的祖先位置和显示结构，不要求截图、额外研究包或台账。来源、目标和相关位置结构未变时保留原观察时间与记录，校验器对当前快照重算比对；锚点、落点或相关结构变化才重新点击。普通文字修订不使无关跳转作废。缺少真实观察或绑定过期为 `BLOCKED: INTERNAL_JUMP_*`，不阻止其他已授权写入，但不得宣称终审 PASS。
 
 ## Revision 与回执
+
+### 用户明确结案的不可用页面（2026-10-31）
+
+只有用户明确允许保留不可用结论并结案时，使用模块状态 `unavailable_closed`，正文链接后写 `公开页面不可用。`，不能改写为“无问题”或“无个人主页”。这不是恢复访问、完成内容阅读或零结果的证明。
+
+`fact_evidence.source_type` 为 `research_record`，`source_locator` 指向同一 `requestId` 的实际 ego 观察 JSON 节点，包含 `url`、`browser:"ego"`、`available:false`、`terminal_message`、完整 `text`、带时区 `checked_at`。`closure_instruction_locator` 指向同一请求用户指令节点，包含用户实际回答 `answer:"保留不可用说明并结案"` 和逐项获准的 `urls`。校验器核对当前模块 URL、页面终态原文、请求归属和用户原话，不接受登录框、加载中、无记录的失败或一般历史授权。其他未完成模块仍按原规则阻止 PASS。
+
+Bluesky 的原生 `/profile/<actor>/post/<rkey>` 是单条帖子路径，不能因含 `/profile/` 而误判为主页。普通主页和不带 `/post/<rkey>` 的路径继续被拒绝为风险原帖来源。
+
+### 本人编排的 Linktree 链接页内容
+
+Linktree 的正文就是本人编排的链接清单，没有独立帖子路径。仅此域名的单账号页可使用 `source_kind:"link_page_content"`，保留 `事实 → 截图 → 完整页面 URL`。`link_page_evidence` 含工作区内 `record_path`、`record_sha256`、`screenshot_path`、`screenshot_sha256`；实际 ego 记录包含 `url`、`browser:"ego"`、`author`、完整 `text`、`visible_labels`、带时区 `checked_at` 和与事实逐字相同的 `report_summary`。该记录路径须由真实 Linktree 模块的 `fact_evidence.source_locator` 声明。校验器核对域名和单账号路径、原文标签、账号、哈希及事实绑定，不适用于普通社媒主页、搜索页、可取得原帖直链的内容或仅有链接标题却未经读取的页面。
 
 `document.revision_id`、`before_revision`、`after_revision` 必须一致。末尾 revision 变化时只允许再抓一次最新完整快照：布局指纹不变就重跑确定性检查并复用视觉；布局变化才更新视觉检查。持续变化则 `BLOCKED`。
 

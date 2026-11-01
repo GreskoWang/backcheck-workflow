@@ -2,7 +2,7 @@
 
 路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
 
-> **版本路由：本文件是旧 `schema 1.10` 的 `exhaustive_audit` 严格契约。默认三小时定向模式使用 `schema 1.11 + research_profile: three_hour_targeted_v1`，必须改读 [三小时定向交接契约](handoff-targeted-contract.md)。两套完成语义不得混用。**
+> **兼容范围：本文件用于已采用 schema 1.10 的旧取证包；schema 1.11 旧包使用 [对应兼容契约](handoff-targeted-contract.md)。当前普通背调以交付 SKILL 的普通流程为准，复用现有调查记录和文档快照。用户明确要求取证审计时，再选用适用的取证契约。联网入口始终采用当前 ego 规则。**
 
 > 以下调查通道规则只描述旧 `exhaustive_audit`：网页使用带持久用户配置与登录态的真实、可见、可交互桌面浏览器 UI；十四个平台桶均须至少有一条完成的真实桌面浏览器 UI 必访路线。默认由执行者自主启动或选择 Microsoft Edge、创建任务页并导航，不要求用户预开 Edge、指定页签或提供 endpoint／target；用户明确指定或已确认另一系统桌面浏览器具备所需持久配置／登录态时可以使用，Chrome 不按名称禁用。Codex 内置／in-app／`iab`／临时 hosted／headless 浏览器不能承担这些路线。新研究包优先写 `tool_kind: browser_ui`；旧值 `microsoft_edge_visible` 继续兼容。公开 API／获授权导出可独立完成其许可范围内具体 surface 的穷尽证据，不要求用浏览器重复同一 surface 的逐项遍历，但不能替代平台桶的桌面浏览器 UI 必访。下文保留的 `edge_*` 字段、`max_task_open_edge_pages`、`edge-route-evidence-1.2` 和 `network-preflight-1.4` 名称均为 schema 1.10 兼容字段名，语义适用于实际使用的合格持久桌面浏览器；API／导出使用各自的来源、分页终点及逐项复核证据。定向模式的详细范围与登录后续跑规则见新契约。
 
@@ -69,15 +69,15 @@ Required and exact: `display_name`, `subject_type`, `category`, `basic_info`, `b
 
 Required: `has_risk`, `result_level`, and `overall_conclusion`. `has_risk` must equal whether `risk_groups` is non-empty. `result_level` is the exact basic-information verdict and must be one of `建议谨慎评估`, `建议评估`, or `低合作风险`. Delivery copies this value exactly and does not infer a tier from risk count or prose.
 
-Use the three tiers consistently:
+Use the maintained [three-tier standard](../../background-check-research/references/methods.md#背调结果分级). Delivery preserves the selected label and verified facts, with source attribution and the existing report structure.
 
 - `低合作风险`: no credible risk group remains only after all fourteen platform completion gates pass (`has_risk=false`). Any unresolved access boundary blocks this verdict and the final document.
-- `建议评估`: one or more credible contextual, content-fit, reputational, or moderate cooperation concerns remain and should be reviewed before cooperation, without verified severe/disqualifying evidence.
-- `建议谨慎评估`: verified high-impact or repeated concerns under the maintained risk standard could materially affect cooperation, compliance, reputation, safety, or commercial trust and call for heightened caution.
+- `建议评估`: verified public content matches a recordable business concern under the maintained standard, without a match requiring the higher review-priority tier.
+- `建议谨慎评估`: verified public content matches a highly sensitive topic or a priority concern under the maintained business standard.
 
 `has_risk=false` must pair with `低合作风险`; `has_risk=true` must pair with `建议评估` or `建议谨慎评估`. Risk count alone never decides between the latter two.
 
-A finding from a selected suspected homepage remains in the risk package and may affect the cooperation verdict, but it is not rewritten as a verified act of the subject. Its instance fact begins with `该疑似主页账号`; that risk group's `summary` and `explanation`, and `verdict.overall_conclusion`, each contain `疑似主页` so the top summary and conclusion preserve the identity uncertainty.
+A finding from a selected suspected homepage remains in the risk package and may affect the review-priority label, but it is not rewritten as a verified act of the subject. Its instance fact begins with `该疑似主页账号`; that risk group's `summary` and `explanation`, and `verdict.overall_conclusion`, each contain `疑似主页` so the top summary and conclusion preserve the identity uncertainty.
 
 ### `accounts`
 

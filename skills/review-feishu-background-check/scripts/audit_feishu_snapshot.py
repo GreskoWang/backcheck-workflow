@@ -38,7 +38,7 @@ PLATFORMS = [
     "境外其他网站",
 ]
 
-SCRIPT_VERSION = "1.11.4+writing.20261030"
+SCRIPT_VERSION = "1.11.5+scoped-availability.20261031"
 DOMESTIC_TAIL = "其他境内平台暂未发现相关账号或相关内容的负面及敏感信息。"
 FOREIGN_TAIL = "其他境外平台暂未发现相关账号或相关内容的负面及敏感信息。"
 # Read the same approved template as the uploader; synthetic fixtures remain offline-only.
@@ -734,6 +734,11 @@ def _is_profile_or_home_url(platform: str, value: str) -> bool:
         return False
     host, path, query, _ = parts
     lower_path = path.casefold()
+    # Bluesky uses /profile/<actor>/post/<rkey> for actual individual posts.
+    # A profile prefix alone must not reject a verified native post route.
+    if (platform == "境外其他网站" and host == "bsky.app"
+            and re.fullmatch(r"/profile/[^/]+/post/[a-z0-9]+", lower_path)):
+        return False
     if lower_path == "/":
         return True
     if platform == "微博":
@@ -1027,6 +1032,77 @@ def _verified_user_waived_search(module: dict[str, Any], payload: dict[str, Any]
         elif isinstance(item, list):
             pending.extend(item)
     return False
+
+
+def _validated_link_page_content(platform: str, risk_item: dict[str, Any], modules: list[dict[str, Any]]) -> bool:
+    """A Linktree link page is itself authored content, with no individual post URL."""
+    if platform != "境外其他网站" or risk_item.get("source_kind") != "link_page_content":
+        return False
+    url = risk_item.get("url", "")
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or parsed.hostname != "linktr.ee" or parsed.port not in (None, 443)
+                or parsed.username or parsed.password or parsed.query or parsed.fragment
+                or re.fullmatch(r"/[A-Za-z0-9._-]+", parsed.path or "") is None):
+            return False
+        proof = risk_item.get("link_page_evidence") or {}
+        record_path = _restricted_local_file(proof.get("record_path"), {".json"}, 2 * 1024 * 1024)
+        screenshot = _restricted_local_file(proof.get("screenshot_path"), {".png", ".jpg", ".webp"}, 10 * 1024 * 1024)
+        if _file_sha256(record_path) != proof.get("record_sha256") or _file_sha256(screenshot) != proof.get("screenshot_sha256"):
+            return False
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        if (record.get("url") != url or record.get("browser") != "ego"
+                or record.get("report_summary") != risk_item.get("fact_text")
+                or not record.get("author") or record["author"] not in record.get("text", "")
+                or datetime.fromisoformat(record.get("checked_at", "")).tzinfo is None):
+            return False
+        labels = record.get("visible_labels")
+        if not isinstance(labels, list) or not labels or any(not isinstance(x, str) or not x or x not in record.get("text", "") for x in labels):
+            return False
+        locators = [m.get("fact_evidence", {}).get("source_locator") for m in modules]
+        return str(record_path) in locators
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def _verified_user_closed_unavailable(module: dict[str, Any], payload: dict[str, Any]) -> bool:
+    """An observed unavailable page may close only with a same-request user exception."""
+    if module.get("status") != "unavailable_closed":
+        return False
+    value = module.get("text", "")
+    urls = URL_RE.findall(value)
+    if len(urls) != 1 or not value.endswith("公开页面不可用。"):
+        return False
+    evidence = module.get("fact_evidence") or {}
+    if evidence.get("source_type") != "research_record":
+        return False
+    try:
+        waiver, waiver_root = _read_index_json_locator(evidence.get("closure_instruction_locator"))
+        observed, observed_root = _read_index_json_locator(evidence.get("source_locator"))
+    except (OSError, ValueError, KeyError, IndexError, TypeError, RecursionError):
+        return False
+    request_id = payload.get("requestId")
+    if (not request_id or waiver_root.get("requestId") != request_id
+            or observed_root.get("requestId") != request_id
+            or not isinstance(waiver, dict) or not isinstance(observed, dict)):
+        return False
+    url = urls[0].rstrip("/")
+    if (waiver.get("answer") != "保留不可用说明并结案"
+            or url not in {str(x).rstrip("/") for x in waiver.get("urls", [])}
+            or str(observed.get("url", "")).rstrip("/") != url
+            or observed.get("browser") != "ego"
+            or observed.get("available") is not False):
+        return False
+    message = observed.get("terminal_message")
+    supported = {"内容暂时无法显示", "This Page Does Not Exist",
+                 "抱歉。您恐怕得搭乘时光机才有办法找回那个内容了。"}
+    if message not in supported or message not in str(observed.get("text", "")):
+        return False
+    try:
+        checked_at = datetime.fromisoformat(str(observed.get("checked_at", "")).replace("Z", "+00:00"))
+        return checked_at.tzinfo is not None
+    except ValueError:
+        return False
 
 
 def audit(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1557,7 +1633,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 mark_blocked("MODULE_CONTEXT_COUNT", f"review_context.platforms.{platform}.modules", len(context_modules), str(expected_module_count))
             if platform in {"境内其他内容", "境外其他网站"} and len(context_modules) < 1:
                 mark_blocked("MODULE_CONTEXT_COUNT", f"review_context.platforms.{platform}.modules", len(context_modules), "at least the mandatory Baidu/Google module")
-            allowed_statuses = {"no_result", "checked_clean", "risk", "incomplete", "not_applicable"}
+            allowed_statuses = {"no_result", "checked_clean", "risk", "incomplete", "not_applicable", "unavailable_closed"}
             for module_index, module in enumerate(context_modules):
                 if module.get("status") not in allowed_statuses or not isinstance(module.get("text"), str):
                     mark_blocked("MODULE_STATUS", f"review_context.platforms.{platform}.modules[{module_index}]", module, f"string text and status in {sorted(allowed_statuses)}")
@@ -1629,6 +1705,10 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     if not review_ok:
                         fail("RISK_REVIEW_ENTRY_EVIDENCE", location, review_reason, "content-bound public review entry evidence")
                     continue
+                if risk_item.get("source_kind") == "link_page_content":
+                    if not _validated_link_page_content(platform, risk_item, context_modules):
+                        fail("LINK_PAGE_CONTENT_EVIDENCE", location, risk_item, "content-bound authored Linktree page and actually reviewed screenshot")
+                    continue
                 route_key = _url_route_key(risk_url)
                 if route_key in module_urls or _is_search_url(risk_url) or _is_profile_or_home_url(platform, risk_url):
                     fail("RISK_URL_HOME_OR_SEARCH", location, risk_url, "the independent direct URL of the evidenced post or dynamic, not a homepage or search-results route")
@@ -1650,6 +1730,9 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     continue
                 module_text = module["text"]
                 status = module.get("status")
+                if status == "unavailable_closed" and not _verified_user_closed_unavailable(module, payload):
+                    fail("UNAVAILABLE_CLOSURE_EVIDENCE", f"{platform} module {module_index + 1}",
+                         module, "same-request explicit user closure and actual ego terminal-page evidence")
                 # 仅按实际文案分类：明确关键词搜索优先，module_kind 不绕过合同。
                 is_search = "关键词搜索：" in module_text
                 is_home = ("主页" in module_text or "音乐人页" in module_text) and not is_search
@@ -1839,7 +1922,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         expected = NO_HOME_EXACT[platform]
                         if home_text != expected:
                             fail("NO_HOME_TEXT", platform, home_text, expected)
-                    elif not context_risk_items:
+                    elif not context_risk_items and not (context_modules and _verified_user_closed_unavailable(context_modules[0], payload)):
                         home_endings = ("相关内容无问题",) if platform == "豆瓣" else ("无问题",)
                         if "http" in home_text and not home_text.endswith(home_endings):
                             fail("HOME_CONCLUSION", platform, home_text, "homepage URL followed by platform-specific no-risk phrase")

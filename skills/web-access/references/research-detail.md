@@ -1,5 +1,7 @@
 # 详情与有限展开客户端
 
+> 适用范围：本文件保留非背调项目的旧 Edge 接口和历史方法。当前背调取材按 [ego 统一规则](../../background-check-research/references/ego-browser-policy.md)执行，使用本任务 ego 页面及其实际可用能力。
+
 `scripts/research-detail.mjs` 复用已运行broker与原任务页的有效租约，不重载服务、不新建浏览器连接。适用于已取得原帖链接后，在独立详情页补取正文、实际日期和作者；不用于翻遍主页，不输出风险结论。
 
 ## 使用

@@ -2,9 +2,7 @@
 
 路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
 
-本文件只适用于默认研究模式 `research_profile: three_hour_targeted_v1`。旧的
-`schema_version: 1.10` 继续按照 [handoff-contract.md](handoff-contract.md) 执行，
-并视为 `exhaustive_audit`；不得把本文件的限量规则用于放宽旧包。
+本文件用于已经采用 `schema 1.11 + research_profile: three_hour_targeted_v1` 的旧研究包兼容校验。`schema 1.10` 旧包按 [对应契约](handoff-contract.md) 处理。当前普通背调使用交付 SKILL 的普通流程，复用现有调查记录和文档快照；用户明确要求取证审计时再选择适用契约。联网入口采用当前 ego 规则。
 
 第一章和第四章的最终文案、模块顺序、链接样式、截图位置与固定结论，仍以
 `deliver-feishu-background-check/SKILL.md` 为绝对交付标准。本契约只规定调查包如何记录并
@@ -472,8 +470,8 @@ X 有主页时 `review_start_month` 使用实际检查到的最早月份 `YYYY-M
 `subject_interaction`、`external_source` 或 `uncertain_identity`，用于把主体原帖、主体回复、
 第三方评论、点赞／转发互动、外部报道及身份不确定内容分开。
 
-评论默认只选主体回复、风险内容互动链以及相关／热门前 20 条；不得把第三方评论或点赞写成
-主体立场。
+该旧版数据包的评论选择为主体回复、风险内容互动链以及相关／热门前 20 条；第三方评论记录
+发言人和内容，点赞记录主体的点赞行为。
 
 ## 8. 视频
 
