@@ -304,8 +304,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/SKILL.md",
-      "bytes": 25897,
-      "sha256": "558ee825cbda454bd53736eea00b7209e81944fb3881e2e1bedc00178c8dc0ec"
+      "bytes": 26190,
+      "sha256": "83af8be7c7c0b8eed9e1730d0ae9ab9d17ede13e5a06b04066b35703671d9878"
     },
     {
       "path": "skills/deliver-feishu-background-check/agents/openai.yaml",
@@ -319,8 +319,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/references/feishu-style-guide.md",
-      "bytes": 19077,
-      "sha256": "80b3a88a9e4b53b5b5540bb2284f77d591296bb5b381c314d6c99b168476ba05"
+      "bytes": 18508,
+      "sha256": "c429782470f95fe44a6fa5a1b52f608744b309124b3fc2698488a63f72aaa69e"
     },
     {
       "path": "skills/deliver-feishu-background-check/references/handoff-contract.md",
@@ -379,8 +379,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/SKILL.md",
-      "bytes": 15000,
-      "sha256": "ea8808d151d8fbebd52521ae634832b798c8c778c879c15116dd52359417fed5"
+      "bytes": 15428,
+      "sha256": "16f809d5aa6a7eecd5bfd91436247ab655690d295bf9954ec6b23379c3e1e6d3"
     },
     {
       "path": "skills/review-feishu-background-check/agents/openai.yaml",
@@ -389,18 +389,18 @@
     },
     {
       "path": "skills/review-feishu-background-check/references/review-checklist.md",
-      "bytes": 8664,
-      "sha256": "7159c39ed4c21000efb18df5449be4eff1572808e5c6aab966af2793a1b661cf"
+      "bytes": 8921,
+      "sha256": "5d9ef5dffdc4a97973e567569c6a04c1887b956235ec169ebf0d4f8dfa1e61ec"
     },
     {
       "path": "skills/review-feishu-background-check/references/review-context-schema.md",
-      "bytes": 19904,
-      "sha256": "394ba5e525f27b5064c79f20c9b3871215b6c6af31cb2aad5e2d6ff0e1b1547b"
+      "bytes": 21900,
+      "sha256": "35669bed746260c4a4d201057edb7b434444428491ab7034dfdbaebc206571e4"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/audit_feishu_snapshot.py",
-      "bytes": 209010,
-      "sha256": "77895f3a1d5fa849acd0a4ae24f2352bbca3381d925bf233f85b54927eef5893"
+      "bytes": 221254,
+      "sha256": "30ba12ea2b3fccf5eec102407c8446911c3fdb16b7bc8200f16fc685587d2a1f"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/business_risk_gate.py",
@@ -459,8 +459,8 @@
     },
     {
       "path": "skills/web-access/SKILL.md",
-      "bytes": 18759,
-      "sha256": "b0696a51baf4fcc075daff1223346635543800d29d2f39a8ac0a2f4c31904447"
+      "bytes": 18893,
+      "sha256": "9445e19c582c0d71e25eddf79a7ef0dcb3f61d4da984010bb234b6789ee6521a"
     },
     {
       "path": "skills/web-access/agents/openai.yaml",
