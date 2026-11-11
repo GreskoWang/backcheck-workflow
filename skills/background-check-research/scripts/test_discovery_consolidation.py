@@ -138,12 +138,12 @@ class DiscoveryConsolidationTests(unittest.TestCase):
         self.save_archive()
         self.assert_failure()
 
-    def test_full_original_queries_are_still_required(self):
+    def test_retired_original_queries_are_not_required(self):
         path = Path(self.review["subagent_review"]["receipt_path"])
         receipt = json.loads(path.read_text("utf-8"))
         receipt["reviews"][0]["queries"] = []
         write_json(path, receipt)
-        self.assert_failure("DISCOVERY_SUBAGENT_QUERIES")
+        self.assertEqual(self.audit()["verdict"], "PASS")
 
     def test_all_original_contexts_must_still_be_semantically_reviewed(self):
         self.review["semantic_review"]["items"].pop()

@@ -113,7 +113,7 @@ class BusinessRiskGateTests(unittest.TestCase):
         self.assertTrue(coverage)
         self.assertEqual(coverage[0]["repair_stage"], "semantic_analysis")
 
-    def test_skipped_term_propagates_fail_from_actual_receipt(self):
+    def test_missing_extracted_term_propagates_fail_from_source_mapping(self):
         with tempfile.TemporaryDirectory() as directory:
             discovery = discovery_fixture(Path(directory))
             discovery["entities"][0]["record_fact"] = self.review["confirmed_hits"][0]["verified_fact"]
@@ -121,10 +121,11 @@ class BusinessRiskGateTests(unittest.TestCase):
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             receipt["reviews"].pop()
             receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            discovery["entities"].pop()
             self.review["discovery_review"] = discovery
             result = self.audit()
         self.assertEqual(result["verdict"], "FAIL", result)
-        self.assertIn("DISCOVERY_SUBAGENT_COVERAGE", {row["code"] for row in result["errors"]})
+        self.assertIn("DISCOVERY_UNRESOLVED_NAME", {row["code"] for row in result["errors"]})
 
     def test_missing_review_is_blocked(self):
         result = self.audit(None)

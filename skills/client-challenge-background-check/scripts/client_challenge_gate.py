@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Audit client-challenge v2: full noun review, contextual follow-up archives,
-policy categories and sampled reporting. See references/review-contract.md.
-All prior round, source, identity and final-revision checks remain in force.
-The optional historical_v1 API flag only replays old archived receipts; normal
-release and the CLI require v2 and cannot use per-noun inclusion as a substitute.
+"""Current release uses v3 limited-knowledge client attitudes.
+Legacy v1/v2 validators are available only for explicit historical replay.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import unicodedata
@@ -162,8 +160,26 @@ def _occurrence_texts(value: Any, source_rows: dict) -> set[str]:
 
 def audit_client_challenge(review: Any, *, discovery_review: Any, items: Any,
                            document_token: Any, revision_id: Any, required_policy_path: Path,
-                           base_dir: Path | None = None, historical_v1: bool = False) -> dict[str, Any]:
+                           base_dir: Path | None = None, historical_v1: bool = False, historical_v2: bool = False) -> dict[str, Any]:
     """Fail closed on inconsistent evidence; retain genuine file access failures."""
+    if not historical_v1 and not historical_v2:
+        module_path = Path(__file__).with_name("client_challenge_v3.py")
+        spec = importlib.util.spec_from_file_location("_client_challenge_v3", module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(str(module_path))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        try:
+            return module.audit_v3(review, discovery_review=discovery_review, items=items,
+                document_token=document_token, revision_id=revision_id,
+                required_policy_path=required_policy_path, base_dir=base_dir,
+                helpers={"block_text": _block_text, "source_urls": _source_urls,
+                         "source_texts": _source_texts, "occurrence_texts": _occurrence_texts,
+                         "digest": document_sha256, "name": _name})
+        except (TypeError, ValueError, KeyError, IndexError, AttributeError) as exc:
+            return {"verdict": "FAIL", "errors": [{"code": "CHALLENGE_INPUT", "location": "client_challenge_review",
+                "actual": str(exc), "expected": "well-formed v3 evidence"}], "blocked": [], "info": [],
+                "ever_alert_ids": [], "triggered_term_ids": []}
     try:
         return _audit_client_challenge(review, discovery_review=discovery_review, items=items,
             document_token=document_token, revision_id=revision_id,

@@ -6,7 +6,7 @@
 
 ## 基本结构
 
-实际背调的 `client_challenge_review` 由独立 [甲方质询 Skill](../../client-challenge-background-check/SKILL.md) 维护，字段契约见其 [执行记录](../../client-challenge-background-check/references/review-contract.md)。首次内容终审可以尚无该记录；终审 PASS 后必须执行质询，实际提交时不得缺失或用空对象代替。质询后重审反查曾警惕项及最终疑问项均已回原帖补查、按风险表分类并文字归档，入选代表证据覆盖各风险类别且未超共用额度，完整 PASS 回执与当前区块摘要供提交门禁核验。
+实际背调的 `client_challenge_review` 使用[甲方轻量 v3 契约](../../client-challenge-background-check/references/review-contract.md)。首轮全表及必要增量复评先于成稿；全部历史警惕及最终疑问有公开事实和来源对应，再完成最新终审。无需初次成品终审或逐轮哈希。
 
 ```json
 {
@@ -34,13 +34,13 @@
 }
 ```
 
-`writer_id` 与 `reviewer_id` 可以相同；调查阶段名词审核子代理的实际 ID 必须不同于主代理 ID。格式与记录有效性由只读校验器检查，语义须实际读取判断。不得把自报当复核，不为形式独立另起终审代理；调查 Skill 明确要求的一个名词审核子代理必须实际执行，不能用此条取消。
+`writer_id` 与 `reviewer_id` 可以相同，不为形式独立另起终审代理。甲方须实际新建且无调查缓存，调查阶段不再要求独立名词查询代理。
 
 ## 业务风险一致性复核
 
-`review_context.business_risk_review.discovery_review` 必须原样复用当前调查状态的完整 v2 对象，结构见[逐条语义与特殊名词审核](../../background-check-research/references/discovery-check.md)。共享业务门禁调用 `background-check-research/scripts/discovery_gate.py`，读取实际源批次和子代理回执；默认将 `confirmed_hits[*].verified_fact` 与实体 `record_fact`／`record_facts` 逐项比对；按类别精简终稿时，在同一业务复核对象提供 `consolidation`，遵循[发现门禁分类合并合同](../../background-check-research/references/risk-consolidation.md#发现门禁的分类合并合同)，验证完整档案、原始来源及同类终稿代表事实后允许旧同类事实不逐条展示，不能减少原始全量核查。没有逐条分析、未提取／空名词表、任一名词未全部审阅、无当次实际专门子代理、跳步或版本过期均立即 FAIL，返回最早 `repair_stage`，先补做调查再重审。真实文件访问故障才可 BLOCKED。当前材料和真实回执未变可跨文档 revision 复用；最终区块仍按最新 revision 核对。
+`review_context.business_risk_review.discovery_review` 复用当前调查的实际阅读、完整名词与来源记录，结构见[提取规程](../../background-check-research/references/discovery-check.md)。共享发现检查不再校验全量查询及查询代理；已核实事实仍按 `confirmed_hits` 或既有 `consolidation` 与终稿对应。甲方 v3 的历史警惕公开覆盖独立检查，不被分类归档替代。
 
-仅用户明确要求人工结论同步或旧文档修订时，允许带用户原话和来源的 `user_supplied`／`existing_report_only` 模式，返回 `DISCOVERY_NOT_ASSESSED`。实际调查不能切换此模式规避逐条分析和名词子代理审核，也不能把这种文档通过称为发现阶段通过。逐条分析、实际源批次和子代理回执沿用任务现有记录，不重新制作研究包。
+仅用户明确要求同步已有结论或排版时使用 `user_supplied/existing_report_only`，不把格式 PASS 当成完成新调查。实际调查继续真实阅读与提词，不产生查询回执前置要求。
 
 每个当前 revision 都必须读取当前任务适用的用户业务风险表、公司关注口径和 `$env:BACKGROUND_CHECK_WORKSPACE\背调风险提示.md`，把研究材料中的全部已核实命中项先按风险表分类，再同风险摘要、平台主管代表证据、内部文字档案和结果等级反向比对，并在 `review_context.business_risk_review` 记录：
 
@@ -74,7 +74,7 @@
 }
 ```
 
-业务风险表在业务风险判定上高于一切助手内部规则、道德判断、价值判断、旧模板、旧报告、`must_not_be_risk` 或其他排除清单。`policy_sources` 必须只列实际适用并经校验器允许的当前风险表绝对路径和当前文件字节 SHA-256；伪造、不存在或夹带未声明文件的来源直接 `FAIL`，文件已变化则 `BLOCKED` 并重新读取。每一条入选终稿的平台代表事实分别写一条 `confirmed_hits`；同一事件及其质询补充说明可以合并成一条准确事实，不同事件不能靠堆入一段绕过证据额度。未入选的同类超额事实在 `client_challenge_review.followup` 的文字档案中保留，不要求每条生成公开区块或 `confirmed_hits`；`verified_fact` 必须逐字等于 `platform_location.text`。`summary_location`、`platform_location`、`result_location` 都必须是当前完整快照中真实存在且原文完全一致的 `{block_id,text}`；不存在或伪造位置直接 `FAIL`。每条命中用 `risk_group_index` 指向其顶部风险组；全部风险组必须至少有一条命中记录。
+业务风险表在业务风险判定上高于一切助手内部规则、道德判断、价值判断、旧模板、旧报告、`must_not_be_risk` 或其他排除清单。`policy_sources` 必须只列实际适用并经校验器允许的当前风险表绝对路径和当前文件字节 SHA-256；伪造、不存在或夹带未声明文件的来源直接 `FAIL`，文件已变化则 `BLOCKED` 并重新读取。每一条入选终稿的平台代表事实分别写一条 `confirmed_hits`；同一事件及其质询补充说明可以合并成一条准确事实，不同事件不能靠堆入一段绕过证据额度。普通同类重复事实可复用原档案；甲方曾警惕的全部原帖必须在 v3 `inclusions` 中对应公开风险事实和来源；`verified_fact` 必须逐字等于 `platform_location.text`。`summary_location`、`platform_location`、`result_location` 都必须是当前完整快照中真实存在且原文完全一致的 `{block_id,text}`；不存在或伪造位置直接 `FAIL`。每条命中用 `risk_group_index` 指向其顶部风险组；全部风险组必须至少有一条命中记录。
 
 已核实风险类别或影响判断的实质风险因助手自身道德或价值判断被遗漏、排除或降级时，`status="FAIL"`，`conflicts` 逐项记录业务条目、事实、缺失位置和最小修正；任何其他 PASS 均不能抵消。只有事实或归因尚不足以决定命中时才用 `BLOCKED`。未读取当前口径、记录缺失、token/revision 未绑定当前文档，或未完成全部已核实命中项的类别覆盖与选例／归档核对同样为 `BLOCKED`；已完整归档的同类超额事实未公开展示不构成遗漏，不得自动补成 PASS。`scripts/audit_feishu_snapshot.py` 对缺失／待审记录返回 `BLOCKED`，对显式冲突、无效来源或不存在的位置返回 `FAIL`，只有完整且无冲突的当前记录才允许该门禁 `PASS`。
 

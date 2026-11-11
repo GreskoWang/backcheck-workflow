@@ -9,7 +9,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any, Iterable
 
-MANDATORY_STAGES = ("source_collection", "semantic_analysis", "term_extraction", "term_subagent_review", "reverse_review")
+MANDATORY_STAGES = ("source_collection", "semantic_analysis", "term_extraction", "reverse_review")
 
 
 def _text(value: Any) -> bool:
@@ -136,12 +136,15 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
     for required in MANDATORY_STAGES:
         if required not in applicable:
             issue("DISCOVERY_REQUIRED_STEP", ".execution_review.applicable_steps", required, "include every mandatory discovery stage", stage=required)
+    applicable = [step for step in applicable if step != "term_subagent_review"]
     stage_order = applicable + [s for s in MANDATORY_STAGES if s not in applicable] + ["final_report"]
     skipped = execution.get("skipped_steps")
     if not _strings(skipped, nonempty=False):
         issue("DISCOVERY_SKIPPED_STEPS", ".execution_review.skipped_steps", skipped, "empty list after repairing every skipped applicable step")
     elif skipped:
         for step_id in skipped:
+            if step_id == "term_subagent_review":
+                continue
             issue("DISCOVERY_SKIPPED_STEPS", ".execution_review.skipped_steps", step_id, "repair this skipped applicable step", stage=step_id if step_id in applicable else "source_collection")
     steps = execution.get("steps")
     if not isinstance(steps, list):
@@ -154,6 +157,8 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
             issue("DISCOVERY_EXECUTION_STEP", location, step, "step object with step_id")
             continue
         step_id = step["step_id"]
+        if step_id == "term_subagent_review":
+            continue
         if step_id in seen_steps or step_id not in applicable:
             issue("DISCOVERY_EXECUTION_STEP", location, step_id, "exactly one declared applicable step", stage=step_id)
         seen_steps.add(step_id)
@@ -260,12 +265,9 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
             issue("DISCOVERY_ITEM_EXTRACTION", location, item, "specific semantic reason when this item has no special nouns", stage="term_extraction")
     for identity in sorted(expected_items - covered):
         issue("DISCOVERY_ITEM_COVERAGE", ".semantic_review.items", identity, "individual semantic review of every acquired item", stage="semantic_analysis")
-    if not extracted_names:
-        issue("DISCOVERY_EXTRACTION_EMPTY", ".semantic_review.items", [], "nonempty actual task term extraction; empty extraction cannot certify completion", stage="term_extraction")
-
     entities = review.get("entities")
-    if not isinstance(entities, list) or not entities:
-        issue("DISCOVERY_ENTITIES", ".entities", entities, "nonempty deduplicated entity list", stage="term_extraction")
+    if not isinstance(entities, list):
+        issue("DISCOVERY_ENTITIES", ".entities", entities, "deduplicated source-grounded noun list", stage="term_extraction")
         entities = []
     known_names: dict[str, int] = {}
     if reported_facts is not None and (not isinstance(reported_facts, (list, tuple, set)) or not all(_text(f) for f in reported_facts)):
@@ -411,14 +413,6 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
         if not _strings(aliases, nonempty=False):
             issue("DISCOVERY_ALIASES", location + ".aliases", aliases, "verified aliases as strings", stage="term_extraction")
             aliases = []
-        alias_evidence = entity.get("alias_evidence", [])
-        proven_aliases: set[str] = set()
-        for evidence in alias_evidence if isinstance(alias_evidence, list) else []:
-            if isinstance(evidence, dict) and _text(evidence.get("alias")) and _strings(evidence.get("source_refs")):
-                proven_aliases.add(_name(evidence["alias"]))
-        for alias in aliases:
-            if _name(alias) not in proven_aliases:
-                issue("DISCOVERY_ALIAS_EVIDENCE", location + ".aliases", alias, "reviewed identity evidence before merging aliases", stage="term_subagent_review")
         for label in ([name] if _text(name) else []) + aliases:
             normalized = _name(label)
             if normalized in known_names and known_names[normalized] != index:
@@ -427,19 +421,8 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
         if not _strings(entity.get("source_refs")):
             issue("DISCOVERY_ENTITY_SOURCE", location + ".source_refs", entity.get("source_refs"), "actual mention locator", stage="term_extraction")
         disposition = entity.get("disposition")
-        terminal = entity.get("terminal_outcome")
-        terminal_valid = _terminal_outcome(terminal)
-        if terminal is not None and not terminal_valid:
-            issue("DISCOVERY_TERMINAL_EVIDENCE", location + ".terminal_outcome", terminal,
-                  "completed outcome with actual reason, evidence refs and matching conclusion", stage="term_subagent_review")
-        if disposition not in ("record", "clear") and not (
-                disposition == "pending" and terminal_valid and terminal["kind"] == "bounded_inconclusive"):
-            issue("DISCOVERY_PENDING_ENTITY", location + ".disposition", disposition, "record/clear, or fact-unknown after evidenced completed bounded review", stage="term_subagent_review")
-        for field in ("identity", "relation", "reason"):
-            if not _text(entity.get(field)):
-                issue("DISCOVERY_ENTITY_BASIS", location + "." + field, entity.get(field), "specific verified identity, relation and disposition reason", stage="term_subagent_review")
-        if not _strings(entity.get("background_refs")):
-            issue("DISCOVERY_BACKGROUND", location + ".background_refs", entity.get("background_refs"), "actual background/context sources", stage="term_subagent_review")
+        # Unknown meaning is an input to client questioning, not incomplete research.
+        # Existing verified risk facts still reconcile with the final report below.
         if disposition == "record":
             entity_facts = entity.get("record_facts", [entity.get("record_fact")])
             if not _strings(entity_facts) or reported_facts is None:
@@ -453,59 +436,9 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
     for name in sorted(extracted_names - set(known_names)):
         issue("DISCOVERY_UNRESOLVED_NAME", ".semantic_review.items.names", name, "resolved entity entry or verified alias", stage="term_extraction")
 
-    subagent = review.get("subagent_review")
-    subagent = subagent if isinstance(subagent, dict) else {}
-    child = subagent.get("agent_id")
-    if not _text(child) or child == review.get("primary_agent_id") or subagent.get("created_agent_ids") != [child]:
-        issue("DISCOVERY_DISTINCT_SUBAGENT", ".subagent_review", child, "exactly one newly created child agent distinct from primary_agent_id", stage="term_subagent_review")
-    for field, expected in (("task_id", review.get("task_id")), ("source_revision", revision), ("status", "complete")):
-        if not _text(subagent.get(field)) or subagent[field] != expected:
-            issue("DISCOVERY_SUBAGENT_BINDING", ".subagent_review." + field, subagent.get(field), f"match {expected}", stage="term_subagent_review")
-    for field in ("spawn_ref", "result_ref"):
-        if not _text(subagent.get(field)):
-            issue("DISCOVERY_SUBAGENT_EVIDENCE", ".subagent_review." + field, subagent.get(field), "actual collaboration tool-message reference", stage="term_subagent_review")
-    blocked_before = len(blocked)
-    receipt = read_artifact(subagent.get("receipt_path"), ".subagent_review.receipt_path", "term_subagent_review")
-    if len(blocked) != blocked_before:
-        return result()
-    if not isinstance(receipt, dict):
-        receipt = {}
-        issue("DISCOVERY_SUBAGENT_RECEIPT", ".subagent_review.receipt_path", None, "actual child-produced JSON receipt", stage="term_subagent_review")
-    for field, expected in (("version", 2), ("agent_id", child), ("task_id", review.get("task_id")), ("source_revision", revision),
-                            ("status", "complete"), ("spawn_ref", subagent.get("spawn_ref")), ("result_ref", subagent.get("result_ref")),
-                            ("acquisition_sha256", manifest_hash)):
-        if receipt.get(field) != expected or (field == "version" and type(receipt.get(field)) is not int):
-            issue("DISCOVERY_RECEIPT_BINDING", ".subagent_review.receipt." + field, receipt.get(field), f"match {expected}", stage="term_subagent_review")
-    term_reviews = receipt.get("reviews")
-    if not isinstance(term_reviews, list) or not term_reviews:
-        term_reviews = []
-        issue("DISCOVERY_SUBAGENT_TERMS", ".subagent_review.receipt.reviews", receipt.get("reviews"), "actual query and review for every unique term", stage="term_subagent_review")
-    reviewed_entities: set[int] = set()
-    for index, term in enumerate(term_reviews):
-        location = f".subagent_review.receipt.reviews[{index}]"
-        if not isinstance(term, dict) or not _text(term.get("name")):
-            issue("DISCOVERY_SUBAGENT_TERM", location, term, "named individual term review", stage="term_subagent_review")
-            continue
-        entity_index = known_names.get(_name(term["name"]))
-        if entity_index is None or entity_index in reviewed_entities:
-            issue("DISCOVERY_SUBAGENT_COVERAGE", location, term["name"], "exactly one review per resolved entity, with no unresolved extras", stage="term_subagent_review")
-        else:
-            reviewed_entities.add(entity_index)
-        if term.get("status") != "complete" or not _text(term.get("conclusion")):
-            issue("DISCOVERY_SUBAGENT_INCOMPLETE", location, term, "completed term-specific conclusion", stage="term_subagent_review")
-        queries = term.get("queries")
-        if not isinstance(queries, list) or not queries:
-            queries = []
-            issue("DISCOVERY_SUBAGENT_QUERIES", location, term.get("queries"), "actual queries with inspected source refs", stage="term_subagent_review")
-        for query in queries:
-            if not isinstance(query, dict) or not _text(query.get("query")) or not _strings(query.get("source_refs")):
-                issue("DISCOVERY_SUBAGENT_QUERIES", location, query, "query text and actual inspected source refs", stage="term_subagent_review")
-    for missing in set(range(len(entities))) - reviewed_entities:
-        issue("DISCOVERY_SUBAGENT_COVERAGE", ".subagent_review.receipt.reviews", missing, "complete individual child-agent review of this entity", stage="term_subagent_review")
-
     reverse = review.get("reverse_pass")
     reverse = reverse if isinstance(reverse, dict) else {}
-    if reverse.get("status") != "complete" or not _strings(reverse.get("names")):
+    if reverse.get("status") != "complete" or not _strings(reverse.get("names"), nonempty=False):
         issue("DISCOVERY_REVERSE_REVIEW", ".reverse_pass", reverse, "completed source-first reverse review with actual names", stage="reverse_review")
     reverse_names = {_name(name) for name in reverse.get("names", []) if _text(name)} if isinstance(reverse.get("names"), list) else set()
     for name in sorted(reverse_names - set(known_names)):
@@ -517,7 +450,7 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
     if reversed_entities != extracted_entities:
         issue("DISCOVERY_REVERSE_COVERAGE", ".reverse_pass.names", sorted(reversed_entities), "reverse-review every extracted entity", stage="reverse_review")
     if not errors and not blocked:
-        info.append("DISCOVERY_STATE_PASS: source bytes, item coverage and one child receipt are consistent; cognition, all-term recall and tool-message authenticity require actual review")
+        info.append("DISCOVERY_STATE_PASS: source bytes, item coverage and noun/source mapping are consistent; no all-term queries or query child required; cognition, all-term recall and tool-message authenticity require actual review")
     return result()
 
 

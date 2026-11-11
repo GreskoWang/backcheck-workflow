@@ -1,4 +1,4 @@
 interface:
   display_name: "背调研究"
-  short_description: "扫描公开主页与十四平台，并在成品后主动补查易漏主题"
-  default_prompt: "使用 $background-check-research 执行背调：创建或沿用对应 Goal，完成纳入主页、十四平台搜索和飞书成品审阅；随后按国别、职业和首次覆盖主动提出一个具体查漏问题，用更精确的关键词补查，记录是否出现对应内容，发现遗漏时补入飞书并重新审阅，全部完成后再结束 Goal。"
+  short_description: "阅读公开主页与十四平台，完成画像补查和名词质询后成稿终审"
+  default_prompt: "使用 $background-check-research 完成指定范围的公开调查和画像补查，提取完整名词表交虚拟甲方快速表态及必要复评，曾警惕原帖永久入稿，成稿后完成最终审阅；不开展前置全量逐词查询。"

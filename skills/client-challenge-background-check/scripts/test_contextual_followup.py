@@ -1,3 +1,4 @@
+"""Explicit historical-v2 replay tests, not current release behavior."""
 """Synthetic v2 integration tests: archive all terms, report sampled categories."""
 import copy
 import json
@@ -59,7 +60,7 @@ class ContextualFollowupTests(unittest.TestCase):
     def audit(self):
         self.review['followup'] = write_json(self.root / 'followup.json', self.data)
         return audit_client_challenge(self.review, discovery_review=self.discovery, items=self.items,
-            document_token='synthetic-doc', revision_id=2, required_policy_path=self.policy)
+            document_token='synthetic-doc', revision_id=2, required_policy_path=self.policy, historical_v2=True)
 
     def fail(self, code):
         result = self.audit()
@@ -184,7 +185,7 @@ class ContextualFollowupTests(unittest.TestCase):
         result = self.audit()
         self.assertIn('CHALLENGE_ARTIFACT_HASH', {r['code'] for r in result['errors']})
 
-    def test_cli_v2_pass_and_missing_archive_fail(self):
+    def test_current_cli_rejects_historical_v2_records(self):
         self.audit()
         state = {'client_challenge_review': self.review, 'discovery_review': self.discovery, 'items': self.items,
             'document_token': 'synthetic-doc', 'revision_id': 2, 'required_policy_path': str(self.policy)}
@@ -192,7 +193,8 @@ class ContextualFollowupTests(unittest.TestCase):
         write_json(state_path, state)
         command = [sys.executable, str(Path(__file__).with_name('client_challenge_gate.py')), '--state', str(state_path)]
         result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CHALLENGE_VERSION", result.stdout)
         self.data['terms'][0]['occurrences'].pop()
         self.audit()
         write_json(state_path, state)

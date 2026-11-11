@@ -75,7 +75,7 @@ python scripts/audit_feishu_snapshot.py snapshot.json
 
 ## 输出
 
-本清单的内容终审 PASS 不等于实际背调可以提交。首次 PASS 后必须调用独立的 `$client-challenge-background-check`，核对完整名词表质询、所有必记名词原帖补查及文字归档、风险表分类与共用选例额度、六项事实及固定拒绝记录；有修改则重审当前 revision，最后由该独立提交门禁放行。缺少质询、任一必记名词漏核查归档或整类风险漏报不得交付；不要求所有名词进入终稿。
+本清单的终审 PASS 不单独构成提交许可。成稿前完成甲方首轮完整名词表态及必要事实复评，曾警惕原帖永久公开收录、最终疑问列待确认；成稿后核对最新终审与 v3 提交检查。不要求质询前成品终审或逐词查询。
 
 `PASS`：`business_risk_review` 已绑定当前 revision 且业务风险表与已核实事实反向比对无冲突；全篇无免责且当前全文语义复核有效；脚本零错误、零未决，必要视觉为 fresh PASS 或 reuse_layout PASS，revision 稳定。
 

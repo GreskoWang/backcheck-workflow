@@ -396,7 +396,7 @@ def _audit_client_challenge(
     if not isinstance(review, dict):
         diagnostic = Diagnostic(
             "ERROR", "CLIENT_CHALLENGE_REVIEW_REQUIRED",
-            "a post-audit independent client challenge is required before release",
+            "a v3 independent client attitude loop followed by current final audit is required before release",
             "review_context.client_challenge_review",
         )
         if diagnostic not in report.items:
@@ -2648,6 +2648,9 @@ def validation_result(
         standard_sources["../background-check-research/scripts/discovery_gate.py"] = file_hash(discovery_gate_path)
     if CLIENT_CHALLENGE_GATE_PATH.is_file():
         standard_sources["../client-challenge-background-check/scripts/client_challenge_gate.py"] = file_hash(CLIENT_CHALLENGE_GATE_PATH)
+        current_challenge_path = CLIENT_CHALLENGE_GATE_PATH.with_name("client_challenge_v3.py")
+        if current_challenge_path.is_file():
+            standard_sources["../client-challenge-background-check/scripts/client_challenge_v3.py"] = file_hash(current_challenge_path)
     challenge_skill_root = CLIENT_CHALLENGE_GATE_PATH.parent.parent
     for relative in ("SKILL.md", "references/review-contract.md", "scripts/contextual_followup.py"):
         source = challenge_skill_root / relative

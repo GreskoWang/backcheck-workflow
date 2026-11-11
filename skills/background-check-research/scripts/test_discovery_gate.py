@@ -69,28 +69,17 @@ def fixture(root):
 
 
 class DiscoveryGateTests(unittest.TestCase):
-    def test_bounded_unknown_is_completed_but_unqueried_is_not(self):
-        entity = self.review["entities"][1]
-        entity["disposition"] = "pending"
-        entity["terminal_outcome"] = {"status": "complete", "kind": "bounded_inconclusive",
-            "conclusion": "未坐实", "reason": "Two reviewed sources do not resolve the identity",
-            "evidence_refs": ["offline#festival-about", "offline#backup-search"]}
+    def test_unknown_meaning_requires_no_background_query(self):
+        self.review.pop("subagent_review")
+        for entity in self.review["entities"]:
+            for field in ("identity", "background_refs", "relation", "alias_evidence"):
+                entity.pop(field, None)
+        self.review["entities"][1]["disposition"] = "pending"
         self.assertEqual(self.audit()["verdict"], "PASS")
-        receipt_path = Path(self.review["subagent_review"]["receipt_path"])
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        receipt["reviews"][1]["queries"] = []
-        write_json(receipt_path, receipt)
-        self.assert_failure("DISCOVERY_SUBAGENT_QUERIES")
 
-    def test_objective_unavailable_requires_evidence_and_does_not_erase_known_risk(self):
-        entity = self.review["entities"][1]
-        entity["terminal_outcome"] = {"status": "complete", "kind": "objective_unavailable",
-            "conclusion": "无问题", "reason": "Owner restricted this post",
-            "evidence_refs": ["offline#actual-access-message"]}
-        self.assertEqual(self.audit()["verdict"], "PASS")
+    def test_access_status_does_not_erase_already_recorded_fact(self):
+        self.review["entities"][0]["terminal_outcome"] = {"kind":"objective_unavailable"}
         self.assert_failure("DISCOVERY_REPORT_OMISSION", facts=[])
-        entity["terminal_outcome"]["evidence_refs"] = []
-        self.assert_failure("DISCOVERY_TERMINAL_EVIDENCE")
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -132,12 +121,12 @@ class DiscoveryGateTests(unittest.TestCase):
         self.review["version"] = 1
         self.assert_failure("DISCOVERY_VERSION", "source_collection")
 
-    def test_old_empty_list_pass_is_now_fail(self):
+    def test_genuinely_nameless_material_can_have_empty_noun_table(self):
         self.review["entities"] = []
         self.review["reverse_pass"]["names"] = []
         for item in self.review["semantic_review"]["items"]:
-            item.update(names=[], no_special_terms_reason="self-declared empty")
-        self.assert_failure("DISCOVERY_EXTRACTION_EMPTY", "term_extraction", facts=[])
+            item.update(names=[], no_special_terms_reason="Only ordinary descriptions in this offline nameless-input test.")
+        self.assertEqual(self.audit(facts=[])["verdict"], "PASS")
 
     def test_missing_extraction_field_fails(self):
         self.review["semantic_review"]["items"][0].pop("names")
@@ -170,56 +159,27 @@ class DiscoveryGateTests(unittest.TestCase):
         self.review["semantic_review"]["items"][0]["names"].append("Nebulous Uncatalogued Work")
         self.assert_failure("DISCOVERY_UNRESOLVED_NAME", "term_extraction")
 
-    def test_one_term_skipped_by_child_fails(self):
-        self.mutate_receipt(lambda receipt: receipt["reviews"].pop())
-        self.assert_failure("DISCOVERY_SUBAGENT_COVERAGE", "term_subagent_review")
 
-    def test_child_partial_or_no_query_fails(self):
-        self.mutate_receipt(lambda receipt: receipt["reviews"][1].update(status="partial", queries=[]))
-        self.assert_failure("DISCOVERY_SUBAGENT_INCOMPLETE", "term_subagent_review")
 
-    def test_query_must_have_inspected_sources(self):
-        self.mutate_receipt(lambda receipt: receipt["reviews"][0]["queries"][0].update(source_refs=[]))
-        self.assert_failure("DISCOVERY_SUBAGENT_QUERIES", "term_subagent_review")
 
-    def test_same_agent_cannot_self_certify(self):
-        self.review["subagent_review"].update(agent_id="root-agent", created_agent_ids=["root-agent"])
-        self.assert_failure("DISCOVERY_DISTINCT_SUBAGENT", "term_subagent_review")
 
-    def test_exactly_one_created_child_required(self):
-        for children in ([], ["term-child-1", "another-child"], ["term-child-1", "term-child-1"]):
-            review = copy.deepcopy(self.review)
-            review["subagent_review"]["created_agent_ids"] = children
-            self.assert_failure("DISCOVERY_DISTINCT_SUBAGENT", review=review)
 
-    def test_missing_receipt_cannot_pass_on_declared_complete(self):
-        Path(self.review["subagent_review"]["receipt_path"]).unlink()
-        self.assert_failure("DISCOVERY_ARTIFACT_MISSING", "term_subagent_review")
 
-    def test_actual_artifact_access_denial_remains_blocked(self):
+    def test_actual_source_access_denial_remains_blocked(self):
         original_read = Path.read_bytes
-        receipt_path = Path(self.review["subagent_review"]["receipt_path"])
+        source_path = Path(self.review["semantic_review"]["source_batches"][0]["path"])
         def read(path):
-            if path == receipt_path:
-                raise PermissionError("offline simulated artifact access denial")
+            if path == source_path:
+                raise PermissionError("offline simulated source access denial")
             return original_read(path)
         with patch.object(Path, "read_bytes", read):
             result = self.audit()
         self.assertEqual(result["verdict"], "BLOCKED", result)
-        self.assertEqual(result["repair_stage"], "term_subagent_review")
+        self.assertEqual(result["repair_stage"], "source_collection")
         self.assertEqual(result["errors"], [])
 
-    def test_stale_receipt_revision_and_task_fail(self):
-        self.mutate_receipt(lambda receipt: receipt.update(task_id="other-task", source_revision="batch-2"))
-        self.assert_failure("DISCOVERY_RECEIPT_BINDING", "term_subagent_review")
 
-    def test_unresolved_extra_child_review_fails(self):
-        self.mutate_receipt(lambda receipt: receipt["reviews"].append({"name": "Unknown", "status": "complete", "conclusion": "clear", "queries": []}))
-        self.assert_failure("DISCOVERY_SUBAGENT_COVERAGE", "term_subagent_review")
 
-    def test_duplicate_alias_review_cannot_count_as_another_term(self):
-        self.mutate_receipt(lambda receipt: receipt["reviews"][1].update(name="兰灯舞台"))
-        self.assert_failure("DISCOVERY_SUBAGENT_COVERAGE", "term_subagent_review")
 
     def test_verified_alias_maps_to_one_entity(self):
         self.review["semantic_review"]["items"][0]["names"] = ["兰灯舞台", "ORCHID  LANTERN STAGE"]
@@ -227,9 +187,9 @@ class DiscoveryGateTests(unittest.TestCase):
         self.mutate_receipt(lambda receipt: receipt["reviews"][0].update(name="兰灯舞台"))
         self.assertEqual(self.audit()["verdict"], "PASS")
 
-    def test_aliases_require_reviewed_identity_evidence(self):
+    def test_source_aliases_do_not_require_separate_search_receipt(self):
         self.review["entities"][0].pop("alias_evidence")
-        self.assert_failure("DISCOVERY_ALIAS_EVIDENCE", "term_subagent_review")
+        self.assertEqual(self.audit()["verdict"], "PASS")
 
     def test_duplicate_entity_identity_cannot_hold_another_fact(self):
         self.review["entities"][1]["name"] = "Orchid Lantern Stage"
@@ -251,16 +211,6 @@ class DiscoveryGateTests(unittest.TestCase):
         self.review["acquisition_manifest"]["sha256"] = write_json(path, manifest)
         self.assert_failure("DISCOVERY_ACQUISITION_COVERAGE", "source_collection")
 
-    def test_stale_receipt_after_inventory_change_fails_even_same_revision(self):
-        source = Path(self.review["semantic_review"]["source_batches"][0]["path"])
-        contents = json.loads(source.read_text(encoding="utf-8"))
-        contents["items"][2]["text"] = "It rained all afternoon."
-        self.review["semantic_review"]["source_batches"][0]["sha256"] = write_json(source, contents)
-        manifest_path = Path(self.review["acquisition_manifest"]["path"])
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["source_batches"] = self.review["semantic_review"]["source_batches"]
-        self.review["acquisition_manifest"]["sha256"] = write_json(manifest_path, manifest)
-        self.assert_failure("DISCOVERY_RECEIPT_BINDING", "term_subagent_review")
 
     def test_duplicate_source_batch_cannot_hide_coverage(self):
         self.review["semantic_review"]["source_batches"].append(copy.deepcopy(self.review["semantic_review"]["source_batches"][0]))
@@ -293,10 +243,9 @@ class DiscoveryGateTests(unittest.TestCase):
         execution["skipped_steps"] = ["term_extraction", "account_confirmation"]
         self.assert_failure("DISCOVERY_SKIPPED_STEPS", "account_confirmation")
 
-    def test_mandatory_stage_cannot_be_declared_inapplicable(self):
-        self.review["execution_review"]["applicable_steps"].remove("term_subagent_review")
-        self.review["execution_review"]["steps"] = [step for step in self.review["execution_review"]["steps"] if step["step_id"] != "term_subagent_review"]
-        self.assert_failure("DISCOVERY_REQUIRED_STEP", "term_subagent_review")
+    def test_real_reading_stage_cannot_be_declared_inapplicable(self):
+        self.review["execution_review"]["applicable_steps"].remove("semantic_analysis")
+        self.assert_failure("DISCOVERY_REQUIRED_STEP", "semantic_analysis")
 
     def test_recorded_fact_missing_or_changed_from_report_fails(self):
         self.assert_failure("DISCOVERY_REPORT_OMISSION", "final_report", facts=[])
@@ -335,12 +284,11 @@ class DiscoveryGateTests(unittest.TestCase):
         self.review["entities"][0]["record_fact"] = "conflicting legacy fact"
         self.assert_failure("DISCOVERY_RECORD_CONFLICT", "final_report")
 
-    def test_pending_background_and_media_do_not_pass(self):
-        for field, value, code in (("disposition", "pending", "DISCOVERY_PENDING_ENTITY"), ("background_refs", [], "DISCOVERY_BACKGROUND")):
-            review = copy.deepcopy(self.review)
-            review["entities"][0][field] = value
-            self.assert_failure(code, review=review)
-        self.review["open_items"] = [{"source_ref": "offline#image", "next": "read text"}]
+    def test_actual_unread_media_still_blocks_completion(self):
+        self.review["entities"][1]["disposition"] = "pending"
+        self.review["entities"][1]["background_refs"] = []
+        self.assertEqual(self.audit()["verdict"], "PASS")
+        self.review["open_items"] = [{"source_ref":"offline#image", "next":"read actual image"}]
         self.assert_failure("DISCOVERY_OPEN_ITEMS", "semantic_analysis")
 
     def test_reverse_pass_covers_every_extracted_entity(self):
@@ -358,7 +306,7 @@ class DiscoveryGateTests(unittest.TestCase):
 
     def test_bad_shapes_fail_closed_without_exception(self):
         cases = [[], "PASS", {"version": True, "mode": "assistant_research"}]
-        for field in ("entities", "execution_review", "semantic_review", "subagent_review", "open_items", "reverse_pass", "source_refs"):
+        for field in ("entities", "execution_review", "semantic_review", "open_items", "reverse_pass", "source_refs"):
             for bad in (None, False, 3, "PASS", [None], {}):
                 review = copy.deepcopy(self.review)
                 review[field] = bad
@@ -367,10 +315,11 @@ class DiscoveryGateTests(unittest.TestCase):
             with self.subTest(review=review):
                 self.assertEqual(self.audit(review)["verdict"], "FAIL")
 
-    def test_bad_receipt_shapes_fail_closed(self):
-        for bad in (None, [], "PASS", {"reviews": [None]}, {"reviews": [{"name": []}]}):
-            write_json(Path(self.review["subagent_review"]["receipt_path"]), bad)
-            self.assertEqual(self.audit()["verdict"], "FAIL")
+    def test_retired_query_records_do_not_reintroduce_query_work(self):
+        self.review["subagent_review"] = {"status":"incomplete", "receipt_path":"missing-retired-file.json"}
+        self.review["execution_review"]["applicable_steps"].append("term_subagent_review")
+        self.review["execution_review"]["skipped_steps"] = ["term_subagent_review"]
+        self.assertEqual(self.audit()["verdict"], "PASS")
 
     def test_cli_missing_malformed_and_complete(self):
         path = self.root / "state.json"

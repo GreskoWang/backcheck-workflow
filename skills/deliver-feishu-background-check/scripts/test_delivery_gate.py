@@ -3,6 +3,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -69,6 +70,36 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertEqual(result['inputs']['snapshot']['sha256'], hashlib.sha256(source.read_bytes()).hexdigest())
         self.assertEqual(result['document']['revision_after'], 1)
 
+    def test_real_v3_ordinary_gate_uses_final_snapshot_audit_without_initial_pass(self):
+        snapshot = SnapshotDigestTests().actual_review_fixture(self.root)
+        document = snapshot['document']
+        document['document_id'] = snapshot_auditor.review_document_token(document, snapshot['block_list']['items'])
+        document['revision_before'] = document['revision_after'] = document['revision_id']
+        discovery = snapshot['review_context']['business_risk_review']['discovery_review']
+        discovery.pop('subagent_review')
+        nouns = [{'id': f'n{index}', 'name': name} for index, name in enumerate(
+            name for entity in discovery['entities'] for name in [entity['name']] + entity.get('aliases', []))]
+        audit = snapshot_auditor.audit(snapshot)
+        self.assertEqual(audit['verdict'], 'PASS', audit)
+        final_path = self.root / 'actual-v3-final-audit.json'
+        final_path.write_text(json.dumps(audit, ensure_ascii=False), encoding='utf-8')
+        snapshot['review_context']['client_challenge_review'] = {
+            'version':3, 'task_id':discovery['task_id'], 'source_revision':discovery['source_revision'],
+            'document_token':audit['document']['token'], 'revision_id':audit['document']['revision_id'],
+            'policy_path':str(validator.CURRENT_BUSINESS_RISK_POLICY), 'nouns':nouns,
+            'child':{'agent_id':'offline-v3-client', 'created_agent_ids':['offline-v3-client'], 'fork_turns':'none',
+                     'spawn_ref':'synthetic#isolated-create'},
+            'rounds':[{'index':1, 'agent_id':'offline-v3-client', 'input':copy.deepcopy(nouns), 'input_ref':'synthetic#names',
+                       'response':[{'id':row['id'], '态度':'放松'} for row in nouns], 'result_ref':'synthetic#attitudes'}],
+            'inclusions':[], 'current_final_review':str(final_path)}
+        source = self.root / 'ordinary-v3-release.json'
+        source.write_text(json.dumps(snapshot), encoding='utf-8')
+        result = validator.validation_result(validator.Report(), audit_only=False, snapshot_path=source, payload_path=None)
+        self.assertEqual(result['verdict'], 'PASS', result)
+        self.assertFalse(result['delivery_validation_passed'])  # Ordinary mode has no research payload; use actual gate/audit PASS.
+        self.assertTrue(any(row['code'] == 'CLIENT_CHALLENGE_REVIEW_INFO' for row in result['diagnostics']))
+        self.assertIn('../client-challenge-background-check/scripts/client_challenge_v3.py', result['standard_sources'])
+
     def test_full_standard_validation_success(self):
         run, result, _ = self.run_cli(delivery=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
@@ -112,7 +143,7 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertIn('DISCOVERY_OPEN_ITEMS', {d['code'] for d in result['diagnostics']})
         self.assertEqual(result['verdict'], 'FAIL')
 
-    def test_v2_discovery_receipt_enforced_in_real_delivery_cli(self):
+    def test_noun_source_mapping_enforced_in_real_delivery_cli(self):
         snapshot = self.research_snapshot()
         discovery = snapshot['review_context']['business_risk_review']['discovery_review']
         initial_audit = validator.validate_document(snapshot, payload=self.payload)
@@ -126,11 +157,12 @@ class DeliveryGateTests(unittest.TestCase):
         receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
         receipt['reviews'].pop()
         receipt_path.write_text(json.dumps(receipt), encoding='utf-8')
+        discovery['entities'].pop()
         run, result, _ = self.run_cli(snapshot, delivery=True)
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
         self.assertEqual(result['verdict'], 'FAIL')
         self.assertFalse(result['delivery_validation_passed'])
-        self.assertIn('DISCOVERY_SUBAGENT_COVERAGE', {d['code'] for d in result['diagnostics']})
+        self.assertIn('DISCOVERY_UNRESOLVED_NAME', {d['code'] for d in result['diagnostics']})
 
     def test_research_initial_audit_does_not_require_release_challenge(self):
         snapshot = self.research_snapshot()
@@ -525,7 +557,7 @@ class SnapshotDigestTests(unittest.TestCase):
     def test_shared_audit_binds_actual_source_not_outer_task_claim(self):
         # Reuse the existing complete shared-document fixture shape, supplying
         # its source with current offline discovery evidence before any audit.
-        repo = Path(snapshot_auditor.__file__).resolve().parents[3]
+        repo = Path(os.environ.get('BACKCHECK_TEST_REPOSITORY', Path(snapshot_auditor.__file__).resolve().parents[3]))
         fixture_path = repo / 'tests' / 'repair' / 'test_team_visual_contract.py'
         spec = importlib.util.spec_from_file_location('_offline_shared_binding_fixture', fixture_path)
         module = importlib.util.module_from_spec(spec)
