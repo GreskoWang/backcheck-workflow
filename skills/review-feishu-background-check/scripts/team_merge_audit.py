@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = 'team-merge-1.1.0'
+VERSION = 'team-merge-1.2.0'
 
 
 def audit_team_visual(visual, requirements, *, request_id, token, revision,
@@ -150,17 +150,11 @@ def audit_team(payload, single_audit, helpers):
         for ident in ids: walk(ident)
         return found
 
-    def normalized(by, ids, numbered=False):
-        number = 0
+    def normalized(by, ids):
         def norm(ident):
-            nonlocal number
             b = copy.deepcopy(by[ident])
             children = b.pop('children', None)
             b.pop('block_id'); b.pop('parent_id', None)
-            if numbered and b.get('block_type') == 13:
-                number += 1
-                title = helpers['text_of'](by[ident])
-                b = {'block_type': 2, 'text': {'elements': [{'text_run': {'content': f'{number}. {title}', 'text_element_style': {'bold': False, 'inline_code': False, 'italic': False, 'strikethrough': False, 'underline': False}}}], 'style': {'align': 1, 'folded': False}}}
             for value in b.values():
                 if isinstance(value, dict) and isinstance(value.get('style'), dict) and value['style'].get('indentation_level') == 'NoIndent':
                     value['style'].pop('indentation_level')
@@ -209,7 +203,7 @@ def audit_team(payload, single_audit, helpers):
         src_ids = srcroot['children']
         basic = [i for i,k in enumerate(src_ids) if src[k].get('block_type') == 5 and helpers['text_of'](src[k]) == '基本信息']
         require(len(basic) == 1, 'SOURCE_STRUCTURE', 'one basic-information heading required')
-        expected = normalized(src, src_ids[basic[0]:], True)
+        expected = normalized(src, src_ids[basic[0]:])
         require(normalized(by, current_ids[a + 1:b]) == expected, 'COPIED_CONTENT', 'assigned section differs from the approved complete source')
         disclaimer = helpers['audit_disclaimer_review'](meta, items, payload.get('raw_content'), rc.get('disclaimer_review'))
         require(not disclaimer['errors'] and not disclaimer['blocked'], 'FULL_TEXT_REVIEW', 'current whole-document disclaimer semantic review required')

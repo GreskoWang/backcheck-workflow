@@ -55,6 +55,11 @@ def semantic_fixture(snapshot, source=False):
     }
     if source:
         context['business_risk_review'] = {
+            'discovery_review': {
+                'version': 1, 'mode': 'user_supplied', 'scope': 'offline team layout fixture',
+                'instruction': 'Synthetic researched conclusions supplied only for document-format tests.',
+                'source_ref': 'test_team_visual_contract.py#semantic_fixture',
+            },
             'status': 'PASS', 'scope': 'current_business_risk_policy_and_full_document',
             'token': AUDIT.review_document_token(document, items),
             'revision_id': document['revision_id'], 'policy_sources': [AUDIT.policy_source()],
@@ -90,18 +95,10 @@ def fixture():
         collect(ident)
     token = 'SYNTHETIC-TEAM-U08'
     copied = []
-    sequence = 0
     for original in source['block_list']['items']:
         if original['block_id'] not in selected:
             continue
         item = copy.deepcopy(original)
-        if item['block_type'] == 13:
-            sequence += 1
-            item = {'block_id': item['block_id'], 'parent_id': item['parent_id'], 'block_type': 2,
-                    'text': {'elements': [{'text_run': {'content': f'{sequence}. {AUDIT.text_of(original)}',
-                             'text_element_style': {'bold': False, 'inline_code': False, 'italic': False,
-                                                   'strikethrough': False, 'underline': False}}}],
-                             'style': {'align': 1, 'folded': False}}}
         item['block_id'] = 'copy-' + item['block_id']
         item['parent_id'] = token if item['parent_id'] == source_root['block_id'] else 'copy-' + item['parent_id']
         if 'children' in item:
@@ -185,6 +182,19 @@ class VisualContract(unittest.TestCase):
             self.assertEqual(result['receipt']['scope'], 'assigned_subject_only')
             self.assertFalse(result['receipt']['whole_team_complete'])
             self.assertEqual(len(result['receipt']['assigned_layout_fingerprint']), 64)
+
+    def test_handwritten_platform_numbers_cannot_replace_native_lists(self):
+        sequence = 0
+        for item in self.payload['block_list']['items']:
+            if item.get('block_type') == 13:
+                sequence += 1
+                label = AUDIT.text_of(item)
+                item.pop('ordered')
+                item['block_type'] = 2
+                item['text'] = {'elements': [{'text_run': {'content': f'{sequence}. {label}'}}]}
+        self.assertEqual(sequence, 14)
+        refresh(self.payload)
+        self.expect('FAIL', 'TEAM_MERGE')
 
     def test_missing_optional_capture_does_not_erase_actual_viewing(self):
         self.payload['review_context']['visual_check']['screenshots'] = ['missing-optional-capture.png']

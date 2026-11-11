@@ -38,7 +38,7 @@ PLATFORMS = [
     "境外其他网站",
 ]
 
-SCRIPT_VERSION = "1.11.4+writing.20261030"
+SCRIPT_VERSION = "1.11.5+native-numbering.20261111"
 DOMESTIC_TAIL = "其他境内平台暂未发现相关账号或相关内容的负面及敏感信息。"
 FOREIGN_TAIL = "其他境外平台暂未发现相关账号或相关内容的负面及敏感信息。"
 # Read the same approved template as the uploader; synthetic fixtures remain offline-only.
@@ -1557,7 +1557,9 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
         else:
             platform_positions[platform], title_blocks[platform] = matches[0]
             block = matches[0][1]
-            if block.get("block_type") == 13:
+            if block.get("block_type") != 13:
+                fail("PLATFORM_NATIVE_REQUIRED", platform, text_of(block), "native ordered-list block; handwritten text numbering is not accepted")
+            else:
                 sequence = str(block.get("ordered", {}).get("style", {}).get("sequence", ""))
                 if sequence not in {str(number), "auto"}:
                     fail("PLATFORM_SEQUENCE", platform, sequence, f"{number}, or auto only when visual review confirms visible {number}")
@@ -2484,6 +2486,29 @@ def self_test() -> int:
     result = _fixture_audit(valid)
     if result["verdict"] != "PASS":
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 1
+
+    native_auto = copy.deepcopy(valid)
+    for item in native_auto["block_list"]["items"]:
+        if item.get("block_type") == 13:
+            item["ordered"]["style"]["sequence"] = "1" if text_of(item) == PLATFORMS[0] else "auto"
+    native_auto["review_context"]["visual_check"]["checks"]["visible_platform_numbers"] = True
+    native_auto_result = _fixture_audit(native_auto)
+    if native_auto_result["verdict"] != "PASS":
+        print(json.dumps({"self_test": "native-auto-platforms", "result": native_auto_result}, ensure_ascii=False))
+        return 1
+
+    handwritten = copy.deepcopy(valid)
+    for item in handwritten["block_list"]["items"]:
+        if item.get("block_type") == 13:
+            label = text_of(item)
+            item.pop("ordered")
+            item["block_type"] = 2
+            item["text"] = {"elements": [{"text_run": {"content": f"{PLATFORMS.index(label) + 1}. {label}"}}]}
+    handwritten["raw_content"] = "\n".join(text_of(item) for item in handwritten["block_list"]["items"])
+    handwritten_result = _fixture_audit(handwritten)
+    if handwritten_result["verdict"] != "FAIL" or sum(item["code"] == "PLATFORM_NATIVE_REQUIRED" for item in handwritten_result["errors"]) != 14:
+        print(json.dumps({"self_test": "handwritten-platforms-rejected", "result": handwritten_result}, ensure_ascii=False))
         return 1
 
     missing_business_review = copy.deepcopy(valid)
