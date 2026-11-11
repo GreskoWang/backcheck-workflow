@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 from datetime import datetime
@@ -117,6 +118,40 @@ def audit_business_risk_review(
             "record_sha256": None,
             "confirmed_hits": 0,
         }
+
+    # The same discovery closure gate is used by chat and Feishu delivery.
+    # Missing/broken dependencies must not let a document-format PASS hide it.
+    consolidation = review.get("consolidation")
+    if isinstance(consolidation, dict):
+        consolidation_policy = consolidation.get("policy")
+        policy_sources_for_consolidation = review.get("policy_sources")
+        if (not isinstance(consolidation_policy, dict)
+                or not isinstance(policy_sources_for_consolidation, list)
+                or not any(isinstance(source, dict)
+                    and source.get("path") == consolidation_policy.get("path")
+                    and source.get("sha256") == consolidation_policy.get("sha256")
+                    for source in policy_sources_for_consolidation)):
+            errors.append(_finding("DISCOVERY_CONSOLIDATION_POLICY", "business_risk_review.consolidation.policy",
+                consolidation_policy, "same actual current policy source as the business-risk review"))
+    try:
+        gate_path = Path(__file__).resolve().parents[2] / "background-check-research" / "scripts" / "discovery_gate.py"
+        spec = importlib.util.spec_from_file_location("_backcheck_discovery_gate", gate_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(str(gate_path))
+        gate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gate)
+        hits_for_discovery = review.get("confirmed_hits")
+        discovery = gate.audit_discovery_review(
+            review.get("discovery_review"),
+            reported_facts=[h.get("verified_fact") for h in hits_for_discovery if isinstance(h, dict)]
+            if isinstance(hits_for_discovery, list) else None,
+            consolidation=review.get("consolidation"),
+        )
+        errors.extend(discovery["errors"])
+        blocked.extend(discovery["blocked"])
+        info.extend(discovery["info"])
+    except Exception as exc:
+        blocked.append(_finding("DISCOVERY_GATE_UNAVAILABLE", "business_risk_review.discovery_review", str(exc), "working shared discovery gate"))
 
     record_sha256 = hashlib.sha256(
         json.dumps(review, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")

@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import copy
+import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import business_risk_gate as gate
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "background-check-research" / "scripts"))
+from test_discovery_gate import fixture as discovery_fixture
 
 
 def text_block(block_id: str, text: str) -> dict:
@@ -43,6 +48,11 @@ class BusinessRiskGateTests(unittest.TestCase):
                 }
             ],
             "conflicts": [],
+            "discovery_review": {
+                "version": 1, "mode": "user_supplied", "scope": "offline business-gate fixture",
+                "instruction": "Offline fixture supplies the researched findings for formatting tests.",
+                "source_ref": "test_business_risk_gate.py#setUp",
+            },
             "reviewer_id": "reviewer",
             "checked_at": "2026-10-14T00:00:00+08:00",
         }
@@ -61,6 +71,60 @@ class BusinessRiskGateTests(unittest.TestCase):
 
     def test_current_policy_and_exact_blocks_pass(self):
         self.assertEqual(self.audit()["verdict"], "PASS")
+
+    def test_consolidation_cannot_substitute_a_different_policy_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            policy_copy = Path(directory) / "policy-copy.md"
+            policy_copy.write_bytes(gate.CURRENT_BUSINESS_RISK_POLICY.read_bytes())
+            self.review["consolidation"] = {"policy": gate.policy_source(policy_copy)}
+            result = self.audit()
+        self.assertIn("DISCOVERY_CONSOLIDATION_POLICY", {item["code"] for item in result["errors"]})
+
+    def test_missing_discovery_blocks_shared_gate(self):
+        self.review.pop("discovery_review")
+        result = self.audit()
+        self.assertEqual(result["verdict"], "FAIL")
+        self.assertIn("DISCOVERY_REVIEW_REQUIRED", {x["code"] for x in result["errors"]})
+
+    def test_known_discovery_fact_cannot_be_omitted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.review["discovery_review"] = discovery_fixture(Path(directory))
+            result = self.audit()
+        self.assertEqual(result["verdict"], "FAIL")
+        self.assertIn("DISCOVERY_REPORT_OMISSION", {x["code"] for x in result["errors"]})
+
+    def test_complete_v2_discovery_passes_shared_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            discovery = discovery_fixture(Path(directory))
+            discovery["entities"][0]["record_fact"] = self.review["confirmed_hits"][0]["verified_fact"]
+            self.review["discovery_review"] = discovery
+            result = self.audit()
+        self.assertEqual(result["verdict"], "PASS", result)
+
+    def test_skipped_item_propagates_fail_and_repair_stage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            discovery = discovery_fixture(Path(directory))
+            discovery["entities"][0]["record_fact"] = self.review["confirmed_hits"][0]["verified_fact"]
+            discovery["semantic_review"]["items"].pop()
+            self.review["discovery_review"] = discovery
+            result = self.audit()
+        self.assertEqual(result["verdict"], "FAIL", result)
+        coverage = [row for row in result["errors"] if row["code"] == "DISCOVERY_ITEM_COVERAGE"]
+        self.assertTrue(coverage)
+        self.assertEqual(coverage[0]["repair_stage"], "semantic_analysis")
+
+    def test_skipped_term_propagates_fail_from_actual_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            discovery = discovery_fixture(Path(directory))
+            discovery["entities"][0]["record_fact"] = self.review["confirmed_hits"][0]["verified_fact"]
+            receipt_path = Path(discovery["subagent_review"]["receipt_path"])
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["reviews"].pop()
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            self.review["discovery_review"] = discovery
+            result = self.audit()
+        self.assertEqual(result["verdict"], "FAIL", result)
+        self.assertIn("DISCOVERY_SUBAGENT_COVERAGE", {row["code"] for row in result["errors"]})
 
     def test_missing_review_is_blocked(self):
         result = self.audit(None)

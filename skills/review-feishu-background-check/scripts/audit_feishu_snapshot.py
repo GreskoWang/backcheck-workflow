@@ -1032,7 +1032,20 @@ def _verified_user_waived_search(module: dict[str, Any], payload: dict[str, Any]
 def audit(payload: dict[str, Any]) -> dict[str, Any]:
     if (payload.get("review_context") or {}).get("document_mode") == "team_merge":
         from team_merge_audit import audit_team
-        return audit_team(payload, audit, globals())
+        result = audit_team(payload, audit, globals())
+        try:
+            _, data, _ = normalize_input(payload)
+        except ValueError:
+            return result
+        items = data.get("items")
+        if data.get("has_more") is False and isinstance(items, list) and items and all(isinstance(item, dict) for item in items):
+            digest = hashlib.sha256(
+                json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            result["document_sha256"] = digest
+            if isinstance(result.get("receipt"), dict):
+                result["receipt"]["document_sha256"] = digest
+        return result
     errors: list[dict[str, str]] = []
     blocked: list[dict[str, str]] = []
     info: list[str] = []
@@ -1056,6 +1069,9 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
         mark_blocked("API_ITEMS", "block_list", type(items).__name__, "non-empty items array")
         return {"schema_version": 1, "script_version": SCRIPT_VERSION, "verdict": "BLOCKED", "blocked": blocked, "errors": errors, "info": info}
     current_layout_fingerprint = layout_fingerprint(items)
+    document_sha256 = hashlib.sha256(
+        json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
     if review_context is None:
         mark_blocked("REVIEW_CONTEXT", "review_context", "missing", "subject_type, stable revisions, 14 platform expectations, and risk_groups")
@@ -1186,6 +1202,31 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
     business_risk_verdict = business_result["verdict"]
     business_review_sha256 = business_result["record_sha256"]
     business_confirmed_hits_count = business_result["confirmed_hits"]
+    business_review = review_context.get("business_risk_review")
+    business_review = business_review if isinstance(business_review, dict) else {}
+    discovery_review = business_review.get("discovery_review")
+    discovery_binding = None
+    if isinstance(discovery_review, dict) and discovery_review.get("mode") == "assistant_research":
+        discovery_binding = {
+            "task_id": discovery_review.get("task_id"),
+            "source_revision": discovery_review.get("source_revision"),
+            "discovery_sha256": hashlib.sha256(json.dumps(
+                discovery_review, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")).hexdigest(),
+        }
+    policy_sha256 = None
+    if business_risk_verdict == "PASS" and business_review:
+        try:
+            current_policy = policy_source()
+            policy_sha256 = current_policy["sha256"]
+            if not any(isinstance(source, dict) and source.get("sha256") == policy_sha256
+                       and Path(str(source.get("path", ""))).resolve() == Path(current_policy["path"])
+                       for source in business_review.get("policy_sources", [])):
+                mark_blocked("BUSINESS_RISK_POLICY_EXPORT_CHANGED", "business_risk_review.policy_sources",
+                             policy_sha256, "same current policy bytes validated by the business-risk review")
+        except (OSError, ValueError, TypeError) as exc:
+            mark_blocked("BUSINESS_RISK_POLICY_EXPORT_UNREADABLE", "business_risk_review.policy_sources",
+                         str(exc), "readable current risk policy bytes")
 
     title = str(meta.get("title") or text_of(page))
     if not re.fullmatch(r"\d{1,2}\.\d{1,2}-.+", title):
@@ -1502,6 +1543,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
             if works_index + 1 >= len(root) or root[works_index + 1].get("block_type") != 22:
                 fail("WORKS_DIVIDER", works.get("block_id", ""), "not followed directly by divider", "representative works Callout immediately followed by divider")
 
+    platform_fact_roles: dict[int, set[str]] = {}
     platform_positions: dict[str, int] = {}
     title_blocks: dict[str, dict[str, Any]] = {}
     for number, platform in enumerate(PLATFORMS, 1):
@@ -1945,6 +1987,10 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     fail("RISK_FACT_CONTEXT", f"{platform} risk_items[{risk_index}]", fact_indices,
                          f"exactly {len(declared_indices)} explicitly declared fact occurrences in this platform: {risk_item['fact_text']}")
                     continue
+                if type(risk_item.get("group_index")) is int:
+                    platform_fact_roles.setdefault(risk_item["group_index"], set()).update(
+                        str(nonblank[i].get("block_id")) for i in fact_indices
+                    )
                 expected_image_count = risk_item["image_count"] if type(risk_item["image_count"]) is int and risk_item["image_count"] >= 1 else None
                 if expected_image_count is None:
                     mark_blocked("RISK_ITEM_IMAGE_SCHEMA", f"{platform} risk_items[{risk_index}].image_count", risk_item["image_count"], "integer >= 1, excluding bool")
@@ -2000,12 +2046,44 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
         if ascii_match:
             fail("PROCESS_PROSE", block.get("block_id", ""), value, f"remove internal process wording {ascii_match.group(0)}")
 
+    # The export is a structural role map, not just arbitrary existing block IDs.
+    # Top evidence can be condensed into its pin; the platform fact role remains
+    # the separately validated body occurrence for that same risk group.
+    risk_locations: list[dict[str, Any]] = []
+    if business_risk_verdict == "PASS":
+        summary_ids = risk_callout.get("children", [])[1:] if isinstance(risk_callout, dict) else []
+        for index, hit in enumerate(business_review.get("confirmed_hits", [])):
+            if not isinstance(hit, dict):
+                continue  # The shared business gate already rejects malformed hits.
+            group_index = hit.get("risk_group_index")
+            summary = hit.get("summary_location")
+            platform = hit.get("platform_location")
+            valid_group = type(group_index) is int and 1 <= group_index <= len(expected_risk_groups)
+            group = expected_risk_groups[group_index - 1] if valid_group else {}
+            allowed_platform_ids = platform_fact_roles.get(group_index, set()) if valid_group else set()
+            if isinstance(group, dict) and group.get("target_kind") == "document_block":
+                allowed_platform_ids = {str(group.get("target_block_id"))}
+            if (not valid_group or group_index > len(summary_ids)
+                    or not isinstance(summary, dict) or summary.get("block_id") != summary_ids[group_index - 1]
+                    or not isinstance(platform, dict) or platform.get("block_id") not in allowed_platform_ids):
+                fail("BUSINESS_RISK_LOCATION_ROLE", f"business_risk_review.confirmed_hits[{index}]",
+                     {"risk_group_index": group_index, "summary_location": summary, "platform_location": platform},
+                     "the actual numbered trophy summary and declared fact occurrence for this same risk group")
+                continue
+            risk_locations.append({"risk_group_index": group_index,
+                                   "summary_location": copy.deepcopy(summary),
+                                   "platform_location": copy.deepcopy(platform)})
+
     # Known deterministic defects remain FAIL even while another check is pending.
     verdict = "FAIL" if errors else ("BLOCKED" if blocked else "PASS")
     result = {
         "schema_version": 1,
         "script_version": SCRIPT_VERSION,
         "verdict": verdict,
+        "document_sha256": document_sha256,
+        "discovery_binding": discovery_binding,
+        "policy_sha256": policy_sha256,
+        "risk_locations": risk_locations,
         "document": {"title": title, "token": document_token, "revision_id": meta.get("revision_id")},
         "stats": {"blocks": len(items), "root_blocks": len(root), "platform_titles": len(platform_positions), "blocked": len(blocked), "errors": len(errors)},
         "visual": {
@@ -2033,6 +2111,10 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
             "script_version": SCRIPT_VERSION,
             "reviewer_id": reviewer_id,
             "layout_fingerprint": current_layout_fingerprint,
+            "document_sha256": document_sha256,
+            "discovery_binding": copy.deepcopy(discovery_binding),
+            "policy_sha256": policy_sha256,
+            "risk_locations": copy.deepcopy(risk_locations),
             "disclaimer_policy_version": DISCLAIMER_POLICY_VERSION,
             "text_sha256": disclaimer_result["text_sha256"],
             "business_risk_review_sha256": business_review_sha256,
@@ -2315,6 +2397,11 @@ def self_test() -> int:
                 }
             )
         context["business_risk_review"] = {
+            "discovery_review": {
+                "version": 1, "mode": "user_supplied", "scope": "offline snapshot fixture",
+                "instruction": "Offline fixture supplies researched conclusions for document tests.",
+                "source_ref": "audit_feishu_snapshot.py#_fixture_audit",
+            },
             "status": "PASS",
             "scope": "current_business_risk_policy_and_full_document",
             "token": review_document_token(doc, data["items"]),
@@ -2545,6 +2632,28 @@ def self_test() -> int:
     if risk_result["verdict"] != "PASS":
         print(json.dumps(risk_result, ensure_ascii=False, indent=2))
         return 1
+    expected_roles = [{key: copy.deepcopy(hit[key]) for key in
+                       ("risk_group_index", "summary_location", "platform_location")}
+                      for hit in risk_fixture["review_context"]["business_risk_review"]["confirmed_hits"]]
+    if (risk_result["risk_locations"] != expected_roles
+            or risk_result["receipt"]["risk_locations"] != expected_roles
+            or risk_result["policy_sha256"] != policy_source()["sha256"]
+            or risk_result["receipt"]["policy_sha256"] != risk_result["policy_sha256"]):
+        print("SELF_TEST: release binding export did not match actually validated risk roles/policy")
+        return 1
+    for field in ("summary_location", "platform_location"):
+        wrong_role = copy.deepcopy(risk_fixture)
+        wrong_hit = wrong_role["review_context"]["business_risk_review"]["confirmed_hits"][0]
+        wrong_block = next(item for item in wrong_role["block_list"]["items"] if item["block_id"] == "risk-platform-url")
+        wrong_hit[field] = block_location(wrong_block)
+        if field == "platform_location":
+            wrong_hit["verified_fact"] = text_of(wrong_block)
+        wrong_role_result = audit(wrong_role)
+        if (wrong_role_result["verdict"] != "FAIL" or "receipt" in wrong_role_result
+                or wrong_role_result["risk_locations"]
+                or not any(error["code"] == "BUSINESS_RISK_LOCATION_ROLE" for error in wrong_role_result["errors"])):
+            print(json.dumps({"wrong_risk_role": field, "result": wrong_role_result}, ensure_ascii=False, indent=2))
+            return 1
 
     # 用户明确停止的搜索可以没有虚构 URL；原话、来源与同批绑定均须真实。
     from tempfile import TemporaryDirectory

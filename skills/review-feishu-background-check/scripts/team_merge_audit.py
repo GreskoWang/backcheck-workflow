@@ -237,7 +237,14 @@ def audit_team(payload, single_audit, helpers):
         'visual': {'verdict': verdict, 'mode': visual_mode, 'layout_fingerprint': fingerprint,
                    'assigned_layout_fingerprint': assigned_fingerprint},
         'errors': errors, 'blocked': blocked, 'info': ['Other members are preserved, not certified.']}
-    if source_result: result['source_audit'] = {k: source_result.get(k) for k in ('verdict', 'document', 'business_risk_review')}
+    binding_fields = ('discovery_binding', 'policy_sha256', 'risk_locations')
+    if source_result:
+        result['source_audit'] = {k: copy.deepcopy(source_result.get(k)) for k in
+                                  ('verdict', 'document', 'business_risk_review', *binding_fields)}
+        # Only the actually audited assigned source supplies task identity. The
+        # shared document's other members and outer self-declarations do not.
+        if source_result.get('verdict') == 'PASS':
+            result.update({key: copy.deepcopy(source_result.get(key)) for key in binding_fields})
     if verdict == 'PASS':
         result['receipt'] = {'token': token, 'revision_id': revision, 'verdict': 'PASS', 'script_version': VERSION,
             'reviewer_id': rc['reviewer_id'], 'layout_fingerprint': fingerprint, 'scope': 'assigned_subject_only',
@@ -245,4 +252,5 @@ def audit_team(payload, single_audit, helpers):
             'requestId': payload['requestId'], 'assigned_layout_fingerprint': assigned_fingerprint,
             'evidence_sha256': hashlib.sha256(json.dumps(rc['team_merge_evidence'], sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
             'generated_at': datetime.now(timezone.utc).isoformat()}
+        result['receipt'].update({key: copy.deepcopy(result.get(key)) for key in binding_fields})
     return result

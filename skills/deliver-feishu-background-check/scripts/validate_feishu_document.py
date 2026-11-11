@@ -57,6 +57,14 @@ BUSINESS_RISK_GATE_PATH = (
     Path(__file__).resolve().parents[2]
     / "review-feishu-background-check" / "scripts" / "business_risk_gate.py"
 )
+CLIENT_CHALLENGE_GATE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "client-challenge-background-check" / "scripts" / "client_challenge_gate.py"
+)
+CURRENT_BUSINESS_RISK_POLICY = (
+    Path(os.environ.get("BACKGROUND_CHECK_WORKSPACE", str(Path(__file__).resolve().parents[3])))
+    / "背调风险提示.md"
+)
 PLATFORM_ORDER = tuple(PLATFORM_DISPLAY[key] for key in PLATFORMS)
 OTHER_TAILS = tuple(OTHER_TAIL_STATEMENTS.values())
 VERDICT_COLORS = {"建议谨慎评估": 1, "建议评估": 2, "低合作风险": None}
@@ -357,6 +365,89 @@ def _business_risk_gate() -> Any:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@lru_cache(maxsize=1)
+def _client_challenge_gate() -> Any:
+    """Load the release-only challenge gate without changing the initial audit."""
+    spec = importlib.util.spec_from_file_location("_feishu_client_challenge_gate", CLIENT_CHALLENGE_GATE_PATH)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {CLIENT_CHALLENGE_GATE_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _audit_client_challenge(
+    decoded: dict[str, Any], items: list[dict[str, Any]], report: Report, *, base_dir: Path
+) -> None:
+    """Require a fresh challenge before releasing assistant-researched findings."""
+    context = decoded.get("review_context")
+    context = context if isinstance(context, dict) else {}
+    business_review = context.get("business_risk_review")
+    discovery_review = business_review.get("discovery_review") if isinstance(business_review, dict) else None
+    research_mode = discovery_review.get("mode") if isinstance(discovery_review, dict) else None
+    if research_mode != "assistant_research" and "client_challenge_review" not in context:
+        # The business-risk gate separately verifies the explicit delivery-only
+        # basis. Missing or malformed discovery records cannot create a pass.
+        return
+    review = context.get("client_challenge_review")
+    if not isinstance(review, dict):
+        diagnostic = Diagnostic(
+            "ERROR", "CLIENT_CHALLENGE_REVIEW_REQUIRED",
+            "a post-audit independent client challenge is required before release",
+            "review_context.client_challenge_review",
+        )
+        if diagnostic not in report.items:
+            report.items.append(diagnostic)
+        return
+    container = _direct_snapshot_container(decoded)
+    if container is None or container.get("has_more") is not False:
+        report.error("CLIENT_CHALLENGE_DOCUMENT_INCOMPLETE", "complete current block items with has_more=false are required")
+        return
+    meta = _metadata(decoded)
+    try:
+        result = _client_challenge_gate().audit_client_challenge(
+            review,
+            discovery_review=discovery_review,
+            items=items,
+            document_token=str(meta.get("document_id") or ""),
+            revision_id=meta.get("revision_after"),
+            required_policy_path=CURRENT_BUSINESS_RISK_POLICY,
+            base_dir=base_dir,
+        )
+        if not isinstance(result, dict):
+            raise ValueError("client challenge gate did not return an object")
+        diagnostics: list[Diagnostic] = []
+        for bucket, level in (("errors", "ERROR"), ("blocked", "BLOCKED")):
+            findings = result.get(bucket)
+            if not isinstance(findings, list):
+                raise ValueError(f"client challenge gate returned malformed {bucket}")
+            for finding in findings:
+                if not isinstance(finding, dict) or not all(key in finding for key in ("code", "location", "actual", "expected")):
+                    raise ValueError(f"client challenge gate returned a malformed {bucket} finding")
+                diagnostics.append(Diagnostic(
+                    level, str(finding["code"] or "CLIENT_CHALLENGE_GATE"),
+                    f"{finding['actual']!r}; expected {finding['expected']!r}",
+                    str(finding["location"] or "review_context.client_challenge_review"),
+                ))
+        expected_verdict = "FAIL" if result["errors"] else "BLOCKED" if result["blocked"] else "PASS"
+        if result.get("verdict") != expected_verdict:
+            raise ValueError("client challenge gate returned a missing or inconsistent verdict")
+        notes = result.get("info", [])
+        if not isinstance(notes, list) or not all(isinstance(note, str) for note in notes):
+            raise ValueError("client challenge gate returned malformed info")
+        diagnostics.extend(Diagnostic("INFO", "CLIENT_CHALLENGE_REVIEW_INFO", note) for note in notes)
+        for diagnostic in diagnostics:
+            if diagnostic not in report.items:
+                report.items.append(diagnostic)
+    except Exception as exc:
+        diagnostic = Diagnostic(
+            "BLOCKED", "CLIENT_CHALLENGE_GATE_UNAVAILABLE", str(exc), "review_context.client_challenge_review"
+        )
+        if diagnostic not in report.items:
+            report.items.append(diagnostic)
 
 
 def _disclaimer_document(meta: dict[str, Any]) -> dict[str, Any]:
@@ -1973,6 +2064,11 @@ def _fixture_disclaimer_review(snapshot: dict[str, Any]) -> dict[str, Any]:
             }
         )
     context["business_risk_review"] = {
+        "discovery_review": {
+            "version": 1, "mode": "user_supplied", "scope": "offline delivery fixture",
+            "instruction": "Offline fixture supplies researched conclusions for document tests.",
+            "source_ref": "validate_feishu_document.py#_fixture_snapshot",
+        },
         "status": "PASS",
         "scope": business_gate.BUSINESS_RISK_SCOPE,
         "token": str(_metadata(snapshot).get("document_id") or ""),
@@ -2519,8 +2615,8 @@ def validation_result(
     if snapshot is not None:
         container = _direct_snapshot_container(snapshot)
         if container is not None and _looks_like_blocks(container.get("items")):
-            # A supplied Report or a changed input file cannot waive either
-            # current revision-bound manual gate.
+            # A supplied Report or a changed input file cannot waive any
+            # current revision-bound review gate.
             _audit_disclaimers(snapshot, container["items"], report)
             if payload_path is not None:
                 try:
@@ -2531,6 +2627,8 @@ def validation_result(
             else:
                 current_risk_count = sum(1 for item in container["items"] if item.get("block_type") == 6)
             _audit_business_risk(snapshot, container["items"], report, risk_count=current_risk_count)
+            if not audit_only:
+                _audit_client_challenge(snapshot, container["items"], report, base_dir=snapshot_path.resolve().parent)
         else:
             report.block("DISCLAIMER_DOCUMENT_UNREADABLE", "complete block items are required for whole-document review")
             report.block("BUSINESS_RISK_DOCUMENT_UNREADABLE", "complete block items are required for business-risk review")
@@ -2545,6 +2643,19 @@ def validation_result(
         standard_sources["../review-feishu-background-check/scripts/disclaimer_gate.py"] = file_hash(DISCLAIMER_GATE_PATH)
     if BUSINESS_RISK_GATE_PATH.is_file():
         standard_sources["../review-feishu-background-check/scripts/business_risk_gate.py"] = file_hash(BUSINESS_RISK_GATE_PATH)
+    discovery_gate_path = skill_root.parent / "background-check-research" / "scripts" / "discovery_gate.py"
+    if discovery_gate_path.is_file():
+        standard_sources["../background-check-research/scripts/discovery_gate.py"] = file_hash(discovery_gate_path)
+    if CLIENT_CHALLENGE_GATE_PATH.is_file():
+        standard_sources["../client-challenge-background-check/scripts/client_challenge_gate.py"] = file_hash(CLIENT_CHALLENGE_GATE_PATH)
+    challenge_skill_root = CLIENT_CHALLENGE_GATE_PATH.parent.parent
+    for relative in ("SKILL.md", "references/review-contract.md", "scripts/contextual_followup.py"):
+        source = challenge_skill_root / relative
+        if source.is_file():
+            standard_sources[f"../client-challenge-background-check/{relative}"] = file_hash(source)
+    consolidation_rule = skill_root.parent / "background-check-research" / "references" / "risk-consolidation.md"
+    if consolidation_rule.is_file():
+        standard_sources["../background-check-research/references/risk-consolidation.md"] = file_hash(consolidation_rule)
     clean = not report.errors and not report.blocked and not report.warnings
     return {
         "report_schema_version": "feishu-standard-validation-1.0",
@@ -2619,9 +2730,9 @@ def main() -> int:
         subject_type=args.subject_type,
     )
     print(f"STYLE_PROFILE {STYLE_PROFILE_VERSION}")
+    result = validation_result(report, audit_only=args.audit_only, snapshot_path=snapshot_path, payload_path=args.payload)
     for item in report.items:
         print(item.line())
-    result = validation_result(report, audit_only=args.audit_only, snapshot_path=snapshot_path, payload_path=args.payload)
     if args.report_json:
         # 不允许输出覆盖输入、共享校验器或 Skill。
         destination = args.report_json.resolve()

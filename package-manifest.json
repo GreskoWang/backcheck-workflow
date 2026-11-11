@@ -244,8 +244,8 @@
     },
     {
       "path": "skills/background-check-research/SKILL.md",
-      "bytes": 33188,
-      "sha256": "ccbe5c0ebb62f71e1943d38affdd9a624763d8fc52ce6a3f8bea27f0231f0e8a"
+      "bytes": 42083,
+      "sha256": "9159e77198a4f5e6774757b65d9766879ede2b8231d73f54b433b1ede6d2109a"
     },
     {
       "path": "skills/background-check-research/agents/openai.yaml",
@@ -254,8 +254,13 @@
     },
     {
       "path": "skills/background-check-research/references/access-policy.md",
-      "bytes": 12235,
-      "sha256": "8caed64fa1af49b82b68feb52dff40f19baa24a1ca08db4761c4c4ee10de0909"
+      "bytes": 16614,
+      "sha256": "8bcaa287b165535794efa94e846cf905cf3242fb38031fa9d2e8e2fb1b1efb3c"
+    },
+    {
+      "path": "skills/background-check-research/references/discovery-check.md",
+      "bytes": 18197,
+      "sha256": "75ad7dba52ae523a4dd346ccc12a79e3e8cd92dc207b3b1f3042dabb90f98714"
     },
     {
       "path": "skills/background-check-research/references/maigret.md",
@@ -264,18 +269,28 @@
     },
     {
       "path": "skills/background-check-research/references/methods.md",
-      "bytes": 40848,
-      "sha256": "1f7dfd83102cfdd05483fb2505c23977d7664f639fe1a1ea7de9a1cb12177a3d"
+      "bytes": 42708,
+      "sha256": "315e91ac27732ce9b70ca61fa176d5ffd81615ba6e0b5f96f15fc0979292c54b"
     },
     {
       "path": "skills/background-check-research/references/platform-runbook.md",
-      "bytes": 24505,
-      "sha256": "a73fe646aa1684f87ce4dede1b1c2484c69be7235cd52993f910f9a355de0dc6"
+      "bytes": 24896,
+      "sha256": "9926dfc2db5ebe57151666962387a356d9fe3753f3290f09275baf5f5c5e5f41"
+    },
+    {
+      "path": "skills/background-check-research/references/risk-consolidation.md",
+      "bytes": 6903,
+      "sha256": "d9fd704f200f903b284a9833d5e559259e5e8a6c7849d95ba7be3d0e28b58d1f"
     },
     {
       "path": "skills/background-check-research/scripts/audit_handoff_prose.py",
       "bytes": 10639,
       "sha256": "60834a211be10dae6385da154990b2331d775c65b50418f68814a7dc03d9d35f"
+    },
+    {
+      "path": "skills/background-check-research/scripts/discovery_gate.py",
+      "bytes": 38659,
+      "sha256": "442c7717368dae742100d90183c91be19361212ea27371fac0a15913b0517b82"
     },
     {
       "path": "skills/background-check-research/scripts/maigret_to_account_map.py",
@@ -303,9 +318,49 @@
       "sha256": "3cc0b01a488ba8a19906cf2dbb42b3eb08933ed277a79a65f41e2fe4419b0d56"
     },
     {
+      "path": "skills/background-check-research/scripts/test_discovery_consolidation.py",
+      "bytes": 7475,
+      "sha256": "54569d3ad72c7aa976d92cdefc5efe134260bbe4858b7cc14b5d0273d954a9f6"
+    },
+    {
+      "path": "skills/background-check-research/scripts/test_discovery_gate.py",
+      "bytes": 23271,
+      "sha256": "70bb15f4e0427d44dda1fc4796f34bb5fd74077729373a7144064eb1216c4a0a"
+    },
+    {
+      "path": "skills/client-challenge-background-check/SKILL.md",
+      "bytes": 14872,
+      "sha256": "a39b989c39a2ebe82f72d64988381b0db9b3c945a1d86ba9e5cc20825c5ae855"
+    },
+    {
+      "path": "skills/client-challenge-background-check/references/review-contract.md",
+      "bytes": 15705,
+      "sha256": "792168d526a34fc514a4a4ba6ca39c32ddba39cf711e0ffac5e3689c64fc52a1"
+    },
+    {
+      "path": "skills/client-challenge-background-check/scripts/client_challenge_gate.py",
+      "bytes": 50954,
+      "sha256": "7c2e25e02a5ed8275d8e928b91faed0f74b7951a365dd8da692862f5174418c8"
+    },
+    {
+      "path": "skills/client-challenge-background-check/scripts/contextual_followup.py",
+      "bytes": 10014,
+      "sha256": "f364dc082ebdcbace15dca06540dca26af8c1bf505bb70ca7bb352252b6bfbda"
+    },
+    {
+      "path": "skills/client-challenge-background-check/scripts/test_client_challenge_gate.py",
+      "bytes": 40319,
+      "sha256": "cfb19fd3d35228fe40244e9e6ce64d446ac33db8dcb358d872f06af536842fc9"
+    },
+    {
+      "path": "skills/client-challenge-background-check/scripts/test_contextual_followup.py",
+      "bytes": 11177,
+      "sha256": "d7542f95e155aa9f7361ea31b1628a5e7ff723ad245246a1368ded1d98383802"
+    },
+    {
       "path": "skills/deliver-feishu-background-check/SKILL.md",
-      "bytes": 26190,
-      "sha256": "83af8be7c7c0b8eed9e1730d0ae9ab9d17ede13e5a06b04066b35703671d9878"
+      "bytes": 30472,
+      "sha256": "be57c8450102d1a55caa8726a6614ed3ca0768c9bf3751bd141802d3a2083cf5"
     },
     {
       "path": "skills/deliver-feishu-background-check/agents/openai.yaml",
@@ -319,8 +374,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/references/feishu-style-guide.md",
-      "bytes": 18508,
-      "sha256": "c429782470f95fe44a6fa5a1b52f608744b309124b3fc2698488a63f72aaa69e"
+      "bytes": 18799,
+      "sha256": "4415a1047a8057bc81d8c04f87ad5159041cf63292e9d4538d13917d3a45b55f"
     },
     {
       "path": "skills/deliver-feishu-background-check/references/handoff-contract.md",
@@ -334,8 +389,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/references/platform-format.md",
-      "bytes": 51978,
-      "sha256": "4e6ddd8002f4b3cee80f10c1f3c0c6183e5b65da8f30b17dcd83cd04d07f77d5"
+      "bytes": 52629,
+      "sha256": "0b7876cf91afb35a0ff745f59eb4b1d1516fca32a60ebf1714f61430374062da"
     },
     {
       "path": "skills/deliver-feishu-background-check/scripts/review_proofs.py",
@@ -344,8 +399,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/scripts/test_delivery_gate.py",
-      "bytes": 15756,
-      "sha256": "224d966de81c276d06d35163a5ebedf5dfb137be4af0d86aa0feba116ab85628"
+      "bytes": 37531,
+      "sha256": "19911bec83fe3f0e0eab5e868ce0e78cf670cb8aba77b2a691e3cb7c3bf80f45"
     },
     {
       "path": "skills/deliver-feishu-background-check/scripts/test_review_proofs.py",
@@ -364,8 +419,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/scripts/validate_feishu_document.py",
-      "bytes": 139581,
-      "sha256": "70eb147a5036b0bbe86747bfd67474509d6fbccb76fcc99b12eb1442bf4c8874"
+      "bytes": 145846,
+      "sha256": "78609c30aa53e2894d7f6570a43af31e80f779d48dac53482756f57f38704a5d"
     },
     {
       "path": "skills/deliver-feishu-background-check/scripts/validate_research_payload.py",
@@ -379,8 +434,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/SKILL.md",
-      "bytes": 15428,
-      "sha256": "16f809d5aa6a7eecd5bfd91436247ab655690d295bf9954ec6b23379c3e1e6d3"
+      "bytes": 20500,
+      "sha256": "455395fded269485949bb9bf7553c5aaf9831dd63ba741489bb030b82939d3ed"
     },
     {
       "path": "skills/review-feishu-background-check/agents/openai.yaml",
@@ -389,23 +444,23 @@
     },
     {
       "path": "skills/review-feishu-background-check/references/review-checklist.md",
-      "bytes": 8921,
-      "sha256": "5d9ef5dffdc4a97973e567569c6a04c1887b956235ec169ebf0d4f8dfa1e61ec"
+      "bytes": 9721,
+      "sha256": "e5ed4f1c2db82e3c7a065e9d7831123e387878778a2e3f683851fd0d7fc6e095"
     },
     {
       "path": "skills/review-feishu-background-check/references/review-context-schema.md",
-      "bytes": 21900,
-      "sha256": "35669bed746260c4a4d201057edb7b434444428491ab7034dfdbaebc206571e4"
+      "bytes": 24669,
+      "sha256": "113ffc837514da727d32ed4bce7ffd5691108a7fa366646f09e440df0f165e8a"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/audit_feishu_snapshot.py",
-      "bytes": 221254,
-      "sha256": "30ba12ea2b3fccf5eec102407c8446911c3fdb16b7bc8200f16fc685587d2a1f"
+      "bytes": 228397,
+      "sha256": "19fbd41ef2cc6719fe88ec5e779f1bd36d724277784274839a43dfa2ce052b71"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/business_risk_gate.py",
-      "bytes": 22077,
-      "sha256": "d8597fff6c628c7795adbbe8277a0aa6659568ff26044bb7f42704c208d62e61"
+      "bytes": 24232,
+      "sha256": "29777c91e9c2e8a7b52812dbbff7ce961c70ac954571b49dedd8a6c74e1a57ba"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/disclaimer_gate.py",
@@ -414,13 +469,13 @@
     },
     {
       "path": "skills/review-feishu-background-check/scripts/team_merge_audit.py",
-      "bytes": 16243,
-      "sha256": "8c6f2023e3aacc7d6c83e87f00f9569a817329fe427484d8eb689b7c7f803702"
+      "bytes": 16800,
+      "sha256": "53ffd79fc96f3c15f9224235e7c5b9147f99f6331eb1af3c3dba6d962dbca2bd"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/test_business_risk_gate.py",
-      "bytes": 5209,
-      "sha256": "55ee97ce27404ea9621602450442a6b7443821777e3e603114bb8f1d5b131acc"
+      "bytes": 8859,
+      "sha256": "622d137d526787f4263bc5c08bc38ffbe0c65347df3e936435025524ad0469c4"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/test_risk_highlight_links.py",
