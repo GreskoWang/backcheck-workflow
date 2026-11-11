@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from client_challenge_gate import audit_client_challenge, document_sha256
+from client_challenge_gate import audit_client_challenge, document_sha256, discovery_sha256, _discovery_gate
 from contextual_followup import post_key
 from test_client_challenge_gate import fixture, write_json, binding
 
@@ -108,6 +108,65 @@ class ContextualFollowupTests(unittest.TestCase):
         row.update(outcome='objective_unavailable', category_ids=[], reason='Original page explicitly says deleted; closed as 无问题.')
         row['evidence'] = write_json(self.root / 'deleted.json', {'url': row['post_url'], 'text': 'This post was deleted.'})
         self.assertEqual(self.audit()['verdict'], 'PASS')
+
+    def test_nonempty_unavailable_term_crosses_discovery_challenge_and_archive_without_erasing_risk(self):
+        gate = _discovery_gate()
+        discovery = self.discovery
+        source = discovery['semantic_review']['source_batches'][0]
+        common = {key: discovery[key] for key in ('task_id', 'source_revision')}
+        discovery.update(scope='Synthetic three-post source scope', source_refs=[source['path']], open_items=[],
+            execution_review={'status': 'complete', 'source_revision': common['source_revision'],
+                'applicable_steps': list(gate.MANDATORY_STAGES), 'skipped_steps': [],
+                'steps': [{'step_id': stage, 'status': 'complete', 'evidence_refs': ['synthetic#' + stage]}
+                          for stage in gate.MANDATORY_STAGES]})
+        discovery['semantic_review'].update(status='complete', source_revision=common['source_revision'])
+        for row in discovery['semantic_review']['items']:
+            row.update(status='complete', summary='The subject mentions the named public production or event.')
+        risk_fact = binding(self.items[1])['text']
+        for index, entity in enumerate(discovery['entities']):
+            entity.update(identity='Synthetic named public production or event', relation='The source mentions its title.',
+                background_refs=entity['source_refs'][:], disposition='record' if index == 0 else 'clear',
+                reason='The verified public mention matches the synthetic policy.' if index == 0 else 'No established policy hit.')
+            if index == 0:
+                entity.update(record_fact=risk_fact, alias_evidence=[{'alias': entity['aliases'][0], 'source_refs': entity['source_refs'][:]}])
+        discovery['reverse_pass'] = {'status': 'complete', 'names': ['Qevira Stage', '奎维拉舞台', 'Orchid Festival']}
+        discovery['acquisition_manifest'] = write_json(self.root / 'acquisition-manifest.json',
+            {**common, 'source_batches': discovery['semantic_review']['source_batches']})
+        sub = discovery['subagent_review']
+        sub.update(**common, created_agent_ids=[sub['agent_id']], status='complete',
+            spawn_ref='synthetic#research-spawn', result_ref='synthetic#research-result',
+            receipt_path=str(self.root / 'research-receipt.json'))
+        unavailable = self.data['terms'][0]['occurrences'][1]
+        proof = write_json(self.root / 'deleted-access.json', {'source_ref': unavailable['post_url'],
+            'checked_at': '2026-11-11T00:00:00Z', 'access_outcome': 'objective_unavailable',
+            'access_reason': 'deleted', 'access_message': 'This post was deleted.',
+            'content_obtained': False, 'result_count': None})
+        terminal = {'status': 'complete', 'kind': 'objective_unavailable', 'conclusion': '无问题',
+            'reason': 'The original page now explicitly reports deletion.',
+            'evidence_refs': [unavailable['post_url']], 'evidence': proof}
+        discovery['entities'][0]['terminal_outcome'] = terminal
+        receipt = {'version': 2, **{key: sub[key] for key in ('agent_id', 'task_id', 'source_revision', 'status', 'spawn_ref', 'result_ref')},
+            'acquisition_sha256': discovery['acquisition_manifest']['sha256'], 'reviews': [
+                {'name': entity['name'], 'status': 'complete', 'conclusion': entity['reason'],
+                 'queries': [] if index == 0 else [{'query': entity['name'], 'source_refs': entity['background_refs']}]}
+                for index, entity in enumerate(discovery['entities'])]}
+        receipt['reviews'][0]['terminal_outcome'] = terminal
+        write_json(Path(sub['receipt_path']), receipt)
+        upstream = gate.audit_discovery_review(discovery, reported_facts=[risk_fact])
+        self.assertEqual(upstream['verdict'], 'PASS', upstream)
+        unavailable.update(outcome='objective_unavailable', category_ids=[], evidence=proof,
+            reason='Actual deletion is archived; the earlier established representative remains in the report.')
+        for key in ('initial_final_review', 'current_final_review'):
+            ref = self.review[key]
+            audit = json.loads(Path(ref['path']).read_text(encoding='utf-8'))
+            for obj in (audit, audit['receipt']):
+                obj['discovery_binding'] = {**common, 'discovery_sha256': discovery_sha256(discovery)}
+            self.review[key] = write_json(Path(ref['path']), audit)
+        self.assertEqual(self.audit()['verdict'], 'PASS', self.audit())
+        self.assertEqual(len(self.data['terms'][0]['occurrences']), 2)
+        self.assertEqual(gate.audit_discovery_review(discovery, reported_facts=[])['verdict'], 'FAIL')
+        self.data['categories'] = []
+        self.assertEqual(self.audit()['verdict'], 'FAIL')
 
     def test_no_policy_hit_can_be_archived_without_any_public_risk(self):
         self.data['categories'] = []

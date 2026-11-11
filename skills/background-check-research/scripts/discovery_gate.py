@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -35,12 +36,61 @@ def _terminal_outcome(value: Any) -> bool:
 def _incomplete_content(value: Any) -> bool:
     """Honor declared acquisition defects without guessing semantics from keywords."""
     if isinstance(value, dict):
-        if any(value.get(key) for key in ("unparsed", "truncated", "content_truncated")):
+        if any(value.get(key) for key in ("unparsed", "truncated", "content_truncated", "text_truncated", "needs_expansion")):
             return True
         if value.get("parsed") is False or value.get("parse_status") in ("unparsed", "failed", "partial"):
             return True
         return any(_incomplete_content(child) for child in value.values())
     return isinstance(value, list) and any(_incomplete_content(child) for child in value)
+
+
+def terminal_evidence_error(outcome: Any, *, base_dir: Path | None = None,
+                            expected_source_refs: Iterable[str] | None = None) -> str | None:
+    """Validate an actual, byte-bound access/empty-query observation, not unseen text.
+
+    Consumers share this narrow exception; ordinary collection failures remain
+    incomplete. Existing records are not upgraded merely by setting a status.
+    """
+    if (not isinstance(outcome, dict) or outcome.get("status") != "complete"
+            or outcome.get("kind") not in ("objective_unavailable", "no_results")
+            or not _text(outcome.get("reason")) or not _strings(outcome.get("evidence_refs"))):
+        return "completed access outcome with reason and actual source references required"
+    kind = outcome["kind"]
+    if outcome.get("conclusion") != ("无问题" if kind == "objective_unavailable" else "无相关结果"):
+        return "access conclusion does not match the observed outcome"
+    ref = outcome.get("evidence")
+    if (not isinstance(ref, dict) or set(ref) != {"path", "sha256"}
+            or not _text(ref.get("path")) or not _text(ref.get("sha256"))):
+        return "actual access evidence path and SHA-256 required"
+    try:
+        path = Path(ref["path"])
+        path = path if path.is_absolute() else (base_dir or Path.cwd()) / path
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != ref["sha256"]:
+            return "access evidence hash does not match actual source bytes"
+        proof = json.loads(raw.decode("utf-8-sig"))
+        if not isinstance(proof, dict):
+            return "access evidence must be an observed source record"
+        checked = datetime.fromisoformat(proof.get("checked_at", "").replace("Z", "+00:00"))
+        if checked.tzinfo is None or checked.utcoffset() is None:
+            return "actual access observation timestamp with timezone required"
+    except (OSError, ValueError, TypeError, UnicodeError, AttributeError) as exc:
+        return "unreadable or invalid access evidence: " + str(exc)
+    if (_incomplete_content(proof) or not _text(proof.get("source_ref"))
+            or proof["source_ref"] not in outcome["evidence_refs"]
+            or proof.get("access_outcome") != kind):
+        return "access observation must match source reference and outcome without collection defects"
+    if expected_source_refs is not None and proof["source_ref"] not in expected_source_refs:
+        return "access observation does not belong to this source batch or entity"
+    if kind == "objective_unavailable":
+        if (proof.get("access_reason") not in ("deleted", "suspended", "closed", "private", "restricted", "not_found", "media_expired")
+                or not _text(proof.get("access_message")) or proof.get("content_obtained") is not False
+                or "result_count" not in proof or proof["result_count"] is not None):
+            return "confirmed objective access reason/message required; unseen content and unknown count must stay unknown"
+    elif (proof.get("collection_complete") is not True or type(proof.get("result_count")) is not int
+          or proof["result_count"] != 0 or not _text(proof.get("observed_text"))):
+        return "actual completed zero-result query observation required"
+    return None
 
 
 def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None = None,
@@ -194,6 +244,7 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
     if batch_keys(inventory) != batch_keys(batches):
         issue("DISCOVERY_ACQUISITION_COVERAGE", ".semantic_review.source_batches", batches, "every acquisition inventory batch exactly once, including current source hashes")
     expected_items: set[tuple[str, int]] = set()
+    closed_empty_batches: set[str] = set()
     batch_ids: set[str] = set()
     batch_paths: set[Path] = set()
     for index, batch in enumerate(batches):
@@ -228,12 +279,22 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
             continue
         if _incomplete_content(source):
             issue("DISCOVERY_INCOMPLETE_SOURCE", location, batch_id, "fully parsed, untruncated acquired content")
+        if not source[key]:
+            job = source.get("job") if isinstance(source.get("job"), dict) else {}
+            source_refs = [ref for ref in (source.get("source_ref"), job.get("target_url")) if _text(ref)]
+            closure_error = terminal_evidence_error(source.get("terminal_outcome"), base_dir=base,
+                                                    expected_source_refs=source_refs)
+            if closure_error is None:
+                closed_empty_batches.add(batch_id)
+            else:
+                issue("DISCOVERY_EMPTY_SOURCE_EVIDENCE", location, closure_error,
+                      "actual empty source array with byte-bound completed no-results or objective access observation")
         for item_index, raw_item in enumerate(source[key]):
             expected_items.add((batch_id, item_index))
             if not isinstance(raw_item, (str, dict)) or not raw_item or (isinstance(raw_item, str) and not raw_item.strip()):
                 issue("DISCOVERY_RAW_ITEM", location + f".{key}[{item_index}]", raw_item, "nonempty actual acquired item")
-    if not expected_items:
-        issue("DISCOVERY_EMPTY_SOURCES", ".semantic_review.source_batches", 0, "at least one acquired item for research certification")
+    if not expected_items and (not batches or closed_empty_batches != batch_ids):
+        issue("DISCOVERY_EMPTY_SOURCES", ".semantic_review.source_batches", 0, "acquired items or evidenced closure of every actual empty batch")
     semantic_items = semantic.get("items")
     if not isinstance(semantic_items, list):
         semantic_items = []
@@ -260,12 +321,9 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
             issue("DISCOVERY_ITEM_EXTRACTION", location, item, "specific semantic reason when this item has no special nouns", stage="term_extraction")
     for identity in sorted(expected_items - covered):
         issue("DISCOVERY_ITEM_COVERAGE", ".semantic_review.items", identity, "individual semantic review of every acquired item", stage="semantic_analysis")
-    if not extracted_names:
-        issue("DISCOVERY_EXTRACTION_EMPTY", ".semantic_review.items", [], "nonempty actual task term extraction; empty extraction cannot certify completion", stage="term_extraction")
-
     entities = review.get("entities")
-    if not isinstance(entities, list) or not entities:
-        issue("DISCOVERY_ENTITIES", ".entities", entities, "nonempty deduplicated entity list", stage="term_extraction")
+    if not isinstance(entities, list):
+        issue("DISCOVERY_ENTITIES", ".entities", entities, "deduplicated entity list reconciled with actual extraction", stage="term_extraction")
         entities = []
     known_names: dict[str, int] = {}
     if reported_facts is not None and (not isinstance(reported_facts, (list, tuple, set)) or not all(_text(f) for f in reported_facts)):
@@ -477,9 +535,13 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
         if receipt.get(field) != expected or (field == "version" and type(receipt.get(field)) is not int):
             issue("DISCOVERY_RECEIPT_BINDING", ".subagent_review.receipt." + field, receipt.get(field), f"match {expected}", stage="term_subagent_review")
     term_reviews = receipt.get("reviews")
-    if not isinstance(term_reviews, list) or not term_reviews:
+    if not isinstance(term_reviews, list) or (entities and not term_reviews):
         term_reviews = []
         issue("DISCOVERY_SUBAGENT_TERMS", ".subagent_review.receipt.reviews", receipt.get("reviews"), "actual query and review for every unique term", stage="term_subagent_review")
+    if not entities and (not _text(receipt.get("no_special_terms_reason"))
+                         or receipt.get("source_refs") != review.get("source_refs")):
+        issue("DISCOVERY_EMPTY_TERM_REVIEW", ".subagent_review.receipt", receipt,
+              "independent source-bound no-special-terms conclusion, never fabricated queries", stage="term_subagent_review")
     reviewed_entities: set[int] = set()
     for index, term in enumerate(term_reviews):
         location = f".subagent_review.receipt.reviews[{index}]"
@@ -494,7 +556,14 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
         if term.get("status") != "complete" or not _text(term.get("conclusion")):
             issue("DISCOVERY_SUBAGENT_INCOMPLETE", location, term, "completed term-specific conclusion", stage="term_subagent_review")
         queries = term.get("queries")
-        if not isinstance(queries, list) or not queries:
+        terminal = entities[entity_index].get("terminal_outcome") if entity_index is not None else None
+        entity = entities[entity_index] if entity_index is not None else {}
+        source_refs = [ref for key in ("source_refs", "background_refs")
+                       for ref in (entity.get(key) if isinstance(entity.get(key), list) else []) if _text(ref)]
+        unavailable = (isinstance(terminal, dict) and terminal.get("kind") == "objective_unavailable"
+                       and terminal_evidence_error(terminal, base_dir=base, expected_source_refs=source_refs) is None
+                       and term.get("terminal_outcome") == terminal)
+        if not isinstance(queries, list) or (not queries and not unavailable):
             queries = []
             issue("DISCOVERY_SUBAGENT_QUERIES", location, term.get("queries"), "actual queries with inspected source refs", stage="term_subagent_review")
         for query in queries:
@@ -505,8 +574,12 @@ def audit_discovery_review(review: Any, *, reported_facts: Iterable[str] | None 
 
     reverse = review.get("reverse_pass")
     reverse = reverse if isinstance(reverse, dict) else {}
-    if reverse.get("status") != "complete" or not _strings(reverse.get("names")):
+    if reverse.get("status") != "complete" or not _strings(reverse.get("names"), nonempty=bool(entities)):
         issue("DISCOVERY_REVERSE_REVIEW", ".reverse_pass", reverse, "completed source-first reverse review with actual names", stage="reverse_review")
+    if not entities and (not _text(reverse.get("no_special_terms_reason"))
+                         or reverse.get("source_refs") != review.get("source_refs")):
+        issue("DISCOVERY_EMPTY_REVERSE_REVIEW", ".reverse_pass", reverse,
+              "source-first empty-term review with specific reason and current source refs", stage="reverse_review")
     reverse_names = {_name(name) for name in reverse.get("names", []) if _text(name)} if isinstance(reverse.get("names"), list) else set()
     for name in sorted(reverse_names - set(known_names)):
         issue("DISCOVERY_UNRESOLVED_NAME", ".reverse_pass.names", name, "resolved entity entry or verified alias", stage="term_extraction")

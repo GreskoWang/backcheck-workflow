@@ -20,6 +20,8 @@ from disclaimer_gate import (DISCLAIMER_POLICY_VERSION, audit_disclaimer_review,
                              review_document_token, review_text_fingerprint)
 from business_risk_gate import (audit_business_risk_review, block_location,
                                 policy_source)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "background-check-research" / "scripts"))
+from discovery_gate import terminal_evidence_error
 
 PLATFORMS = [
     "微博",
@@ -38,7 +40,7 @@ PLATFORMS = [
     "境外其他网站",
 ]
 
-SCRIPT_VERSION = "1.11.5+native-numbering.20261111"
+SCRIPT_VERSION = "1.11.6+evidence-closure.20261111"
 DOMESTIC_TAIL = "其他境内平台暂未发现相关账号或相关内容的负面及敏感信息。"
 FOREIGN_TAIL = "其他境外平台暂未发现相关账号或相关内容的负面及敏感信息。"
 # Read the same approved template as the uploader; synthetic fixtures remain offline-only.
@@ -919,6 +921,39 @@ def audit_internal_jump(items: list[dict[str, Any]], token: str, source_block_id
     return issues
 
 
+def _objective_unavailable_issue(evidence: dict[str, Any], module_text: str,
+                                 count_key: str, platform: str) -> str | None:
+    """Use the acquisition proof, never an inferred zero or the final document."""
+    outcome = evidence.get("terminal_outcome")
+    issue = terminal_evidence_error(outcome)
+    if issue:
+        return issue
+    if outcome.get("kind") != "objective_unavailable":
+        return "objective_unavailable requires a matching access outcome"
+    # The shared gate has checked the file bytes and hash; bind it to this module.
+    try:
+        proof = json.loads(Path(outcome["evidence"]["path"]).read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        return f"cannot reread access evidence: {exc}"
+    if URL_RE.findall(module_text) != [proof["source_ref"]]:
+        return "access evidence must identify this module's single visible URL"
+    if evidence.get("source_locator") not in (outcome["evidence"]["path"], proof["source_ref"]):
+        return "source_locator must identify the verified access evidence"
+    if evidence.get("checked_at") != proof["checked_at"]:
+        return "checked_at must match the verified access evidence"
+    if count_key not in evidence or evidence[count_key] is not None:
+        return f"unknown access count requires explicit {count_key}=null"
+    if any(key.startswith("related_result_count_") for key in evidence):
+        return "unknown access count cannot be mixed with a verified-minimum count claim"
+    if platform == "B站" and count_key == "related_result_count":
+        for record in (evidence, proof):
+            surfaces = record.get("checked_surfaces")
+            if (not isinstance(surfaces, list) or not all(isinstance(s, str) for s in surfaces)
+                    or not {"video", "article"}.issubset(surfaces)):
+                return "Bilibili access evidence must cover video and article"
+    return None
+
+
 def _search_result_count_issue(evidence: dict[str, Any], status: str) -> tuple[str, str] | None:
     """只校验当前查询模块的零/有相关分支；其他路线内容不并入该查询计数。"""
     minimum_keys = (
@@ -1601,7 +1636,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 mark_blocked("MODULE_CONTEXT_COUNT", f"review_context.platforms.{platform}.modules", len(context_modules), str(expected_module_count))
             if platform in {"境内其他内容", "境外其他网站"} and len(context_modules) < 1:
                 mark_blocked("MODULE_CONTEXT_COUNT", f"review_context.platforms.{platform}.modules", len(context_modules), "at least the mandatory Baidu/Google module")
-            allowed_statuses = {"no_result", "checked_clean", "risk", "incomplete", "not_applicable"}
+            allowed_statuses = {"no_result", "checked_clean", "risk", "incomplete", "not_applicable", "objective_unavailable"}
             for module_index, module in enumerate(context_modules):
                 if module.get("status") not in allowed_statuses or not isinstance(module.get("text"), str):
                     mark_blocked("MODULE_STATUS", f"review_context.platforms.{platform}.modules[{module_index}]", module, f"string text and status in {sorted(allowed_statuses)}")
@@ -1689,6 +1724,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     if forbidden in module_text:
                         fail("SUBJECT_LABEL", platform, module_text, f"{subject_type}-appropriate homepage and subject wording")
 
+            closed_module_texts: set[str] = set()
             for module_index, module in enumerate(context_modules):
                 if not isinstance(module, dict) or not isinstance(module.get("text"), str):
                     continue
@@ -1743,7 +1779,22 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(evidence.get("checked_at"), str) or not re.match(r"^\d{4}-\d{2}-\d{2}T", evidence.get("checked_at", "")):
                     mark_blocked("FACT_EVIDENCE_TIME", f"{evidence_location}.checked_at", evidence.get("checked_at"), "ISO-8601 timestamp")
 
-                if is_search_result and status in {"no_result", "checked_clean", "risk"}:
+                access_closed = False
+                if status == "objective_unavailable" or (status == "risk" and "terminal_outcome" in evidence):
+                    count_key = ("related_result_count" if is_search_result else
+                                 "confirmed_homepage_count" if is_home else "related_topic_count")
+                    access_issue = _objective_unavailable_issue(evidence, module_text, count_key, platform)
+                    if access_issue:
+                        mark_blocked("OBJECTIVE_UNAVAILABLE_EVIDENCE", evidence_location, evidence, access_issue)
+                    else:
+                        access_closed = True
+                        if status == "objective_unavailable":
+                            if not re.search(r"https?://\S+ 无问题$", module_text):
+                                fail("OBJECTIVE_UNAVAILABLE_TEXT", evidence_location, module_text, "source URL followed by 无问题")
+                            else:
+                                closed_module_texts.add(module_text)
+
+                if is_search_result and status in {"no_result", "checked_clean", "risk"} and not access_closed:
                     count_issue = _search_result_count_issue(evidence, status)
                     if count_issue is not None:
                         issue_code, requirement = count_issue
@@ -1758,7 +1809,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         checked_surfaces = evidence.get("checked_surfaces")
                         if not isinstance(checked_surfaces, list) or not {"video", "article"}.issubset(set(checked_surfaces)):
                             mark_blocked("BILIBILI_SURFACES", f"{evidence_location}.checked_surfaces", checked_surfaces, "list covering both video and article")
-                if is_home and status in {"no_result", "checked_clean", "risk"}:
+                if is_home and status in {"no_result", "checked_clean", "risk"} and not access_closed:
                     confirmed_count = evidence.get("confirmed_homepage_count")
                     suspected_count = evidence.get("suspected_homepage_count")
                     if not isinstance(confirmed_count, int) or confirmed_count < 0:
@@ -1790,7 +1841,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                             {"status": status, "confirmed_homepage_count": confirmed_count, "suspected_homepage_count": suspected_count},
                             "explicit suspected-homepage label requires suspected_homepage_count>=1",
                         )
-                if is_topic and status in {"no_result", "checked_clean", "risk"}:
+                if is_topic and status in {"no_result", "checked_clean", "risk"} and not access_closed:
                     related_topic_count = evidence.get("related_topic_count")
                     if not isinstance(related_topic_count, int) or related_topic_count < 0:
                         mark_blocked("TOPIC_RESULT_COUNT", f"{evidence_location}.related_topic_count", related_topic_count, "integer >= 0")
@@ -1883,7 +1934,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         expected = NO_HOME_EXACT[platform]
                         if home_text != expected:
                             fail("NO_HOME_TEXT", platform, home_text, expected)
-                    elif not context_risk_items:
+                    elif not context_risk_items and home_text not in closed_module_texts:
                         home_endings = ("相关内容无问题",) if platform == "豆瓣" else ("无问题",)
                         if "http" in home_text and not home_text.endswith(home_endings):
                             fail("HOME_CONCLUSION", platform, home_text, "homepage URL followed by platform-specific no-risk phrase")
@@ -1894,7 +1945,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         allowed_endings = SEARCH_ENDINGS.get(platform)
                         if allowed_endings is None:
                             fail("SEARCH_MODULE_FORBIDDEN", platform, search_text, "no keyword-search module under the current platform contract")
-                        elif not search_text.endswith(allowed_endings):
+                        elif search_text not in closed_module_texts and not search_text.endswith(allowed_endings):
                             fail("SEARCH_CONCLUSION", platform, search_text, "one exact clean conclusion from platform-format.md")
 
                 if platform == "微博" and len(numbered) >= 3 and "无超话/话题" in numbered[2][1] and numbered[2][1] != "（3）无超话/话题；":
@@ -1913,7 +1964,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     no_home = re.match(r"^（1）无(?:个人|官方|项目)主页；$", home_text) is not None
                     if no_home and time_lines:
                         fail("X_TIME_WITHOUT_HOME", platform, time_lines, "no back-check time when no homepage")
-                    if confirmed_home and not time_lines:
+                    if confirmed_home and not time_lines and home_text not in closed_module_texts:
                         fail("X_TIME_REQUIRED", platform, "missing", "exactly one line such as 背调时间：2019年2月—至今")
                     if len(time_lines) > 1:
                         fail("X_TIME_COUNT", platform, time_lines, "exactly one back-check time line")
@@ -1934,7 +1985,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     fail("OTHER_NUMBER", platform, nums, "fullwidth numbering from 1 without gaps")
                 if not values or not values[0].startswith("（1）百度关键词搜索："):
                     fail("DOMESTIC_FIRST", platform, values[:1], "（1）百度关键词搜索：…")
-                elif not context_risk_items and not values[0].endswith(SEARCH_ENDINGS[platform]):
+                elif not context_risk_items and values[0] not in closed_module_texts and not values[0].endswith(SEARCH_ENDINGS[platform]):
                     fail("DOMESTIC_BAIDU", platform, values[0], "Baidu URL followed by 无相关内容 or 相关内容无问题")
                 if not nonblank or text_of(nonblank[-1]) != DOMESTIC_TAIL:
                     fail("DOMESTIC_TAIL", platform, text_of(nonblank[-1]) if nonblank else "", DOMESTIC_TAIL)
@@ -1945,7 +1996,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     fail("OTHER_NUMBER", platform, nums, "fullwidth numbering from 1 without gaps")
                 if not values or not values[0].startswith("（1）谷歌关键词搜索："):
                     fail("FOREIGN_FIRST", platform, values[:1], "（1）谷歌关键词搜索：…")
-                elif not context_risk_items and not values[0].endswith(SEARCH_ENDINGS[platform]):
+                elif not context_risk_items and values[0] not in closed_module_texts and not values[0].endswith(SEARCH_ENDINGS[platform]):
                     fail("FOREIGN_GOOGLE", platform, values[0], "Google URL followed by 无相关内容 or 相关内容无问题")
                 if not nonblank or text_of(nonblank[-1]) != FOREIGN_TAIL:
                     fail("FOREIGN_TAIL", platform, text_of(nonblank[-1]) if nonblank else "", FOREIGN_TAIL)

@@ -19,8 +19,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 11287,
-      "sha256": "e4c1f193dd6ac4019438190ea2ad6c335667a4771b567a095f7fe1cf19d37678"
+      "bytes": 11646,
+      "sha256": "5c07fff659d9374d5a007b4545be1340d3649cd798b9e0ae8432d7e5d7d553e8"
     },
     {
       "path": "README.md",
@@ -234,8 +234,8 @@
     },
     {
       "path": "scripts/run-regression.py",
-      "bytes": 7196,
-      "sha256": "4a9d34a6666cd7a4af1134c67767e0306993ae79f122313ad137a8599ae2de1a"
+      "bytes": 7260,
+      "sha256": "d3b966c34f018b42e110166f4081ea4136af80fcbc7cb922db77985a49de8e6d"
     },
     {
       "path": "scripts/test_package.py",
@@ -244,8 +244,8 @@
     },
     {
       "path": "skills/background-check-research/SKILL.md",
-      "bytes": 42338,
-      "sha256": "7d10f5de0709b0a6b55a2f9892ef44509a12fb639447a1abcbee695539b9e702"
+      "bytes": 42626,
+      "sha256": "a3a9dc4ae5b30b584be9d2fd1e23baac2f76523487725976df08ceefa467ba1b"
     },
     {
       "path": "skills/background-check-research/agents/openai.yaml",
@@ -264,8 +264,8 @@
     },
     {
       "path": "skills/background-check-research/references/discovery-check.md",
-      "bytes": 18197,
-      "sha256": "75ad7dba52ae523a4dd346ccc12a79e3e8cd92dc207b3b1f3042dabb90f98714"
+      "bytes": 20591,
+      "sha256": "f4ba2d49797737943da549b240dfc434ff01b63bee07588c5361e4f71ced83c9"
     },
     {
       "path": "skills/background-check-research/references/maigret.md",
@@ -294,8 +294,8 @@
     },
     {
       "path": "skills/background-check-research/scripts/discovery_gate.py",
-      "bytes": 38659,
-      "sha256": "442c7717368dae742100d90183c91be19361212ea27371fac0a15913b0517b82"
+      "bytes": 44080,
+      "sha256": "99d6ab9e989ffd3876c6aab010fb61a10b29f855f909417803bcb0f94a89c267"
     },
     {
       "path": "skills/background-check-research/scripts/maigret_to_account_map.py",
@@ -329,8 +329,8 @@
     },
     {
       "path": "skills/background-check-research/scripts/test_discovery_gate.py",
-      "bytes": 23271,
-      "sha256": "70bb15f4e0427d44dda1fc4796f34bb5fd74077729373a7144064eb1216c4a0a"
+      "bytes": 34014,
+      "sha256": "4e94a7c7643798e38fc2b1b8c1d699b41bb3111de80be9f103ce5f3fc9bf7b26"
     },
     {
       "path": "skills/client-challenge-background-check/SKILL.md",
@@ -339,13 +339,13 @@
     },
     {
       "path": "skills/client-challenge-background-check/references/review-contract.md",
-      "bytes": 15705,
-      "sha256": "792168d526a34fc514a4a4ba6ca39c32ddba39cf711e0ffac5e3689c64fc52a1"
+      "bytes": 16509,
+      "sha256": "1658bdf8045c919a3ca2ac6c82c83c231a1fe491a7a885151290cb6a6ab8429a"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/client_challenge_gate.py",
-      "bytes": 50954,
-      "sha256": "7c2e25e02a5ed8275d8e928b91faed0f74b7951a365dd8da692862f5174418c8"
+      "bytes": 52068,
+      "sha256": "9edf7914644f51c9c7771c33e9ebef2c6b0879271af39f42072ffcd9af7e13d2"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/contextual_followup.py",
@@ -354,13 +354,13 @@
     },
     {
       "path": "skills/client-challenge-background-check/scripts/test_client_challenge_gate.py",
-      "bytes": 40319,
-      "sha256": "cfb19fd3d35228fe40244e9e6ce64d446ac33db8dcb358d872f06af536842fc9"
+      "bytes": 45404,
+      "sha256": "540087a9fd26ef03de6c896e3baa0116c4ab4bf79d97d936612e06614bff5b78"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/test_contextual_followup.py",
-      "bytes": 11177,
-      "sha256": "d7542f95e155aa9f7361ea31b1628a5e7ff723ad245246a1368ded1d98383802"
+      "bytes": 15983,
+      "sha256": "5aadeabe76a5fe43fdf1ebea5c108ba8d1896e4a6871ccc12b8da6a1a659a4dd"
     },
     {
       "path": "skills/deliver-feishu-background-check/SKILL.md",
@@ -439,8 +439,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/SKILL.md",
-      "bytes": 20646,
-      "sha256": "30d6be5eeaa89623c4c43a0662a32f85b68f2f20b9e4f3418cb45d0c0c20fc71"
+      "bytes": 22161,
+      "sha256": "ba09653a998637ca2056f43b5c547fe9df17eeca06375ff67a20aacfe66855c5"
     },
     {
       "path": "skills/review-feishu-background-check/agents/openai.yaml",
@@ -454,13 +454,13 @@
     },
     {
       "path": "skills/review-feishu-background-check/references/review-context-schema.md",
-      "bytes": 24669,
-      "sha256": "113ffc837514da727d32ed4bce7ffd5691108a7fa366646f09e440df0f165e8a"
+      "bytes": 26671,
+      "sha256": "fbb47a4aa4a3c0ed2f6c1cb215a8af42df28a2ca14aeeb4bc889cf9314875f13"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/audit_feishu_snapshot.py",
-      "bytes": 229925,
-      "sha256": "46305423e11f67f8e610458a2ad436dc0189b9fd95f08f154bcc5f5d6768b151"
+      "bytes": 233420,
+      "sha256": "abc00b860b27b03a8911f082b7e774103f2264ef7abb4885c66b8fb5635791e2"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/business_risk_gate.py",
@@ -481,6 +481,11 @@
       "path": "skills/review-feishu-background-check/scripts/test_business_risk_gate.py",
       "bytes": 8859,
       "sha256": "622d137d526787f4263bc5c08bc38ffbe0c65347df3e936435025524ad0469c4"
+    },
+    {
+      "path": "skills/review-feishu-background-check/scripts/test_objective_unavailable.py",
+      "bytes": 9676,
+      "sha256": "80ef31a4bed95eab1c337be31ab79f09d628c4af4367b5e8227f986bf7e21eb2"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/test_risk_highlight_links.py",
@@ -1044,8 +1049,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/bridge.mjs",
-      "bytes": 36891,
-      "sha256": "27aa356f373c82be8dac4643fe68b2dd336ab8182e209f392c872478cbade35a"
+      "bytes": 36938,
+      "sha256": "62ce36fdcdba464c415ab655002df672abcdffa939b3dc16e59c0fc2b3292f91"
     },
     {
       "path": "tools/feishu-codex-bridge/src/check-dispatch.mjs",
@@ -1129,8 +1134,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/dispatch-intake-effects.mjs",
-      "bytes": 3925,
-      "sha256": "aa034a717d05bbaef437394ccfb42bb394ecd2fa97431236c261f89476c49109"
+      "bytes": 4289,
+      "sha256": "347f1c00e5345b164d427cf950972c50c52c0ed67b78390a2e48d663b6809f7f"
     },
     {
       "path": "tools/feishu-codex-bridge/src/dispatch-scope.mjs",
@@ -1154,8 +1159,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/group-policy.mjs",
-      "bytes": 4989,
-      "sha256": "268cf409d74bfd1e078c5d5983c537fe04269324c0705e183076b56ccb0ebd98"
+      "bytes": 5185,
+      "sha256": "566cc3fa8d8df41da1a2dc8ff9f45de92dabd90fe01681a09dad5ee308adc925"
     },
     {
       "path": "tools/feishu-codex-bridge/src/instance-lock.mjs",
@@ -1164,8 +1169,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/src/intake-accounting-gate.mjs",
-      "bytes": 438,
-      "sha256": "ca672d95688ab1fb183fd815f0c0860c24027b4ec520d2fc4e6960ae98b53d66"
+      "bytes": 1181,
+      "sha256": "50ae8b0a6b86a7bb1be35ea2c418dc93afec1a91d0d1e567b8810d83812116ed"
     },
     {
       "path": "tools/feishu-codex-bridge/src/job-pause.mjs",
@@ -1454,8 +1459,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/test/group-policy.test.mjs",
-      "bytes": 3924,
-      "sha256": "2f2d09d9127caa5b65086b2f6b3390e0446c4c659c7f41d694328338ab279bc9"
+      "bytes": 4680,
+      "sha256": "47506cf664b6614bc60b6822686f47328335bab1fa953724b0460c2a77cd4a51"
     },
     {
       "path": "tools/feishu-codex-bridge/test/instance-lock.test.mjs",
@@ -1464,8 +1469,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/test/intake-accounting-gate.test.mjs",
-      "bytes": 1695,
-      "sha256": "d053f72b9f4f3d883bb94bf0ea417d24e27514e07567df5f01c54f2b8e6cd1d1"
+      "bytes": 10755,
+      "sha256": "672f778733b54151ced689fe415ae96ab21b9625b88028f2ed1b3e8979ba92fa"
     },
     {
       "path": "tools/feishu-codex-bridge/test/job-pause.test.mjs",
@@ -1554,8 +1559,8 @@
     },
     {
       "path": "tools/feishu-codex-bridge/test/special-preflight.test.mjs",
-      "bytes": 9302,
-      "sha256": "29db8b5143bdbd327f5ba40da9bc57c1073e0955be6d306f9250a8a450dc4eea"
+      "bytes": 16124,
+      "sha256": "3469b9f2adb5c5e558494b652017498245b20d0e77945bea1a0336cb192d9fd6"
     },
     {
       "path": "tools/feishu-codex-bridge/test/special-pricing.test.mjs",

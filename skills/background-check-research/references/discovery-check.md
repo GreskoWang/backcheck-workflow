@@ -17,7 +17,7 @@
 - 子代理对**全部名词逐条查询并审核**：实际对象、名称和别名、相关背景、主体在原文中的行为及业务口径。每个名词保留实际查询、所读来源和明确结论。不能按知名度、褒贬、是否命中风险词抽样；“我知道这个名字”不能替代本次查询。确认的同一对象别名可合并一次查询，必须记录别名依据；同名不同实体须分开。
 - 每个名词一次有边界主查询，必要时一次备用。已完成有界查询仍未查清的，保留事实未知和查询依据，但核查执行已完成，不无限挂待办。已确认客观不可访问的按[访问结项规则](access-policy.md#客观不可访问项按无问题结项)记“无问题”结项。逐项名词查询不占用人物 1—3 组主动扩搜额度，也不能因额度耗尽而跳过；真实未执行查询与执行后未知必须区分，访问权限、同域名互斥和止损规则继续适用。
 - 子代理逐项给出 `record`、`clear` 或 `pending`，以完整查询回执返回。不得把批评、讽刺、观看作品、实际参加、支持、成员身份或募资混为一谈。名称出现本身不自动证明支持或敏感个人属性。
-- 主代理核对所有提取名词均有对应审核、所有查询有来源、真实子代理返回与回执一致。漏审一个名词、只有批量总评、空清单或未完成返回均立即 FAIL，交回这个子代理补齐，禁止主代理代签。反查发现的新名词通过 followup 交给同一子代理，不另起一组代理。
+- 主代理核对所有提取名词均有对应审核、所有查询有来源、真实子代理返回与回执一致。漏审一个名词、只有批量总评、无依据的空清单或未完成返回均立即 FAIL，交回这个子代理补齐，禁止主代理代签。真实无名词时仍由该子代理核对完整来源及无名词依据，不编造名词或查询回执。反查发现的新名词通过 followup 交给同一子代理，不另起一组代理。
 
 ## 阅读时先识别对象
 
@@ -43,7 +43,13 @@
 
 `execution_review.applicable_steps` 根据原范围列齐当前阶段之前适用的全部步骤，至少包含下面的五个发现步骤；账号确认、平台搜索、媒体检查等也要列入，交付和画像补查进入对应阶段时追加。每步有真实依据；`skipped_steps` 是尚未补做的跳步，不为空即 FAIL，必须补做后才能清除。
 
-`semantic_review.source_batches` 登记全部实际 JSON 批次的绝对路径、唯一批次 ID、条目数组键名和文件 SHA-256；脚本重新读取文件核对条目索引和指纹。非标准来源先在同一缓存中保留真实来源映射，不能只导出命中部分。每条分析有 `batch_id`、零起始 `item_index`、`status:"complete"`、语义 `summary` 和全部原文 `names`；单条无名词时写 `no_special_terms_reason`。整体未提取或空名词清单一律 FAIL 并退回复核；确实无法形成名词的输入如实说明，不编造名词凑数。
+`semantic_review.source_batches` 登记全部实际 JSON 批次的绝对路径、唯一批次 ID、条目数组键名和文件 SHA-256；脚本重新读取文件核对条目索引和指纹。非标准来源先在同一缓存中保留真实来源映射，不能只导出命中部分。每条分析有 `batch_id`、零起始 `item_index`、`status:"complete"`、语义 `summary` 和全部原文 `names`；单条无名词时写 `no_special_terms_reason`。漏采集、未提取、漏审仍 FAIL；完整逐条语义确实没有特殊名词时，允许 `entities:[]`，但子代理真实回执与 `reverse_pass` 均须保留具体 `no_special_terms_reason` 和与调查记录完全一致的 `source_refs`，并继续满足独立代理、版本和采集清单绑定。不得用空表豁免实际审核或编造名词凑数。
+
+真实零材料仍登记实际空条目数组的来源批次与指纹，不能省略 `source_batches`；源文件的 `source_ref` 或采集器既有 `job.target_url` 必须与实际访问证据的来源一致。该源文件须有 `terminal_outcome:{status:"complete",kind,conclusion,reason,evidence_refs,evidence:{path,sha256}}`，指向真实访问／查询观察 JSON。`kind:"no_results"` 对应 `conclusion:"无相关结果"`；观察保存 `source_ref`、含时区的 `checked_at`、`access_outcome:"no_results"`、`collection_complete:true`、实际 `result_count:0` 和 `observed_text`。真实查询未执行、结果未知或仅空白加载不能使用此分支。
+
+`kind:"objective_unavailable"` 对应 `conclusion:"无问题"`；观察保存同样的来源和时间、`access_outcome:"objective_unavailable"`、已确认的 `access_reason`（`deleted/suspended/closed/private/restricted/not_found/media_expired`）、真实 `access_message`、`content_obtained:false`、`result_count:null`。`source_ref` 必须包含在 `evidence_refs` 中，文件字节与指纹一致；未知数量保持未知，不声称读到正文。普通超时、加载空白、工具错误、未读和缺证据不属于客观结项。已有风险继续记录，不能以访问结项清除。名词背景查询只能确认访问终态时，实体与独立子代理对应回执保存同一已核验 `terminal_outcome`，访问证据来源须属于该实体的 `source_refs/background_refs`，才允许 `queries:[]`，不编造搜索结果或已读来源。
+
+上述访问证据由研究、质询及终审共用 `terminal_evidence_error` 检查；旧记录不会自动补证或变为通过。所有采集不完整标志继续拒绝，包括实际采集器的 `text_truncated`、`needs_expansion`；即使已有语义记录且指纹匹配，也须取得完整来源、重新绑定指纹并完成相应阅读。
 
 采集时同步生成原始批次清单（复用采集器现有 manifest），由 `acquisition_manifest:{path,sha256}` 引用，其 JSON 内容为 `{task_id,source_revision,source_batches:[{batch_id,path,items_key,sha256}]}`。逐条分析的批次集合必须与此采集清单完全相等，防止少申报整批材料；不能在审阅后按已分析子集反造采集清单。主代理核对采集真实返回与清单一致，脚本无法发现从未登记的来源。名词子代理回执另绑定 `acquisition_sha256`，对应本次采集清单的实际指纹。
 
@@ -118,7 +124,7 @@ python "$env:BACKCHECK_SKILLS_ROOT/background-check-research/scripts/discovery_g
 
 脚本读取实际批次和子代理回执，核对逐条覆盖、提取是否缺失／为空、是否漏审名词、别名依据、当次一个独立子代理、版本、跳步和最终事实。它**不联网、不识别未知实体，也不能证明语义零遗漏或认证代理调用真伪**；终审必须对照真实创建／返回消息，不能只接受自填 ID 或 PASS。对话交付提供 `reported_facts`；飞书共享业务门禁把 `record_fact` 与 `confirmed_hits` 比对。
 
-**没有提取名词、任何名词未全部审阅、逐条语义缺项、跳过适用步骤、缺子代理依据或过期记录均立即 FAIL。** 按返回的 `repair_stage` 补做最早缺失规则，再重新审阅，禁止继续进入下游完成阶段。应记事实漏报同样 FAIL。真实源文件／回执访问故障可返回 BLOCKED，但不能把缺记录、漏查或空表伪装成访问故障。工具失败不自动改变 Goal 状态；用户明确范围变更按原话处理。
+**漏提取、任何实际名词未全部审阅、逐条语义缺项、跳过适用步骤、缺子代理依据或过期记录均立即 FAIL。** 有实际来源和独立审核依据的真实无名词／零材料按上述分支结项，不作为待办；不能用空表替代这些依据。按返回的 `repair_stage` 补做最早缺失规则，再重新审阅，禁止继续进入下游完成阶段。应记事实漏报同样 FAIL。真实源文件／回执访问故障可返回 BLOCKED，但不能把缺记录、漏查或空表伪装成访问故障。工具失败不自动改变 Goal 状态；用户明确范围变更按原话处理。
 
 ## 修改方法后的验证
 

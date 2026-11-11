@@ -38,7 +38,7 @@
 
 ## 业务风险一致性复核
 
-`review_context.business_risk_review.discovery_review` 必须原样复用当前调查状态的完整 v2 对象，结构见[逐条语义与特殊名词审核](../../background-check-research/references/discovery-check.md)。共享业务门禁调用 `background-check-research/scripts/discovery_gate.py`，读取实际源批次和子代理回执；默认将 `confirmed_hits[*].verified_fact` 与实体 `record_fact`／`record_facts` 逐项比对；按类别精简终稿时，在同一业务复核对象提供 `consolidation`，遵循[发现门禁分类合并合同](../../background-check-research/references/risk-consolidation.md#发现门禁的分类合并合同)，验证完整档案、原始来源及同类终稿代表事实后允许旧同类事实不逐条展示，不能减少原始全量核查。没有逐条分析、未提取／空名词表、任一名词未全部审阅、无当次实际专门子代理、跳步或版本过期均立即 FAIL，返回最早 `repair_stage`，先补做调查再重审。真实文件访问故障才可 BLOCKED。当前材料和真实回执未变可跨文档 revision 复用；最终区块仍按最新 revision 核对。
+`review_context.business_risk_review.discovery_review` 必须原样复用当前调查状态的完整 v2 对象，结构见[逐条语义与特殊名词审核](../../background-check-research/references/discovery-check.md)。共享业务门禁调用 `background-check-research/scripts/discovery_gate.py`，读取实际源批次和子代理回执；默认将 `confirmed_hits[*].verified_fact` 与实体 `record_fact`／`record_facts` 逐项比对；按类别精简终稿时，在同一业务复核对象提供 `consolidation`，遵循[发现门禁分类合并合同](../../background-check-research/references/risk-consolidation.md#发现门禁的分类合并合同)，验证完整档案、原始来源及同类终稿代表事实后允许旧同类事实不逐条展示，不能减少原始全量核查。没有逐条分析、漏提取、无依据的空名词表、任一名词未全部审阅、无当次实际专门子代理、跳步或版本过期均立即 FAIL，返回最早 `repair_stage`，先补做调查再重审。真实无名词与零材料仅按上述发现合同核验实际源文件、指纹、无名词理由或合法结项证据；研究与甲方两个独立代理及当次真实空表审核仍不可省略。真实文件访问故障才可 BLOCKED。当前材料和真实回执未变可跨文档 revision 复用；最终区块仍按最新 revision 核对。
 
 仅用户明确要求人工结论同步或旧文档修订时，允许带用户原话和来源的 `user_supplied`／`existing_report_only` 模式，返回 `DISCOVERY_NOT_ASSESSED`。实际调查不能切换此模式规避逐条分析和名词子代理审核，也不能把这种文档通过称为发现阶段通过。逐条分析、实际源批次和子代理回执沿用任务现有记录，不重新制作研究包。
 
@@ -129,7 +129,7 @@
 ```
 
 - `subject_type`：`person`、`organization` 或 `project`。
-- `modules`：全部模块的精确成品文字；`status` 为 `no_result`、`checked_clean`、`risk`、`incomplete` 或 `not_applicable`。
+- `modules`：全部模块的精确成品文字；`status` 为 `no_result`、`checked_clean`、`risk`、`incomplete`、`not_applicable` 或下述有真实访问证据的 `objective_unavailable`。
 - 仅`境内其他内容`和`境外其他网站`的具名疑似主页可使用`（N）平台名疑似主页：URL`。该模块须以`platform_name`登记研究事实中的实际平台名，例如`"platform_name":"SoundCloud"`，并与正文标签精确相同；缺失或不匹配为BLOCKED。它仍须提供`confirmed_homepage_count:0`和大于零的`suspected_homepage_count`，不能把候选改成确认主页或无主页。该分支不放宽其他十二个平台的固定主页标签、关键词搜索或零结果要求。
 - `fact_evidence`：沿用当前调查记录，必须有 `source_type`、`source_locator`、`checked_at`、`summary`。搜索模块带 `related_result_count`，主页带 `confirmed_homepage_count`，超话／主题贴吧带 `related_topic_count`；B站搜索另带 `checked_surfaces:["video","article"]`。
 - `expected_blocks`：平台主管标题之后、唯一尾随空白块之前的完整顺序；类型为 `text`、`url`、`image`。
@@ -144,6 +144,14 @@
 ### 公开评价条目只有稳定评论页 URL
 
 仅当 Facebook Page 的公开 reviews 页面已实际定位到一条具名、具日、可见全文的评价，但平台不给出可保留的单条公开 URL 时，风险项可设置 `source_kind:"platform_review_entry"`。成品仍显示精确 reviews 页面 URL；`review_entry_evidence` 必须绑定任务目录内的 JSON 记录和真实页面截图，记录含 `page_url`、`author`、`published_at`、逐字 `text`、`screenshot_path`、`screenshot_sha256`。证据对象另含记录／截图的 SHA-256、当前 `reviewer_id` 与带时区 `checked_at`，且该记录路径必须由实际 Facebook 模块 `fact_evidence.source_locator` 或 `source_locators[].locator` 声明。校验器实际读取文件、核对哈希、页面 URL、日期和正文风险事实，不接受主页、搜索页、空白截图或只填非空字段。该分支不能用于普通帖子、可取得单帖链接的评价或其他平台。
+
+### 已确认的客观不可访问
+
+`objective_unavailable` 只用于已确认删除、封禁、关闭、私密、权限限制、明确不存在或媒体失效的来源；规则及实际访问证据格式沿用[发现合同](../../background-check-research/references/discovery-check.md)。模块 `fact_evidence.terminal_outcome` 必须含 `status:"complete"`、`kind:"objective_unavailable"`、`conclusion:"无问题"`、真实 `reason`、`evidence_refs` 和 `evidence:{path,sha256}`。校验器实际读取 JSON 文件并核对字节指纹、明确的访问原因和页面提示、带时区时间、`content_obtained:false`、`result_count:null`，不能用声明或空回执代替。
+
+实际证据 `source_ref` 必须是当前模块可见 URL，`fact_evidence.source_locator` 指向该证据文件或同一 URL，`checked_at` 与原记录一致。当前模块对应的数量字段显式保留 `null`，不填零、不混用已核下限，不宣称已阅读全文。B站搜索仍须在来源记录和 `fact_evidence` 中同时保留视频、专栏的实际访问核查 `checked_surfaces:["video","article"]`。正文沿用模块标签，只记完整 URL 与“无问题”；不可访问的 X 主页不要求补造最早已读月份。十四平台、范围、最新 revision、全文及视觉审阅等其余验收不变。
+
+已有风险保留 `risk` 及原风险证据；可附同一严格访问证明解释当前未知数量，不得用不可访问改成无风险或删除既有风险。未加载、超时、工具故障、未执行查询、可访问未读、证据不匹配均不能使用此分支。旧 `checked_clean` 或缺数量记录不自动升级；必须提交当前核查证据并重新通过各阶段检查。
 
 ### 已存在但当前空内容的微博超话
 

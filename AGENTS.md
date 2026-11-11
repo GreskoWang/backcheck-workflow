@@ -25,8 +25,8 @@
 
 ## 普通背调与专项调查共用的浏览器入口和阻塞判定
 
-- 本目录的普通背调、特殊背调、专项调查及其配套工具修复默认只使用获准的 `web-access` PowerShell CDP 入口，不调用 Windows Computer Use／CUA 检查或操作 Edge，包括查看连接弹窗、确认窗口状态和截图，也不把它作为交付或 Goal 推进的前置条件。
-- `ALL_TOOLS` 没有 Computer Use、Browser 或 Node REPL，不等于没有浏览器入口。有获准 shell 且 `web-access/scripts/cdp-session.ps1` 可用时，先检查既有 broker。`connected` 且 `approvalRequired=false` 只表示连接就绪；在本任务原有、归属明确且持有有效租约的页面执行 `/info` 和小范围正文读取，通过后从断点继续，不新建页面重跑。脚本存在、health 或列页成功不能单独证明页面可读。
+- 本目录的普通背调、特殊背调和专项调查默认使用 `ego-browser`；卡住时按[访问与工具规则](skills/background-check-research/references/access-policy.md#ego-优先edge-卡住时后备)的有界恢复及 3 分钟断点切换规则使用 `web-access`／Edge 后备。TaskSpace、用户接管、登录验证、权限及故障切换边界以该规程为准，不通过后备浏览器绕过接管或权限拒绝。普通调查及其配套工具修复不调用 Windows Computer Use／CUA 检查或操作 Edge，包括查看连接弹窗、确认窗口状态和截图，也不把它作为交付或 Goal 推进的前置条件。
+- `ALL_TOOLS` 没有 Computer Use、Browser 或 Node REPL，不等于没有浏览器入口。切换到 Edge 后备时，若有获准 shell 且 `web-access/scripts/cdp-session.ps1` 可用，先检查既有 broker。`connected` 且 `approvalRequired=false` 只表示连接就绪；在本任务原有、归属明确且持有有效租约的页面执行 `/info` 和小范围正文读取，通过后从断点继续，不新建页面重跑。脚本存在、health 或列页成功不能单独证明页面可读。
 - broker 明确要求授权时，简短说明当前连接状态；只有确认存在待处理的 Edge 授权提示，才请用户点击“允许”，不调用 CUA 查看或代点。超时不能证明弹窗存在，也不能证明用户未授权。同时继续已读缓存、分析和获准的飞书工作稿，不为制造提示反复重载。
 - 单个控制器失败、某个平台故障或某份材料缺失只记入现有剩余项，保留原断点和恢复次数，继续不依赖该故障的获准工作。不得因为原生网址识别未修复，就给所有平台或整个 Goal 增加一个“等待原生修好”的前置任务。
 - 标记整个 Goal 为 blocked 前，按真实剩余工作核对可用来源、已采集待读材料、分析及获准交付是否还能推进；只有同一真实阻碍连续至少三个 Goal 回合，并且已没有可执行的独立工作时才使用 blocked。故障路线三次失败不自动等于整个 Goal 连续三轮无事可做；真实范围缺口也不能为了保持运行而改成完成。

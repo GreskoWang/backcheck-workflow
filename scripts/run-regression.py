@@ -50,7 +50,7 @@ def main():
         for group in ('coverage','media','pipeline'):
             cwd=ROOT/'tools/research-batch/test'/group
             commands.append(('python-'+group,[sys.executable,'-m','unittest','discover','-s',str(cwd),'-p','test_*.py'],ROOT,120))
-        for skill in ('deliver-feishu-background-check','review-feishu-background-check'):
+        for skill in ('background-check-research','client-challenge-background-check','deliver-feishu-background-check','review-feishu-background-check'):
             cwd=ROOT/'skills'/skill/'scripts'
             commands.append(('python-'+skill,[sys.executable,'-m','unittest','discover','-s',str(cwd),'-p','test_*.py'],cwd,120))
         for skill,script in [('deliver-feishu-background-check','validate_feishu_document.py'),('deliver-feishu-background-check','validate_research_payload.py'),('review-feishu-background-check','audit_feishu_snapshot.py')]:
