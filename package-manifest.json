@@ -449,8 +449,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/SKILL.md",
-      "bytes": 19057,
-      "sha256": "7c0ea67931abe2e3258b850fb1d01abe8a4dc3181a0e8414a1473cef776c095b"
+      "bytes": 20136,
+      "sha256": "60d128e611443ff9ee202e44ca9d6108ecefb81401bb056645c69f21fff78bf1"
     },
     {
       "path": "skills/review-feishu-background-check/agents/openai.yaml",
@@ -459,8 +459,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/references/review-checklist.md",
-      "bytes": 9633,
-      "sha256": "9b66b829a7ba7f258184ff7e515e2d3819a4f315dfca63e654a959611737ac0c"
+      "bytes": 9897,
+      "sha256": "3bd6e007968292a069119cd4f19b1f742195e6d6ae8a400a9bdba547d21cc642"
     },
     {
       "path": "skills/review-feishu-background-check/references/review-context-schema.md",
