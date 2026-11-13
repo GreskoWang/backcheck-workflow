@@ -72,18 +72,32 @@ class BusinessRiskGateTests(unittest.TestCase):
     def test_current_policy_and_exact_blocks_pass(self):
         self.assertEqual(self.audit()["verdict"], "PASS")
 
-    def test_record_only_result_counts_categories_without_cooperation_advice(self):
-        self.review['result_mode']='record_only'
-        self.items[2]=text_block('result','背调结果：已记录1类风险库命中')
-        self.review['confirmed_hits'][0].update(result_level='已记录1类风险库命中',result_location=gate.block_location(self.items[2]))
-        self.assertEqual(self.audit()['verdict'],'PASS')
-        self.review['confirmed_hits'][0]['result_level']='已记录2类风险库命中'
-        self.assertEqual(self.audit()['verdict'],'FAIL')
+    def test_risk_grade_labels_remain_valid(self):
+        self.review['result_mode'] = 'risk_grade'
+        for level in ('建议谨慎评估', '建议评估'):
+            with self.subTest(level=level):
+                self.items[2] = text_block('result', '背调结果：' + level)
+                self.review['confirmed_hits'][0].update(
+                    result_level=level, result_location=gate.block_location(self.items[2]))
+                self.assertEqual(self.audit()['verdict'], 'PASS')
 
-    def test_record_only_mode_rejects_legacy_advice_label(self):
-        self.review['result_mode']='record_only'
-        result=self.audit()
-        self.assertIn('BUSINESS_RISK_RESULT_LEVEL',{x['code'] for x in result['errors']})
+    def test_no_risk_grade_cannot_hide_confirmed_hits(self):
+        self.items[2] = text_block('result', '背调结果：无合作风险')
+        self.review['confirmed_hits'][0].update(
+            result_level='无合作风险', result_location=gate.block_location(self.items[2]))
+        self.assertIn('BUSINESS_RISK_RESULT_LEVEL',
+                      {x['code'] for x in self.audit()['errors']})
+
+    def test_counts_cannot_replace_final_grade_even_with_old_mode(self):
+        for mode in ('risk_grade', 'record_only'):
+            for level in ('已记录1类风险库命中', '未发现风险库命中'):
+                with self.subTest(mode=mode, level=level):
+                    self.review['result_mode'] = mode
+                    self.items[2] = text_block('result', '背调结果：' + level)
+                    self.review['confirmed_hits'][0].update(
+                        result_level=level, result_location=gate.block_location(self.items[2]))
+                    self.assertIn('BUSINESS_RISK_RESULT_LEVEL',
+                                  {x['code'] for x in self.audit()['errors']})
 
     def test_consolidation_cannot_substitute_a_different_policy_file(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -178,7 +192,7 @@ class BusinessRiskGateTests(unittest.TestCase):
 
     def test_result_level_must_match_exact_result_block(self):
         review = copy.deepcopy(self.review)
-        review["confirmed_hits"][0]["result_level"] = "低合作风险"
+        review["confirmed_hits"][0]["result_level"] = "无合作风险"
         result = self.audit(review)
         self.assertEqual(result["verdict"], "FAIL")
         self.assertIn("BUSINESS_RISK_RESULT_BINDING", {item["code"] for item in result["errors"]})

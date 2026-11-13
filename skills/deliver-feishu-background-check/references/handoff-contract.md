@@ -67,15 +67,15 @@ Required and exact: `display_name`, `subject_type`, `category`, `basic_info`, `b
 
 ### `verdict`
 
-Required: `has_risk`, `result_level`, and `overall_conclusion`. `has_risk` must equal whether `risk_groups` is non-empty. `result_level` is the exact basic-information verdict and must be one of `建议谨慎评估`, `建议评估`, or `低合作风险`. Delivery copies this value exactly and does not infer a tier from risk count or prose.
+Required: `has_risk`, `result_level`, and `overall_conclusion`. `has_risk` must equal whether `risk_groups` is non-empty. `result_level` is the exact basic-information verdict and must be one of `建议谨慎评估`, `建议评估`, or `无合作风险`. Delivery copies this value exactly and does not infer a tier from risk count or prose.
 
 Use the three tiers consistently:
 
-- `低合作风险`: no credible risk group remains only after all fourteen platform completion gates pass (`has_risk=false`). Any unresolved access boundary blocks this verdict and the final document.
+- `无合作风险`: no credible risk group remains only after all fourteen platform completion gates pass (`has_risk=false`). Any unresolved access boundary blocks this verdict and the final document.
 - `建议评估`: one or more credible contextual, content-fit, reputational, or moderate cooperation concerns remain and should be reviewed before cooperation, without verified severe/disqualifying evidence.
 - `建议谨慎评估`: verified high-impact or repeated concerns under the maintained risk standard could materially affect cooperation, compliance, reputation, safety, or commercial trust and call for heightened caution.
 
-`has_risk=false` must pair with `低合作风险`; `has_risk=true` must pair with `建议评估` or `建议谨慎评估`. Risk count alone never decides between the latter two.
+`has_risk=false` must pair with `无合作风险`; `has_risk=true` must pair with `建议评估` or `建议谨慎评估`. Risk count alone never decides between the latter two.
 
 A finding from a selected suspected homepage remains in the risk package and may affect the cooperation verdict, but it is not rewritten as a verified act of the subject. Its instance fact begins with `该疑似主页账号`; that risk group's `summary` and `explanation`, and `verdict.overall_conclusion`, each contain `疑似主页` so the top summary and conclusion preserve the identity uncertainty.
 

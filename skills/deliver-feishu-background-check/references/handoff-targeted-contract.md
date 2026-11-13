@@ -138,8 +138,8 @@ JSON 认证执行者是否真实操作了交互式浏览器页面、是否实际
 ### 4.2 `verdict`
 
 严格包含 `has_risk`、`result_level`、`overall_conclusion`。`has_risk` 必须等于
-`risk_groups` 是否非空；`result_level` 只能是 `建议谨慎评估`、`建议评估` 或 `低合作风险`。
-有风险不得使用 `低合作风险`，无风险必须使用 `低合作风险`。
+`risk_groups` 是否非空；`result_level` 只能是 `建议谨慎评估`、`建议评估` 或 `无合作风险`。
+有风险不得使用 `无合作风险`，无风险必须使用 `无合作风险`。
 
 ### 4.3 `accounts`
 

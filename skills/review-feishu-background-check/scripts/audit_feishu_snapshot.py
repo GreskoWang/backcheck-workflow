@@ -1510,17 +1510,14 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     elif len(field_runs) == 2:
                         result_value = str(field_runs[1].get("content", ""))
                         result_color = field_runs[1].get("text_element_style", {}).get("text_color")
-                        expected_result_colors = {"低合作风险": None, "建议评估": 2, "建议谨慎评估": 1}
-                        if review_context.get("result_mode") == "record_only":
-                            count = len(review_context.get("risk_groups", []))
-                            expected_result_colors = {f"已记录{count}类风险库命中": 2} if count else {"未发现风险库命中": None}
+                        expected_result_colors = {"无合作风险": None, "建议评估": 2, "建议谨慎评估": 1}
                         if result_value not in expected_result_colors:
                             fail("RESULT_VALUE", children[0].get("block_id", ""), result_value, ", ".join(expected_result_colors))
                         else:
                             expected_color = expected_result_colors[result_value]
                             if expected_color is None:
                                 if result_color not in (None, 0):
-                                    fail("RESULT_COLOR", children[0].get("block_id", ""), result_color, "default color for 低合作风险")
+                                    fail("RESULT_COLOR", children[0].get("block_id", ""), result_color, "default color for 无合作风险")
                             elif result_color != expected_color:
                                 fail("RESULT_COLOR", children[0].get("block_id", ""), result_color, str(expected_color))
                 elif not field_runs or not all(r.get("text_element_style", {}).get("bold") is True for r in field_runs):
@@ -2175,7 +2172,7 @@ def _selftest_fixture() -> dict[str, Any]:
     fields = [
         ("bust_in_silhouette", "背调对象：测试"),
         ("books", "类别：测试"),
-        ("heart", "背调结果：低合作风险"),
+        ("heart", "背调结果：建议评估"),
         ("ledger", "简介：测试"),
     ]
     for pair in (fields[:2], fields[2:]):
@@ -2191,7 +2188,7 @@ def _selftest_fixture() -> dict[str, Any]:
             if value.startswith("背调结果："):
                 field["text"]["elements"] = [
                     {"text_run": {"content": "背调结果：", "text_element_style": {"bold": True}}},
-                    {"text_run": {"content": "低合作风险", "text_element_style": {"bold": True}}},
+                    {"text_run": {"content": "建议评估", "text_element_style": {"bold": True, "text_color": 2}}},
                 ]
             field["parent_id"] = callout["block_id"]
             callout["children"].append(field["block_id"])

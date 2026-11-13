@@ -205,7 +205,7 @@ QA_FLAGS = (
     "no_unresolved_platforms", "single_edge_page_serial_complete",
 )
 
-RESULT_LEVELS = {"建议谨慎评估", "建议评估", "低合作风险"}
+RESULT_LEVELS = {"建议谨慎评估", "建议评估", "无合作风险"}
 SUBJECT_TYPES = {"person", "organization", "company", "brand", "project", "other_entity"}
 ACCOUNT_STATUSES = {
     "confirmed", "suspected_homepage", "unconfirmed_candidate", "excluded_candidate",
@@ -5352,10 +5352,10 @@ def _validate_exhaustive_payload(payload: Any, *, check_files: bool = True) -> l
         errors.append("risk_summary_order: must equal risk_groups ids in exact order")
     if verdict.get("has_risk") != bool(risk_groups):
         errors.append("verdict.has_risk: must equal whether risk_groups is non-empty")
-    if risk_groups and verdict.get("result_level") == "低合作风险":
-        errors.append("verdict.result_level: risk payload cannot be 低合作风险")
-    if not risk_groups and verdict.get("result_level") != "低合作风险":
-        errors.append("verdict.result_level: no-risk payload must be 低合作风险")
+    if risk_groups and verdict.get("result_level") == "无合作风险":
+        errors.append("verdict.result_level: risk payload cannot be 无合作风险")
+    if not risk_groups and verdict.get("result_level") != "无合作风险":
+        errors.append("verdict.result_level: no-risk payload must be 无合作风险")
 
     screenshot_contexts: dict[str, set[tuple[str, str]]] = {}
     instance_refs: list[tuple[str, str, str, list[tuple[str, str]], str]] = []
@@ -6950,7 +6950,7 @@ def _self_test_payload(
             "identity_basis": "自测固定身份锚点。", "source_urls": [facebook_canonical_url],
         }]
         verdict = {
-            "has_risk": False, "result_level": "低合作风险",
+            "has_risk": False, "result_level": "无合作风险",
             "overall_conclusion": "未发现相关风险。",
         }
         representative_works: list[dict[str, Any]] = []

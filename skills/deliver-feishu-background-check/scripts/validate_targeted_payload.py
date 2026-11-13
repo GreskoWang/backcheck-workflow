@@ -89,7 +89,7 @@ PLATFORM_HOST_SUFFIXES = {
     "domestic_other": ("baidu.com",),
     "overseas_other": ("google.com",),
 }
-RESULT_LEVELS = {"建议谨慎评估", "建议评估", "低合作风险"}
+RESULT_LEVELS = {"建议谨慎评估", "建议评估", "无合作风险"}
 SUBJECT_TYPES = {"person", "organization", "company", "brand", "project", "other_entity"}
 ACCOUNT_STATUSES = {"confirmed", "suspected_homepage", "unconfirmed_candidate", "excluded_candidate"}
 DISCOVERY_STATUSES = {
@@ -1369,10 +1369,10 @@ def validate(payload: Any, *, check_files: bool = True) -> list[str]:
         errors.append("verdict.has_risk: must equal whether risk_groups is non-empty")
     if verdict.get("result_level") not in RESULT_LEVELS:
         errors.append("verdict.result_level: invalid tier")
-    if valid_groups and verdict.get("result_level") == "低合作风险":
-        errors.append("verdict.result_level: risk payload cannot be 低合作风险")
-    if not valid_groups and verdict.get("result_level") != "低合作风险":
-        errors.append("verdict.result_level: no-risk payload must be 低合作风险")
+    if valid_groups and verdict.get("result_level") == "无合作风险":
+        errors.append("verdict.result_level: risk payload cannot be 无合作风险")
+    if not valid_groups and verdict.get("result_level") != "无合作风险":
+        errors.append("verdict.result_level: no-risk payload must be 无合作风险")
     if not _text(verdict.get("overall_conclusion")):
         errors.append("verdict.overall_conclusion: must be non-empty text")
 
