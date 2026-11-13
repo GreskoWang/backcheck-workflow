@@ -19,8 +19,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 11287,
-      "sha256": "e4c1f193dd6ac4019438190ea2ad6c335667a4771b567a095f7fe1cf19d37678"
+      "bytes": 11722,
+      "sha256": "f9e1caa9070dcd76c97edbc4efa8873962b5c01ac5ea4d9c3e8c9d0e8a5d97bf"
     },
     {
       "path": "README.md",
@@ -244,8 +244,8 @@
     },
     {
       "path": "skills/background-check-research/SKILL.md",
-      "bytes": 38378,
-      "sha256": "8268891f7da86eea8ce2b9f9a56d32ae91155b1ed89c4627af41a1e3fc201bd0"
+      "bytes": 38201,
+      "sha256": "5cc7f6ac236163580cb6af32f9410aedf79e30c580d66514e565ca6481635bf1"
     },
     {
       "path": "skills/background-check-research/agents/openai.yaml",
@@ -274,8 +274,8 @@
     },
     {
       "path": "skills/background-check-research/references/methods.md",
-      "bytes": 41950,
-      "sha256": "206897c6bf26eda4a31047a6b91e0fe0584022cbcf7335a7b4b745c045649177"
+      "bytes": 41851,
+      "sha256": "f4fe7c981bd36fef851f9de511148f18e4d98a26945fa8e03a01098d4fb3f249"
     },
     {
       "path": "skills/background-check-research/references/platform-runbook.md",
@@ -1729,8 +1729,8 @@
     },
     {
       "path": "背调风险提示.md",
-      "bytes": 73018,
-      "sha256": "a33126f5dd2982bcb6eaf5999814639ac62e8999200a96329e745f8287447597"
+      "bytes": 73120,
+      "sha256": "475660ded55afa887c977d1ffd850e5f28644c948b6713fe8bdea99a6c81d153"
     },
     {
       "path": "背调风险提示.xlsx",
