@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from source_excerpt_review import check_excerpt, source_triplets
 
 LABELS = {"放松", "疑问", "警惕"}
 REJECTION = "包含不合规的表述，拒绝接受"
@@ -181,7 +182,35 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
         fail('CHILD', '.child', child, 'one real fresh isolated client agent distinct from investigation agents')
     previous_time = stamp(child.get('spawned_at'), '.child.spawned_at')
     rounds = review.get('rounds')
-    if not isinstance(rounds, list) or not 1 <= len(rounds) <= 5:
+    # A user may authorize a bounded supplement for names found after round five.
+    # Preserve the original first input and every response; never reset the loop.
+    supplement = review.get('user_authorized_exception')
+    supplemental_ids = []
+    max_rounds = 5
+    if supplement is not None:
+        valid = (isinstance(supplement, dict)
+                 and supplement.get('request_id') == discovery.get('task_id')
+                 and text(supplement.get('authorization'))
+                 and text(supplement.get('authorization_ref'))
+                 and supplement.get('same_agent') == child.get('agent_id')
+                 and supplement.get('history_preserved') is True
+                 and type(supplement.get('max_additional_rounds')) is int
+                 and 1 <= supplement['max_additional_rounds'] <= 2
+                 and isinstance(supplement.get('scope'), list)
+                 and supplement['scope']
+                 and all(text(i) for i in supplement['scope'])
+                 and len(set(supplement['scope'])) == len(supplement['scope'])
+                 and all(i in ids for i in supplement['scope'])
+                 and isinstance(rounds, list)
+                 and 6 <= len(rounds) <= 5 + supplement['max_additional_rounds']
+                 and supplement.get('actual_rounds') == list(range(6, len(rounds) + 1)))
+        if not valid:
+            fail('AUTHORIZATION', '.user_authorized_exception', supplement,
+                 'actual user authorization bound to this task, same agent, names and at most two extra rounds')
+        else:
+            supplemental_ids = supplement['scope']
+            max_rounds += supplement['max_additional_rounds']
+    if not isinstance(rounds, list) or not 1 <= len(rounds) <= max_rounds:
         fail('ROUND_COUNT', '.rounds', len(rounds) if isinstance(rounds, list) else rounds, '1..5 actual rounds without reset')
         rounds = rounds if isinstance(rounds, list) else []
     attitudes, explained, rejected, previous_answers = {}, set(), set(), {}
@@ -205,16 +234,17 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
         previous_time = timestamp if timestamp is not None else previous_time
         given = payload(round_row.get('input'), loc + '.input')
         requested = []
-        if number == 1:
-            if given != nouns:
+        if number == 1 or number == 6 and supplemental_ids:
+            initial = [n for n in nouns if (n['id'] in supplemental_ids) == (number == 6)]
+            if given != initial:
                 fail('FIRST_INPUT', loc + '.input', given, 'only complete {id,name} list; role and policy supplied separately')
-            requested = list(ids)
+            requested = [n['id'] for n in initial]
         else:
             mandatory = {ident for ident, attitude in attitudes.items() if attitude != '放松' and ident not in explained} | rejected
             if not isinstance(given, list) or not given:
                 fail('ANSWER', loc + '.input', given, 'nonempty factual answers only for open questions')
                 given = []
-            for answer in given:
+            for answer_index, answer in enumerate(given):
                 if not isinstance(answer, dict) or set(answer) != FIELDS:
                     fail('ANSWER', loc + '.input', answer, 'exact six factual fields without extra judgments')
                     continue
@@ -222,20 +252,25 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 if ident is None or ident in requested:
                     fail('ANSWER', loc, answer.get('被问词'), 'each relevant unresolved/rejected term once')
                     continue
+                if number > 5 and ident not in supplemental_ids:
+                    fail('AUTHORIZATION_SCOPE', loc, ident, 'supplement only the expressly authorized missing names')
                 if answer == previous_answers.get(ident):
                     fail('REPEATED_ANSWER', loc, answer.get('被问词'), 'new material facts or a corrected refused explanation; do not repeat unchanged answers')
                 requested.append(ident)
                 for field in ('释义词所指代的对象', '实际含义'):
                     if not text(answer[field]):
                         fail('ANSWER', loc + '.' + field, answer[field], 'brief factual meaning or specific unknown')
-                arrays = [answer[k] for k in ('出现链接', '出现原文', '上下文')]
-                if not all(isinstance(a, list) and a and all(text(v) for v in a) for a in arrays) or len({len(a) for a in arrays if isinstance(a, list)}) != 1:
+                triples = source_triplets(answer, round_row.get('source_array_mappings', {}).get(str(answer_index)))
+                if triples is None:
                     fail('ANSWER', loc, answer, 'aligned necessary source excerpts and contexts; not every occurrence full text')
                     continue
-                for url, excerpt, context in zip(*arrays):
+                for source_index, (url, excerpt, context) in enumerate(triples):
                     candidates = [pair for pair in occurrences.get(term_entity[ident], set()) if url in helpers['source_urls'](sources[pair])]
                     if not candidates or not any(any(excerpt in full for full in helpers['occurrence_texts'](sources[pair], sources)) for pair in candidates):
-                        fail('ANSWER_SOURCE', loc, url, 'unaltered necessary excerpt from this term’s actual source; semantic context checked by reader')
+                        proof = round_row.get('source_excerpt_reviews', {}).get(f'{answer_index}:{source_index}')
+                        if not check_excerpt(proof, excerpt=excerpt, url=url, source_rows=sources,
+                                             source_texts=helpers['occurrence_texts'], source_urls=helpers['source_urls'], base=base):
+                            fail('ANSWER_SOURCE', loc, url, 'unaltered necessary excerpt or explicitly verified multipart/image source mapping')
                 explained.add(ident)
                 previous_answers[ident] = answer
             if not mandatory <= set(requested):
@@ -263,6 +298,8 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 fail('RESPONSE', loc, row, 'one of three attitudes or the fixed factual-answer refusal')
     if rejected:
         fail('FINAL_REJECTION', '.rounds', sorted(rejected), 'rewrite refused wording and obtain a real reassessment within five rounds')
+    if set(attitudes) != set(ids):
+        fail('INITIAL_COVERAGE', '.rounds', sorted(set(ids) - set(attitudes)), 'every extracted noun has an actual initial client attitude')
     if {i for i, attitude in attitudes.items() if attitude != '放松'} - explained:
         fail('REASSESSMENT', '.rounds', sorted(set(attitudes) - explained), 'brief factual explanation followed by client reassessment')
     final_doubts.update(i for i, attitude in attitudes.items() if attitude == '疑问')
@@ -342,7 +379,18 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 fail('INCLUSION_SOURCE', '.inclusions', url, 'this occurrence’s actual source URL')
             summary = location(row.get('summary'), '.inclusions.summary')
             platform = location(row.get('platform'), '.inclusions.platform')
-            link = location(row.get('link'), '.inclusions.link')
+            restriction = row.get('publication_restriction')
+            restricted = False
+            if isinstance(restriction, dict):
+                restricted = (restriction.get('reason') == 'minor_sexual_content_safety'
+                              and restriction.get('scope') == 'omit_direct_link_and_image'
+                              and restriction.get('source_sha256') == digest(sources.get(pair))
+                              and restriction.get('reviewer_id') == discovery.get('primary_agent_id')
+                              and text(restriction.get('basis'))
+                              and not any(url in helpers['block_text'](b) or url in helpers['source_urls'](b) for b in items))
+                if not restricted:
+                    fail('PUBLICATION_RESTRICTION', '.inclusions', ident, 'verified restricted source with factual public coverage and no unsafe direct link')
+            link = None if restricted else location(row.get('link'), '.inclusions.link')
             kind = 'risk' if ident in ever else 'unresolved_doubt'
             if row.get('kind') != kind:
                 fail('INCLUSION_KIND', '.inclusions', row.get('kind'), kind + '; a later relaxation cannot erase historical warning')
@@ -350,7 +398,10 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 fail('INCLUSION_RISK_SECTION', '.inclusions', ident, 'actual audited risk summary and factual platform paragraph')
             if kind == 'unresolved_doubt' and platform and '待确认' not in helpers['block_text'](platform):
                 fail('INCLUSION_UNKNOWN', '.inclusions', ident, 'explicit 待确认 wording for unresolved facts')
-            if platform and (helpers['block_text'](platform).strip() == url or not any(norm(name) in norm(helpers['block_text'](platform)) for name, entity in name_entity.items() if entity == term_entity[ident])):
+            # Exported display names may group source spellings with " / ".
+            public_names = [part.strip() for name, entity in name_entity.items()
+                            if entity == term_entity[ident] for part in name.split(' / ') if part.strip()]
+            if platform and (helpers['block_text'](platform).strip() == url or not any(norm(name) in norm(helpers['block_text'](platform)) for name in public_names)):
                 fail('INCLUSION_FACT', '.inclusions', ident, 'public factual mention of this object, not a URL-only placeholder')
             if link and url not in helpers['source_urls'](link) and url not in helpers['block_text'](link):
                 fail('INCLUSION_LINK', '.inclusions', url, 'visible original URL or actual hyperlink target')

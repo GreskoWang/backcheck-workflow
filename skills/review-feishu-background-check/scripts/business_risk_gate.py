@@ -101,6 +101,7 @@ def audit_business_risk_review(
     errors: list[dict[str, str]] = []
     blocked: list[dict[str, str]] = []
     info: list[str] = []
+    expected_group_indices = set(expected_group_indices) if expected_group_indices is not None else None
     if not isinstance(review, dict):
         blocked.append(
             _finding(
@@ -494,13 +495,17 @@ def audit_business_risk_review(
                     )
                 )
             result_level = hit.get("result_level")
-            if isinstance(result_level, str) and result_level not in RESULT_LEVELS:
+            allowed_results = RESULT_LEVELS
+            if review.get("result_mode") == "record_only" and expected_group_indices is not None:
+                count = len(expected_group_indices)
+                allowed_results = {f"已记录{count}类风险库命中"} if count else {"未发现风险库命中"}
+            if isinstance(result_level, str) and result_level not in allowed_results:
                 errors.append(
                     _finding(
                         "BUSINESS_RISK_RESULT_LEVEL",
                         f"{hit_location}.result_level",
                         result_level,
-                        f"one of {sorted(RESULT_LEVELS)}",
+                        f"one of {sorted(allowed_results)}",
                     )
                 )
             if result_text is not None and isinstance(result_level, str):

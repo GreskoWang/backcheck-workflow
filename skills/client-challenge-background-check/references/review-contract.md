@@ -47,3 +47,11 @@ client_challenge_review = {
 状态字段沿用 `client_challenge_review,discovery_review,items,document_token,revision_id,required_policy_path`，`items` 是完整成品区块。对话内交付按同等规则核对实际最终答复及位置，不伪造飞书回执适配机器接口。
 
 CLI 和普通 API 只接受 v3。`historical_v1=True` 或 `historical_v2=True` 仅用于明确回放旧记录，不用于提交；旧测试不能证明新流程行为。材料或名词有实质增加时更新对应提取与质询覆盖，不重做已读平台、不改写旧态度，也不重置本任务五轮上限。原始事实消歧纠错保留依据并交回同一甲方复评，历史警惕不删除。
+
+## 显式补漏与历史来源映射
+
+用户明确授权的补漏例外使用 `user_authorized_exception`，包含本任务request_id、授权原文和真实消息定位authorization_ref、same_agent、history_preserved:true、scope名词ID、max_additional_rounds（1或2）、实际连续actual_rounds。不得修改首轮；第6轮只收授权漏词，后续仅作这些词的必要复评；默认五轮不变。
+
+历史输入不得改写。原文分段摘录、图片转录与单页多段摘录可以在对应round之外保存 `source_excerpt_reviews`、`source_array_mappings`。每段文字须逐字对应实际源，图片转录和后来直接回读须绑定本地文件哈希、URL及实际人工阅读；补读不能冒充当时已提供的材料。当前事实纠错单独记录，不能冒充甲方新态度。校验器核对每个原始字符、来源及数组索引完整覆盖，不能凭一句“人工通过”跳过。
+
+斜线分组显示名保留完整导出，正文可使用其中已核实的实际名称。无结果查询页中的助手查询词不算主体原帖出现项，需保留原缓存并记录语义映射更正。涉及未成年露骨内容的直链和图像不得公开；`publication_restriction`须绑定实际来源哈希、审阅者和原因`minor_sexual_content_safety`，公开保留对应事实，机器仍检查历史警惕、风险位置与其他来源完整性。
