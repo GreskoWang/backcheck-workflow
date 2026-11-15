@@ -405,8 +405,10 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 fail('INCLUSION_FACT', '.inclusions', ident, 'public factual mention of this object, not a URL-only placeholder')
             if link and url not in helpers['source_urls'](link) and url not in helpers['block_text'](link):
                 fail('INCLUSION_LINK', '.inclusions', url, 'visible original URL or actual hyperlink target')
-        if actual != expected:
+        if ident in ever and actual != expected:
             fail('INCLUSION_COVERAGE', '.inclusions', sorted(expected - actual), 'every historical-warning post publicly covered; archives and example quotas do not substitute')
+        elif ident not in ever and not actual:
+            fail('INCLUSION_COVERAGE', '.inclusions', ident, 'final unresolved doubt has factual public explanation and at least one actual original source')
     if included != triggered:
         fail('INCLUSION_COVERAGE', '.inclusions', sorted(triggered - included), 'all ever-alert terms plus final unresolved doubts')
     return result()

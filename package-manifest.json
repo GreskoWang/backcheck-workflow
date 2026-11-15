@@ -334,13 +334,13 @@
     },
     {
       "path": "skills/client-challenge-background-check/SKILL.md",
-      "bytes": 7395,
-      "sha256": "27ab88e6ff868e3e0e3559fd0317c0133ceb2f5c904be6979818436b0714c9ea"
+      "bytes": 7608,
+      "sha256": "64b903c79875263144f8465df4d09866639743f35ae8ba319bdee6402735bc07"
     },
     {
       "path": "skills/client-challenge-background-check/references/review-contract.md",
-      "bytes": 5981,
-      "sha256": "71b0b0aab825504f4c78299bc1f71a2765bd2dcb11788009bc3fc42210fb0661"
+      "bytes": 6263,
+      "sha256": "0004bf32cabf63ae6df859e90b687b3712188071f190ff7405cb0ba086a892d6"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/client_challenge_gate.py",
@@ -349,8 +349,8 @@
     },
     {
       "path": "skills/client-challenge-background-check/scripts/client_challenge_v3.py",
-      "bytes": 26239,
-      "sha256": "cb5140e8a0b74a42ccefe458bba29e6f1954ae994e134ee8b0db93a4a135cc6d"
+      "bytes": 26462,
+      "sha256": "f5e7628ff52bf9810f84a7325e3dd4eefbef950646a91c85544664e0b2ee258b"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/contextual_followup.py",
@@ -364,8 +364,8 @@
     },
     {
       "path": "skills/client-challenge-background-check/scripts/test_client_challenge_v3.py",
-      "bytes": 13198,
-      "sha256": "c40d8c6612f3e62d63278091d957eb0d58d1d6b2b44faada72262e031d66bdf9"
+      "bytes": 14467,
+      "sha256": "6f8d6e23cf3d249d1115f4fda2ebacf94145634bb92967542ba366720180394f"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/test_contextual_followup.py",
@@ -389,8 +389,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/references/feishu-style-guide.md",
-      "bytes": 18780,
-      "sha256": "e94f09265e6a826766efe5b19414b7014d6fbfae5250e8dde4793b9b3473cbe9"
+      "bytes": 19573,
+      "sha256": "d8905b4c113836a692994effcfb7956abd9411751ac7257776ac6106e685b519"
     },
     {
       "path": "skills/deliver-feishu-background-check/references/handoff-contract.md",
@@ -449,8 +449,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/SKILL.md",
-      "bytes": 19758,
-      "sha256": "745d3291b4a6cf8d0332c7a5aabd46500c26f481bdf3c07a25ac747f81df2675"
+      "bytes": 20711,
+      "sha256": "69175242762dff642b39e5e7bd3c17aa891923a59dd677a01c6836d1e7cc06e4"
     },
     {
       "path": "skills/review-feishu-background-check/agents/openai.yaml",

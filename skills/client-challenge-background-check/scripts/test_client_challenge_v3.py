@@ -112,6 +112,31 @@ class CurrentChallengeTests(unittest.TestCase):
         refresh(self.review, self.discovery, self.items, self.final)
         self.assertEqual(self.audit()['verdict'], 'PASS')
 
+    def make_final_doubt(self):
+        self.review['rounds'][0]['response'][0]['态度'] = '疑问'
+        self.review['rounds'][1]['response'][0]['态度'] = '疑问'
+        for row in self.review['inclusions'][0]['occurrences']:
+            row['kind'] = 'unresolved_doubt'
+            index = row['item_index'] * 2 + 1
+            self.items[index]['text']['elements'][0]['text_run']['content'] = '待确认：' + self.items[index]['text']['elements'][0]['text_run']['content']
+            row['platform'] = binding(self.items[index])
+        refresh(self.review, self.discovery, self.items, self.final)
+
+    def test_final_doubt_may_use_representative_actual_source(self):
+        self.make_final_doubt()
+        self.review['inclusions'][0]['occurrences'] = self.review['inclusions'][0]['occurrences'][:1]
+        self.assertEqual(self.audit()['verdict'], 'PASS')
+
+    def test_final_doubt_needs_at_least_one_public_source(self):
+        self.make_final_doubt()
+        self.review['inclusions'][0]['occurrences'] = []
+        self.failure('INCLUSION_COVERAGE')
+
+    def test_final_doubt_rejects_unrelated_source(self):
+        self.make_final_doubt()
+        self.review['inclusions'][0]['occurrences'][0]['item_index'] = 99
+        self.failure('INCLUSION')
+
     def test_final_doubt_cannot_be_silently_dropped(self):
         self.review['rounds'][0]['response'][0]['态度'] = '疑问'
         self.review['rounds'][1]['response'][0]['态度'] = '疑问'
