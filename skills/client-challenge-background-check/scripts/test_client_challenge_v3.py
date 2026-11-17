@@ -100,47 +100,63 @@ class CurrentChallengeTests(unittest.TestCase):
         self.review['inclusions'] = []
         self.assertEqual(self.audit()['verdict'], 'PASS')
 
-    def test_unknown_meaning_can_be_explained_without_background_search(self):
-        self.review['rounds'][0]['response'][0]['态度'] = '疑问'
-        self.review['rounds'][1]['input'][0]['实际含义'] = 'The post uses this as a production name; further identity is unknown.'
-        self.review['rounds'][1]['response'][0]['态度'] = '疑问'
-        for row in self.review['inclusions'][0]['occurrences']:
-            row['kind'] = 'unresolved_doubt'
-            index = row['item_index'] * 2 + 1
-            self.items[index]['text']['elements'][0]['text_run']['content'] = '待确认：' + self.items[index]['text']['elements'][0]['text_run']['content']
-            row['platform'] = binding(self.items[index])
-        refresh(self.review, self.discovery, self.items, self.final)
-        self.assertEqual(self.audit()['verdict'], 'PASS')
-
     def make_final_doubt(self):
         self.review['rounds'][0]['response'][0]['态度'] = '疑问'
         self.review['rounds'][1]['response'][0]['态度'] = '疑问'
-        for row in self.review['inclusions'][0]['occurrences']:
-            row['kind'] = 'unresolved_doubt'
-            index = row['item_index'] * 2 + 1
-            self.items[index]['text']['elements'][0]['text_run']['content'] = '待确认：' + self.items[index]['text']['elements'][0]['text_run']['content']
-            row['platform'] = binding(self.items[index])
-        refresh(self.review, self.discovery, self.items, self.final)
+        self.review['inclusions'] = []
+        self.review['unresolved_items'] = [{'id': 'n1', 'known_facts': 'A production title appears in the post.',
+            'unknown': 'The exact identity remains unknown.', 'source_refs': ['https://example.invalid/post/1'],
+            'disposition': 'internal_only'}]
 
-    def test_final_doubt_may_use_representative_actual_source(self):
+    def test_unknown_meaning_remains_internal_without_background_search(self):
         self.make_final_doubt()
-        self.review['inclusions'][0]['occurrences'] = self.review['inclusions'][0]['occurrences'][:1]
+        self.review['rounds'][1]['input'][0]['实际含义'] = 'The post uses this as a production name; further identity is unknown.'
         self.assertEqual(self.audit()['verdict'], 'PASS')
 
-    def test_final_doubt_needs_at_least_one_public_source(self):
+    def test_final_doubt_cannot_be_published_as_a_pending_paragraph(self):
+        public = copy.deepcopy(self.review['inclusions'])
         self.make_final_doubt()
-        self.review['inclusions'][0]['occurrences'] = []
-        self.failure('INCLUSION_COVERAGE')
-
-    def test_final_doubt_rejects_unrelated_source(self):
-        self.make_final_doubt()
-        self.review['inclusions'][0]['occurrences'][0]['item_index'] = 99
+        public[0]['occurrences'][0]['kind'] = 'unresolved_doubt'
+        self.review['inclusions'] = public
         self.failure('INCLUSION')
 
-    def test_final_doubt_cannot_be_silently_dropped(self):
-        self.review['rounds'][0]['response'][0]['态度'] = '疑问'
-        self.review['rounds'][1]['response'][0]['态度'] = '疑问'
+    def test_final_doubt_requires_internal_record(self):
+        self.make_final_doubt()
+        self.review['unresolved_items'] = []
+        self.failure('UNRESOLVED_INTERNAL')
+
+    def test_final_doubt_rejects_unrelated_internal_source(self):
+        self.make_final_doubt()
+        self.review['unresolved_items'][0]['source_refs'] = ['https://example.invalid/unrelated']
+        self.failure('UNRESOLVED_INTERNAL')
+
+    def test_earlier_alert_does_not_publish_unresolved_doubt(self):
+        self.make_final_doubt()
+        self.review['rounds'][0]['response'][0]['态度'] = '警惕'
+        result = self.audit()
+        self.assertEqual(result['verdict'], 'PASS', result)
+        self.assertEqual(result['ever_alert_ids'], ['n1'])
+
+    def make_user_deletion(self):
         self.review['inclusions'] = []
+        self.review['user_directed_exclusions'] = [{'id': 'n1',
+            'occurrences': [{'batch_id': 'A', 'item_index': 0}, {'batch_id': 'A', 'item_index': 1}],
+            'instruction': 'Remove this risk from the final report.', 'authorization_ref': 'synthetic-user-message#1'}]
+
+    def test_explicit_user_deletion_preserves_history_without_republication(self):
+        self.make_user_deletion()
+        result = self.audit()
+        self.assertEqual(result['verdict'], 'PASS', result)
+        self.assertEqual(result['ever_alert_ids'], ['n1'])
+
+    def test_deletion_without_actual_user_reference_fails(self):
+        self.make_user_deletion()
+        self.review['user_directed_exclusions'][0]['authorization_ref'] = ''
+        self.failure('USER_EXCLUSION')
+
+    def test_partial_user_deletion_does_not_excuse_other_posts(self):
+        self.make_user_deletion()
+        self.review['user_directed_exclusions'][0]['occurrences'].pop()
         self.failure('INCLUSION_COVERAGE')
 
     def test_initial_warning_requires_factual_reassessment(self):

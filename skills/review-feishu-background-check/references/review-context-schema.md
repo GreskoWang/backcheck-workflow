@@ -6,7 +6,9 @@
 
 ## 基本结构
 
-实际背调的 `client_challenge_review` 使用[甲方轻量 v3 契约](../../client-challenge-background-check/references/review-contract.md)。首轮全表及必要增量复评先于成稿；全部历史警惕及最终疑问有公开事实和来源对应，再完成最新终审。无需初次成品终审或逐轮哈希。
+实际背调的 `client_challenge_review` 使用[甲方轻量 v3 契约](../../client-challenge-background-check/references/review-contract.md)。首轮全表及必要增量复评先于成稿；已闭环必记事项有公开事实和来源对应，未闭环疑问仅内部记录，再完成最新终审。无需初次成品终审或逐轮哈希。
+
+内部 `unresolved_items` 非空不构成 FAIL/BLOCKED。完成约定调查及必要复评后，按规则排除的疑问可以内部结项并继续交付，不需要全部查明。本文“事实或归因不足”的阻塞语义仅针对终稿保留断言、固定平台状态或实际执行验收所必需的事实；须公开的曾警惕原帖集合扣除这些内部疑问及用户明确审定删除。
 
 ```json
 {
@@ -96,7 +98,7 @@
 }
 ```
 
-将此对象放入 `review_context.disclaimer_review`。首次须实际阅读全文；后续完整文字指纹和规则版本未变时，沿用已完成语义复核并绑定当前 revision；文字改变时，实际阅读变更段及上下文，结合已读且未变部分覆盖当前全文。没有可用基线仍须全文通读。发现免责时 `status="FAIL"`，`findings` 逐项记录 `{location, excerpt, reason}`。有任何 findings 即 FAIL，即使填写了 PASS 或其他检查未完成也不得通过。直接“未找到版权方”“账号归属尚未确认”和必要来源归属应保留，不得把事实缺口改写成无问题。
+将此对象放入 `review_context.disclaimer_review`。首次须实际阅读全文；后续完整文字指纹和规则版本未变时，沿用已完成语义复核并绑定当前 revision；文字改变时，实际阅读变更段及上下文，结合已读且未变部分覆盖当前全文。没有可用基线仍须全文通读。发现免责时 `status="FAIL"`，`findings` 逐项记录 `{location, excerpt, reason}`。有任何 findings 即 FAIL，即使填写了 PASS 或其他检查未完成也不得通过。未闭环的权属、账号或其他疑问只保留内部记录；终稿不得包含待确认或未完成表述，也不能改写成已核实或无问题。标准格式白名单独立于 expected_blocks，自创模块不能通过添加预期字段取得许可。
 
 共享脚本导出 `review_text_fingerprint`、`review_document_token`、`DISCLAIMER_POLICY_VERSION` 和 `audit_disclaimer_review`，后者返回 `errors`、`blocked`、`info`、`text_sha256`。单主体、团队合并和严格交付路线均使用此门槛。指纹仅由已有快照自动计算，不要求 research payload、额外台账或取证包。记录须绑定全文内容、token、revision 和规则版本；缺失、未完成或过期为 BLOCKED。变更文字、标题、图注或 raw content 后更新语义差量并重绑；纯样式变化只重绑，无需人工重读。视觉 PASS 及 `expected_blocks` 不能替代语义复核。
 

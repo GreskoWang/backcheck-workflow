@@ -1,5 +1,7 @@
 # Research Handoff Contract
 
+> 2026-11-17 工具规则更新：浏览器执行以 [当前访问规则](../../background-check-research/references/access-policy.md) 为准，仅使用 Ego；TaskSpace 关闭或消失可直接新建 Agent 自有空间。下文 Edge 及 edge_* 名称仅供旧包兼容读取，不再授权选择、启动或切换到 Edge、web-access/CDP。
+
 路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
 
 > **版本路由：本文件是旧 `schema 1.10` 的 `exhaustive_audit` 严格契约。默认三小时定向模式使用 `schema 1.11 + research_profile: three_hour_targeted_v1`，必须改读 [三小时定向交接契约](handoff-targeted-contract.md)。两套完成语义不得混用。**

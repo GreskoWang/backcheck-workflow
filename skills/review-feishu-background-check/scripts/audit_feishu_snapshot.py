@@ -38,7 +38,8 @@ PLATFORMS = [
     "境外其他网站",
 ]
 
-SCRIPT_VERSION = "1.11.5+native-numbering.20261111"
+SCRIPT_VERSION = "1.12.0+standard-final.20261117"
+UNFINISHED_FINAL_RE = re.compile(r"待确认|待核实|待核查|待核验|待补查|待补充|待恢复|待完成|待定|尚待|未完成|未核实|未确认|未解决|未查完|尚未说明|未能确认|无法确认|无法核实|有待核实|有待确认|未闭环|待闭环|待跟进|尚缺")
 DOMESTIC_TAIL = "其他境内平台暂未发现相关账号或相关内容的负面及敏感信息。"
 FOREIGN_TAIL = "其他境外平台暂未发现相关账号或相关内容的负面及敏感信息。"
 # Read the same approved template as the uploader; synthetic fixtures remain offline-only.
@@ -1069,6 +1070,11 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
         mark_blocked("API_ITEMS", "block_list", type(items).__name__, "non-empty items array")
         return {"schema_version": 1, "script_version": SCRIPT_VERSION, "verdict": "BLOCKED", "blocked": blocked, "errors": errors, "info": info}
     current_layout_fingerprint = layout_fingerprint(items)
+    for block in items:
+        value = text_of(block)
+        if UNFINISHED_FINAL_RE.search(value):
+            fail("FINAL_UNFINISHED_TEXT", block.get("block_id", ""), value,
+                 "completed verified facts in the standard format; unresolved questions remain internal")
     document_sha256 = hashlib.sha256(
         json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -1270,6 +1276,10 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
 
     if len(section_indices) == 3 and not (section_indices["风险摘要"] < section_indices["基本信息"] < section_indices["背调详情"]):
         fail("MAIN_ORDER", "root", section_indices, "风险摘要 before 基本信息 before 背调详情")
+    if "风险摘要" in section_indices:
+        for block in root[:section_indices["风险摘要"]]:
+            if not is_blank_text(block):
+                fail("NONSTANDARD_TOP_BLOCK", block.get("block_id", ""), text_of(block), "no extra preface or module before the standard sections")
 
     risk_callout: dict[str, Any] | None = None
     if "风险摘要" in section_indices:
@@ -1524,6 +1534,9 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     fail("FIELD_BOLD", children[0].get("block_id", ""), value, "entire field bold")
 
         representative = [b for b in between_basic if b.get("block_type") == 19 and b.get("callout", {}).get("emoji_id") == "white_check_mark"]
+        for block in between_basic:
+            if block not in grids and block not in representative and block.get("block_type") != 22 and not is_blank_text(block):
+                fail("NONSTANDARD_BASIC_BLOCK", block.get("block_id", ""), text_of(block), "only the two standard grids, representative-works card and divider")
         if len(representative) != 1:
             fail("WORKS_CALLOUT", "基本信息", len(representative), "one white_check_mark representative-works Callout")
         else:
@@ -1632,6 +1645,35 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 mark_blocked("RISK_STATUS_REQUIRED", platform, statuses, "at least one risk-status module when risk_items is non-empty")
 
             expected_module_texts = [str(module.get("text", "")) for module in context_modules if isinstance(module, dict)]
+            # expected_blocks is a comparison manifest, not permission to invent prose.
+            standard_texts = set(expected_module_texts)
+            for risk_item in context_risk_items:
+                if not isinstance(risk_item, dict):
+                    continue
+                standard_texts.add(str(risk_item.get("fact_text", "")))
+                standard_texts.add(str(risk_item.get("url", "")))
+                for extra_url in risk_item.get("additional_source_urls", []):
+                    if not isinstance(extra_url, str) or not _is_direct_content_url(platform, extra_url):
+                        fail("NONSTANDARD_SOURCE_URL", platform, extra_url, "an actual native direct source URL for this verified fact")
+                    else:
+                        standard_texts.add(extra_url)
+            if platform == "境内其他内容":
+                standard_texts.add(DOMESTIC_TAIL)
+            if platform == "境外其他网站":
+                standard_texts.add(FOREIGN_TAIL)
+            for block in nonblank:
+                if not context_modules or ("risk" in statuses and not context_risk_items):
+                    # Missing context already blocks acceptance; do not call a
+                    # standard line nonstandard merely because its schema is absent.
+                    break
+                value = text_of(block)
+                risk_heading = re.fullmatch(r"风险点[0-9]+：【(.+)】", value)
+                valid_heading = risk_heading and any(isinstance(g, dict) and g.get("title") == risk_heading.group(1) for g in expected_risk_groups)
+                standard_x_time = platform == "X" and X_TIME_RE.fullmatch(value)
+                if block.get("block_type") == 27 or (block.get("block_type") == 2 and (value in standard_texts or valid_heading or standard_x_time)):
+                    continue
+                fail("NONSTANDARD_PLATFORM_BLOCK", block.get("block_id", ""), value,
+                     "standard module, verified risk heading/fact/image/source or exact platform tail; declaring expected_blocks does not authorize new modules")
             actual_module_texts = [value for _, value in numbered]
             if context_modules and actual_module_texts != expected_module_texts:
                 fail("MODULE_CONTEXT_MISMATCH", platform, actual_module_texts, str(expected_module_texts))
@@ -2629,7 +2671,7 @@ def self_test() -> int:
     x_context["modules"][1]["fact_evidence"]["related_result_count"] = 1
     x_context["risk_items"] = [{"group_index": 1, "fact_text": risk_fact, "image_count": 1, "url": risk_url}]
     platform_risk = [
-        _text_block("risk-platform-heading", "风险点1：测试风险"),
+        _text_block("risk-platform-heading", "风险点1：【测试风险】"),
         _text_block("risk-platform-fact", risk_fact),
         {"block_id": "risk-platform-image", "block_type": 27, "image": {"token": "risk-platform-image-token"}},
         _text_block("risk-platform-url", risk_url),
@@ -2643,7 +2685,7 @@ def self_test() -> int:
     x_context["expected_blocks"] = [
         {"kind": "text", "text": "（1）无个人主页；"},
         {"kind": "text", "text": new_search},
-        {"kind": "text", "text": "风险点1：测试风险"},
+        {"kind": "text", "text": "风险点1：【测试风险】"},
         {"kind": "text", "text": risk_fact},
         {"kind": "image"},
         {"kind": "url", "text": risk_url},

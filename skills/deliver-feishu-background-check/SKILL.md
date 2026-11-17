@@ -17,7 +17,7 @@ description: 把当前任务中已经完成的背调结论快速写入飞书云�
 
 整个普通单人背调按“全＋快”和三小时内形成可交付结果调度。交付不得重复调查、逐平台主管串行读写、反复截整页或为形式独立等待另一代理；批量写入、一次性上下文和差量终审是默认做法。
 
-所有飞书正文创建、修改、删除、排版、链接、图片和回读都使用飞书 OpenAPI／MCP。**不得用鼠标键盘或电脑操纵编辑飞书正文。** Edge 只可做页面实显检查，以及在 UAT 自动续权时完成“原账号、既有权限”范围内的 OAuth 页面操作；后者不是正文写入，也不构成向用户索要授权。
+所有飞书正文创建、修改、删除、排版、链接、图片和回读都使用飞书 OpenAPI／MCP。**不得用鼠标键盘或电脑操纵编辑飞书正文。** Ego 用于页面实显检查，以及在 UAT 自动续权时完成“原账号、既有权限”范围内的 OAuth 页面操作；后者不是正文写入，也不构成向用户索要授权。
 
 ## 业务风险口径不可覆写
 
@@ -104,7 +104,7 @@ pwsh -NoProfile -File "$env:BACKGROUND_CHECK_WORKSPACE\external\feishu-mcp\scrip
 - `BLOCKED` 时处理实际缺口，不能交付，也不能无上限轮询；
 - 只有服务端最新 revision 的 `business_risk_review`、全篇免责语义和完整终审均为 `PASS`，且回执 token/revision 一致，实际背调还通过独立的 `$client-challenge-background-check`，才能发出成品链接。后续写入使文字 PASS 失效，但不会在布局指纹不变时强制重截整页。
 
-实际背调先按[甲方质询技能](../client-challenge-background-check/SKILL.md)进行首轮全表与必要增量复评，再成稿终审。任一轮曾警惕永久入稿，最终疑问列待确认；同类合并不能删掉必记原帖。不得把说服甲方放松作为目标，不要求前置成品终审。
+实际背调先按[甲方质询技能](../client-challenge-background-check/SKILL.md)进行首轮全表与必要增量复评，再成稿终审。已闭环的曾警惕事项入稿，未闭环疑问仅内部记录，用户审定删改优先；同类合并不能删掉必记原帖。不得把说服甲方放松作为目标，不要求前置成品终审。
 
 同一任务保存 `review_context.client_challenge_review` v3，字段见[轻量契约](../client-challenge-background-check/references/review-contract.md)。成稿后取得最新终审，最终 release 调用同一 v3 提交检查；`--audit-only` 可用于终审过程，不代表最终提交。
 

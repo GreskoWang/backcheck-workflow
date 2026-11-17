@@ -37,7 +37,7 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
     def result():
         return {'verdict': 'FAIL' if errors else 'BLOCKED' if blocked else 'PASS',
                 'errors': errors, 'blocked': blocked,
-                'info': ['v3: complete initial nouns, incremental factual reassessment, permanent public coverage of every historical warning. Semantic accuracy and actual agent activity require real review.'],
+                'info': ['v3: complete initial nouns and actual reassessment; verified warnings are public, unresolved questions remain internal, explicit user deletions retain their authorization. Semantic accuracy and real activity still require review.'],
                 'ever_alert_ids': sorted(ever), 'triggered_term_ids': sorted(ever | final_doubts)}
 
     def read(ref, loc, *, raw=False):
@@ -304,6 +304,41 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
         fail('REASSESSMENT', '.rounds', sorted(set(attitudes) - explained), 'brief factual explanation followed by client reassessment')
     final_doubts.update(i for i, attitude in attitudes.items() if attitude == '疑问')
     triggered = ever | final_doubts
+    unresolved = payload(review.get('unresolved_items', []), '.unresolved_items')
+    unresolved_seen = set()
+    if not isinstance(unresolved, list):
+        fail('UNRESOLVED_INTERNAL', '.unresolved_items', unresolved, 'internal-only records of final unresolved doubts')
+        unresolved = []
+    for row in unresolved:
+        ident = row.get('id') if isinstance(row, dict) else None
+        if (ident not in final_doubts or ident in unresolved_seen or row.get('disposition') != 'internal_only'
+                or not text(row.get('known_facts')) or not text(row.get('unknown'))
+                or not isinstance(row.get('source_refs'), list) or not row['source_refs'] or not all(text(x) for x in row['source_refs'])):
+            fail('UNRESOLVED_INTERNAL', '.unresolved_items', row, 'each final doubt once, with known facts, specific unknown and actual source references; never public')
+        else:
+            unresolved_seen.add(ident)
+            actual_urls = set().union(*(helpers['source_urls'](sources[pair]) for pair in occurrences.get(term_entity[ident], set())))
+            if not all(ref in actual_urls for ref in row['source_refs']):
+                fail('UNRESOLVED_INTERNAL', '.unresolved_items.source_refs', row['source_refs'], 'source URLs from this entity’s actual original occurrences')
+    if unresolved_seen != final_doubts:
+        fail('UNRESOLVED_INTERNAL', '.unresolved_items', sorted(final_doubts - unresolved_seen), 'all final doubts retained internally without changing real attitudes')
+    exclusions = {}
+    user_exclusions = review.get('user_directed_exclusions', [])
+    if not isinstance(user_exclusions, list):
+        fail('USER_EXCLUSION', '.user_directed_exclusions', user_exclusions, 'list of actual authorized occurrence deletions')
+        user_exclusions = []
+    for row in user_exclusions:
+        ident = row.get('id') if isinstance(row, dict) else None
+        if ident not in ever or not text(row.get('instruction')) or not text(row.get('authorization_ref')) or not isinstance(row.get('occurrences'), list) or not row['occurrences']:
+            fail('USER_EXCLUSION', '.user_directed_exclusions', row, 'actual user instruction and source-bound deletion scope')
+            continue
+        for entry in row['occurrences']:
+            pair = (entry.get('batch_id'), entry.get('item_index')) if isinstance(entry, dict) else (None, None)
+            if pair not in occurrences.get(term_entity[ident], set()) or pair in exclusions.get(ident, set()):
+                fail('USER_EXCLUSION', '.user_directed_exclusions', pair, 'each actually authorized original occurrence once')
+            else:
+                exclusions.setdefault(ident, set()).add(pair)
+    publish = {ident for ident in ever - final_doubts if occurrences.get(term_entity[ident], set()) - exclusions.get(ident, set())}
     for field, expected in [('ever_alert_ids', ever), ('triggered_term_ids', triggered)]:
         if field in review and (not isinstance(review[field], list) or review[field] != sorted(expected)):
             fail('HISTORY', '.' + field, review[field], 'computed complete history, never erase a warning after relaxation')
@@ -356,12 +391,12 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
         inclusions = []
     included = set()
     for entry in inclusions:
-        if not isinstance(entry, dict) or entry.get('id') not in triggered or entry['id'] in included:
+        if not isinstance(entry, dict) or entry.get('id') not in publish or entry['id'] in included:
             fail('INCLUSION', '.inclusions', entry, 'each required term once')
             continue
         ident = entry['id']
         included.add(ident)
-        actual, expected = set(), occurrences.get(term_entity[ident], set())
+        actual, expected = set(), occurrences.get(term_entity[ident], set()) - exclusions.get(ident, set())
         rows = entry.get('occurrences', [])
         if not isinstance(rows, list):
             fail('INCLUSION', '.inclusions', rows, 'original occurrences with public factual locations')
@@ -391,13 +426,11 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 if not restricted:
                     fail('PUBLICATION_RESTRICTION', '.inclusions', ident, 'verified restricted source with factual public coverage and no unsafe direct link')
             link = None if restricted else location(row.get('link'), '.inclusions.link')
-            kind = 'risk' if ident in ever else 'unresolved_doubt'
+            kind = 'risk'
             if row.get('kind') != kind:
                 fail('INCLUSION_KIND', '.inclusions', row.get('kind'), kind + '; a later relaxation cannot erase historical warning')
             if kind == 'risk' and not any(isinstance(r, dict) and r.get('summary_location') == row.get('summary') and r.get('platform_location') == row.get('platform') for r in risks):
                 fail('INCLUSION_RISK_SECTION', '.inclusions', ident, 'actual audited risk summary and factual platform paragraph')
-            if kind == 'unresolved_doubt' and platform and '待确认' not in helpers['block_text'](platform):
-                fail('INCLUSION_UNKNOWN', '.inclusions', ident, 'explicit 待确认 wording for unresolved facts')
             # Exported display names may group source spellings with " / ".
             public_names = [part.strip() for name, entity in name_entity.items()
                             if entity == term_entity[ident] for part in name.split(' / ') if part.strip()]
@@ -407,8 +440,6 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 fail('INCLUSION_LINK', '.inclusions', url, 'visible original URL or actual hyperlink target')
         if ident in ever and actual != expected:
             fail('INCLUSION_COVERAGE', '.inclusions', sorted(expected - actual), 'every historical-warning post publicly covered; archives and example quotas do not substitute')
-        elif ident not in ever and not actual:
-            fail('INCLUSION_COVERAGE', '.inclusions', ident, 'final unresolved doubt has factual public explanation and at least one actual original source')
-    if included != triggered:
-        fail('INCLUSION_COVERAGE', '.inclusions', sorted(triggered - included), 'all ever-alert terms plus final unresolved doubts')
+    if included != publish:
+        fail('INCLUSION_COVERAGE', '.inclusions', sorted(publish - included), 'all verified historical-warning occurrences except unresolved doubts and actual user-directed deletions')
     return result()

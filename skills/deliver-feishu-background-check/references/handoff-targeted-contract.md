@@ -1,5 +1,7 @@
 # 三小时定向背调交接契约（schema 1.11）
 
+> 2026-11-17 工具规则更新：浏览器执行以 [当前访问规则](../../background-check-research/references/access-policy.md) 为准，仅使用 Ego；TaskSpace 关闭或消失可直接新建 Agent 自有空间。下文 Edge/browser_profile 枚举和示例仅供旧包兼容读取，不能据此启动 Edge、web-access/CDP 或将其作为备用路线。
+
 路径示例中的 `<WORKSPACE>` 表示安装后解析出的工作区，不是可直接提交给工具的字面值。实际运行时从 `BACKGROUND_CHECK_WORKSPACE` 取得根目录，使用路径拼接生成绝对路径；这些本机运行记录留在被 Git 忽略的任务目录中。
 
 本文件只适用于默认研究模式 `research_profile: three_hour_targeted_v1`。旧的
