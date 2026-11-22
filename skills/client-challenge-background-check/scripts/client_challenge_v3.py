@@ -1,4 +1,4 @@
-"""Lightweight attitude loop. Historical warnings always require public coverage.
+"""Lightweight attitude loop with reviewed same-category example selection.
 
 No network, per-term query receipts, per-round hashes or pre-challenge final audit.
 The caller still supplies the real latest final audit and complete document blocks.
@@ -37,7 +37,7 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
     def result():
         return {'verdict': 'FAIL' if errors else 'BLOCKED' if blocked else 'PASS',
                 'errors': errors, 'blocked': blocked,
-                'info': ['v3: complete initial nouns and actual reassessment; verified warnings are public, unresolved questions remain internal, explicit user deletions retain their authorization. Semantic accuracy and real activity still require review.'],
+                'info': ['v3: complete initial nouns and actual reassessment; selected warnings are public, reviewed same-category omissions and unresolved questions remain internal, explicit user deletions retain their authorization. Semantic accuracy and real activity still require review.'],
                 'ever_alert_ids': sorted(ever), 'triggered_term_ids': sorted(ever | final_doubts)}
 
     def read(ref, loc, *, raw=False):
@@ -338,7 +338,6 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
                 fail('USER_EXCLUSION', '.user_directed_exclusions', pair, 'each actually authorized original occurrence once')
             else:
                 exclusions.setdefault(ident, set()).add(pair)
-    publish = {ident for ident in ever - final_doubts if occurrences.get(term_entity[ident], set()) - exclusions.get(ident, set())}
     for field, expected in [('ever_alert_ids', ever), ('triggered_term_ids', triggered)]:
         if field in review and (not isinstance(review[field], list) or review[field] != sorted(expected)):
             fail('HISTORY', '.' + field, review[field], 'computed complete history, never erase a warning after relaxation')
@@ -385,9 +384,44 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
             return None
         return block
 
+    # A previously alerted occurrence may remain internal when a reviewed risk
+    # of the same substantive category is already represented in the final.
+    # This changes publication selection, not the actual client history.
+    omissions = payload(review.get('same_category_omissions', []), '.same_category_omissions')
+    if not isinstance(omissions, list):
+        fail('SAME_CATEGORY', '.same_category_omissions', omissions, 'source-bound omissions mapped to actual audited representative facts')
+        omissions = []
+    public_urls = set().union(*(helpers['source_urls'](b) for b in items))
+    for row in omissions:
+        ident = row.get('id') if isinstance(row, dict) else None
+        if (ident not in ever - final_doubts or row.get('reviewer_id') != discovery.get('primary_agent_id')
+                or not text(row.get('basis')) or type(row.get('risk_group_index')) is not int
+                or not isinstance(row.get('occurrences'), list) or not row['occurrences']):
+            fail('SAME_CATEGORY', '.same_category_omissions', row, 'reviewed same-category basis and actual original occurrences')
+            continue
+        summary = location(row.get('summary'), '.same_category_omissions.summary')
+        platform = location(row.get('platform'), '.same_category_omissions.platform')
+        if summary is None or platform is None or not any(
+                isinstance(r, dict) and r.get('risk_group_index') == row['risk_group_index']
+                and r.get('summary_location') == row.get('summary')
+                and r.get('platform_location') == row.get('platform') for r in risks):
+            fail('SAME_CATEGORY', '.same_category_omissions', ident, 'an existing same-category representative in the current final review')
+            continue
+        for entry in row['occurrences']:
+            pair = (entry.get('batch_id'), entry.get('item_index')) if isinstance(entry, dict) else (None, None)
+            if pair not in occurrences.get(term_entity[ident], set()) or pair in exclusions.get(ident, set()):
+                fail('SAME_CATEGORY', '.same_category_omissions', pair, 'each omitted actual source occurrence once')
+                continue
+            urls = helpers['source_urls'](sources[pair])
+            if any(url in public_urls or any(url in helpers['block_text'](b) for b in items) for url in urls):
+                fail('SAME_CATEGORY_PUBLIC', '.same_category_omissions', pair, 'omitted cases stay internal; no appended public source links')
+                continue
+            exclusions.setdefault(ident, set()).add(pair)
+    publish = {ident for ident in ever - final_doubts if occurrences.get(term_entity[ident], set()) - exclusions.get(ident, set())}
+
     inclusions = payload(review.get('inclusions'), '.inclusions')
     if not isinstance(inclusions, list):
-        fail('INCLUSION', '.inclusions', inclusions, 'every historical warning and final doubt publicly mapped')
+        fail('INCLUSION', '.inclusions', inclusions, 'selected verified warning occurrences publicly mapped')
         inclusions = []
     included = set()
     for entry in inclusions:
@@ -439,7 +473,7 @@ def audit_v3(review: Any, *, discovery_review: Any, items: Any,
             if link and url not in helpers['source_urls'](link) and url not in helpers['block_text'](link):
                 fail('INCLUSION_LINK', '.inclusions', url, 'visible original URL or actual hyperlink target')
         if ident in ever and actual != expected:
-            fail('INCLUSION_COVERAGE', '.inclusions', sorted(expected - actual), 'every historical-warning post publicly covered; archives and example quotas do not substitute')
+            fail('INCLUSION_COVERAGE', '.inclusions', sorted(expected - actual), 'each selected warning occurrence covered or explicitly mapped to a reviewed same-category representative')
     if included != publish:
-        fail('INCLUSION_COVERAGE', '.inclusions', sorted(publish - included), 'all verified historical-warning occurrences except unresolved doubts and actual user-directed deletions')
+        fail('INCLUSION_COVERAGE', '.inclusions', sorted(publish - included), 'all selected verified warning occurrences after doubts, reviewed same-category omissions and user-directed deletions')
     return result()

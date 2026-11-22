@@ -1338,6 +1338,34 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
 
                 if "基本信息" in section_indices:
                     risk_root = root[idx + 2:section_indices["基本信息"]]
+                    # Native evidence grids are an allowed layout. Inspect every
+                    # column, while retaining the original full tree for hashes,
+                    # visual checks, and link fingerprints.
+                    has_evidence_grids = any(b.get("block_type") == 24 for b in risk_root)
+                    expanded_risk_root = []
+                    for evidence_block in risk_root:
+                        if evidence_block.get("block_type") != 24:
+                            expanded_risk_root.append(evidence_block)
+                            continue
+                        columns = [by_id.get(k) for k in evidence_block.get("children", [])]
+                        valid_grid = (evidence_block.get("grid", {}).get("column_size") == 2
+                                      and len(columns) == 2
+                                      and all(column and column.get("block_type") == 25
+                                              and column.get("grid_column", {}).get("width_ratio") == 50
+                                              for column in columns))
+                        if not valid_grid:
+                            fail("RISK_EVIDENCE_GRID", evidence_block.get("block_id", ""),
+                                 evidence_block, "two native 50/50 evidence columns")
+                            continue
+                        for column in columns:
+                            for child_id in column.get("children", []):
+                                child = by_id.get(child_id)
+                                if child is None or child.get("block_type") not in (2, 27):
+                                    fail("RISK_EVIDENCE_GRID_CHILD", str(child_id), child,
+                                         "existing fact text or image")
+                                elif not is_blank_text(child):
+                                    expanded_risk_root.append(child)
+                    risk_root = expanded_risk_root
                     cursor = 0
                     for n, group in enumerate(expected_risk_groups, 1):
                         if not isinstance(group, dict) or not required_group_keys.issubset(group):
@@ -1420,6 +1448,18 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                                 item for item in context_risk_items_all
                                 if item.get("group_index") == n and item.get("include_in_top", True) is not False
                             ]
+                        if has_evidence_grids:
+                            # A two-column presentation may place evidence in a
+                            # different order from the fourteen platform modules.
+                            # Still require every selected fact and its adjacent
+                            # image count; missing or extra content fails below.
+                            group_end = next((j for j in range(cursor, len(risk_root))
+                                              if risk_root[j].get("block_type") == 6), len(risk_root))
+                            fact_order = {text_of(block): j for j, block in enumerate(risk_root[cursor:group_end])
+                                          if block.get("block_type") == 2}
+                            group_items = sorted(group_items, key=lambda item: -1
+                                                 if item.get("top_fact_location") == "highlight"
+                                                 else fact_order.get(item.get("top_fact_text", item.get("fact_text")), len(risk_root)))
                         if not group_items:
                             mark_blocked("RISK_GROUP_EVIDENCE", f"review_context.risk_groups[{n - 1}]", [], "at least one selected top-evidence item")
                         for evidence_index, item in enumerate(group_items, 1):
@@ -1622,6 +1662,11 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 mark_blocked("RISK_ITEM_CONTEXT", f"review_context.platforms.{platform}.risk_items", context_risk_items, "list, empty when no platform risk")
                 context_risk_items = []
             required_risk_item_keys = {"group_index", "fact_text", "image_count"}
+            category_cases: dict[str, set[str]] = {}
+            business_review = review_context.get("business_risk_review", {})
+            classified_hits = business_review.get("confirmed_hits", []) if isinstance(business_review, dict) else []
+            if not isinstance(classified_hits, list):
+                classified_hits = []
             for risk_index, risk_item in enumerate(context_risk_items):
                 restricted = isinstance(risk_item, dict) and risk_item.get("source_kind") == RESTRICTED_SOURCE_KIND
                 source_keys = {"restricted_source"} if restricted else {"url"}
@@ -1630,6 +1675,21 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     mark_blocked("RISK_ITEM_SCHEMA", f"review_context.platforms.{platform}.risk_items[{risk_index}]", risk_item, f"object with {sorted(expected_keys)}")
                 elif "include_in_top" in risk_item and not isinstance(risk_item.get("include_in_top"), bool):
                     mark_blocked("RISK_ITEM_TOP_SELECTION", f"review_context.platforms.{platform}.risk_items[{risk_index}].include_in_top", risk_item.get("include_in_top"), "boolean when supplied")
+                if isinstance(risk_item, dict) and type(risk_item.get("group_index")) is int:
+                    categories = {str(hit["business_item"]) for hit in classified_hits
+                                  if isinstance(hit, dict) and hit.get("business_item")
+                                  and hit.get("verified_fact") == risk_item.get("fact_text")}
+                    categories = categories or {f"risk group {risk_item['group_index']}"}
+                    case = str(risk_item.get("url") or risk_item.get("fact_text", ""))
+                    for category in categories:
+                        category_cases.setdefault(category, set()).add(case)
+                if isinstance(risk_item, dict) and risk_item.get("image_count") == 0:
+                    fail("RISK_ITEM_IMAGE_REQUIRED", f"{platform} risk_items[{risk_index}]", 0,
+                         "every selected public case has evidence imagery; unselected same-category cases stay internal")
+            for category, cases in category_cases.items():
+                if len(cases) > 4:
+                    fail("RISK_CASE_LIMIT", f"{platform} {category}", len(cases),
+                         "at most 4 selected same-category cases per platform; no extra prose or links")
             if not isinstance(context_blocks, list) or not all(isinstance(entry, dict) and entry.get("kind") in {"text", "url", "image"} for entry in context_blocks):
                 mark_blocked("EXPECTED_BLOCKS", f"review_context.platforms.{platform}.expected_blocks", context_blocks, "complete ordered list of text, url, and image entries excluding the trailing spacer")
                 context_blocks = []
@@ -2035,9 +2095,12 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     platform_fact_roles.setdefault(risk_item["group_index"], set()).update(
                         str(nonblank[i].get("block_id")) for i in fact_indices
                     )
-                expected_image_count = risk_item["image_count"] if type(risk_item["image_count"]) is int and risk_item["image_count"] >= 1 else None
+                # All public cases are selected evidence. Same-category extras
+                # remain internal, even when they appeared in client warnings.
+                image_count_value = risk_item["image_count"]
+                expected_image_count = image_count_value if type(image_count_value) is int and image_count_value >= 1 else None
                 if expected_image_count is None:
-                    mark_blocked("RISK_ITEM_IMAGE_SCHEMA", f"{platform} risk_items[{risk_index}].image_count", risk_item["image_count"], "integer >= 1, excluding bool")
+                    mark_blocked("RISK_ITEM_IMAGE_SCHEMA", f"{platform} risk_items[{risk_index}].image_count", risk_item["image_count"], "integer >= 1 for every selected public case; excluding bool")
                     continue
                 for declared_index in declared_indices:
                     cursor = declared_index + 1
@@ -2702,6 +2765,44 @@ def self_test() -> int:
     expected_roles = [{key: copy.deepcopy(hit[key]) for key in
                        ("risk_group_index", "summary_location", "platform_location")}
                       for hit in risk_fixture["review_context"]["business_risk_review"]["confirmed_hits"]]
+    grid_fixture = copy.deepcopy(risk_fixture)
+    grid_items = grid_fixture["block_list"]["items"]
+    grid_page = next(item for item in grid_items if item.get("block_type") == 1)
+    grid_index = grid_page["children"].index("risk-top-fact")
+    grid_page["children"][grid_index:grid_index + 2] = ["risk-grid"]
+    grid_items.extend([
+        {"block_id": "risk-grid", "block_type": 24, "grid": {"column_size": 2},
+         "children": ["risk-grid-left", "risk-grid-right"], "parent_id": grid_page["block_id"]},
+        {"block_id": "risk-grid-left", "block_type": 25, "grid_column": {"width_ratio": 50},
+         "children": ["risk-top-fact", "risk-top-image"], "parent_id": "risk-grid"},
+        {"block_id": "risk-grid-right", "block_type": 25, "grid_column": {"width_ratio": 50},
+         "children": [], "parent_id": "risk-grid"},
+    ])
+    for item in grid_items:
+        if item.get("block_id") in ("risk-top-fact", "risk-top-image"):
+            item["parent_id"] = "risk-grid-left"
+    grid_fixture["review_context"]["visual_check"]["jump_checks"][0]["jump_fingerprint"] = jump_fingerprint(
+        grid_items, "9.12-test", "risk-top-pin-text", "risk-platform-fact")
+    grid_result = _fixture_audit(grid_fixture)
+    if grid_result["verdict"] != "PASS":
+        raise AssertionError(json.dumps({"native_grid": grid_result}, ensure_ascii=False))
+    for mutation, expected_code in [("image", "RISK_IMAGES"), ("extra", "RISK_EXTRA_BLOCKS"),
+                                     ("column", "RISK_EVIDENCE_GRID")]:
+        broken_grid = copy.deepcopy(grid_fixture)
+        broken_items = broken_grid["block_list"]["items"]
+        left = next(item for item in broken_items if item.get("block_id") == "risk-grid-left")
+        if mutation == "image":
+            left["children"].remove("risk-top-image")
+            broken_items[:] = [item for item in broken_items if item.get("block_id") != "risk-top-image"]
+        elif mutation == "extra":
+            extra = _text_block("risk-grid-extra", "未声明的额外事实")
+            extra["parent_id"] = left["block_id"]
+            broken_items.append(extra)
+            left["children"].append(extra["block_id"])
+        else:
+            left["grid_column"]["width_ratio"] = 100
+        if not any(error["code"] == expected_code for error in _fixture_audit(broken_grid)["errors"]):
+            raise AssertionError("native evidence grid bypassed " + mutation)
     if (risk_result["risk_locations"] != expected_roles
             or risk_result["receipt"]["risk_locations"] != expected_roles
             or risk_result["policy_sha256"] != policy_source()["sha256"]

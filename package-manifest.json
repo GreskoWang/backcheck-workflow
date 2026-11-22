@@ -244,13 +244,13 @@
     },
     {
       "path": "skills/background-check-research/SKILL.md",
-      "bytes": 37288,
-      "sha256": "bb8ccd90b637f0bd5e9d74f65e43b5425c12b3fb57f79bab42a157a860bcc3e3"
+      "bytes": 37489,
+      "sha256": "d4dc6d5ed2969179d0b543f975bb26d4aad88e6ad593e8e3c76c154f0e6bb06f"
     },
     {
       "path": "skills/background-check-research/agents/openai.yaml",
-      "bytes": 422,
-      "sha256": "e09915add64f13d6c16a6529d05c03e43284e48053eb7b8a4fb9cae95bc15ae8"
+      "bytes": 507,
+      "sha256": "0c915aef6ecb971aa984a6ff2b1076c8733f4c3aa5a418519a78d89c5bd1262e"
     },
     {
       "path": "skills/background-check-research/references/access-policy.md",
@@ -264,8 +264,8 @@
     },
     {
       "path": "skills/background-check-research/references/discovery-check.md",
-      "bytes": 3836,
-      "sha256": "86d3966ccfba2f9c1733915f3d92b61d77f7f95f4413c4b8a59a90c03e084a8e"
+      "bytes": 3890,
+      "sha256": "7e3350de8aca8c51b8ad44eda244772af2850f9b616649f24ea9cfec123ab3c6"
     },
     {
       "path": "skills/background-check-research/references/maigret.md",
@@ -274,8 +274,8 @@
     },
     {
       "path": "skills/background-check-research/references/methods.md",
-      "bytes": 39453,
-      "sha256": "e15a5aaf54530234335296fd4b2767f311580700ec6ac6b8b6504fc0ad04b1e4"
+      "bytes": 39440,
+      "sha256": "93d57a94e0692b5e9e299ba90a98406941c6cf93e1daaf80b6015e79de0561a5"
     },
     {
       "path": "skills/background-check-research/references/platform-runbook.md",
@@ -284,8 +284,8 @@
     },
     {
       "path": "skills/background-check-research/references/risk-consolidation.md",
-      "bytes": 2547,
-      "sha256": "b59aacc48d9253e6dae521c9cfa72ee8dd9349daecea7ca14fd33281a927d4ec"
+      "bytes": 2756,
+      "sha256": "bbeb50d9ac3e4dec8af72e5570bedecf9491ecdc8bee212ab1a5693ef88a3726"
     },
     {
       "path": "skills/background-check-research/scripts/audit_handoff_prose.py",
@@ -334,13 +334,13 @@
     },
     {
       "path": "skills/client-challenge-background-check/SKILL.md",
-      "bytes": 7918,
-      "sha256": "1241b0871b67ad671221d75a060ee5927a10848afeed9bbacefa44bb3e8fccb1"
+      "bytes": 8382,
+      "sha256": "1738ad5e25d49ffb5cdac6b65e768bb5bf893c756da850c76d60afd90c0244a7"
     },
     {
       "path": "skills/client-challenge-background-check/references/review-contract.md",
-      "bytes": 6661,
-      "sha256": "cbf82aa1022da5f7d0b60d4e1675fe2842a542153b205a45e63f5ea1b7bdbcc2"
+      "bytes": 7390,
+      "sha256": "8b0108fbbfdde7161d5f8d25da455ae18206a2e27ef43c4da8c4b75d85d895b5"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/client_challenge_gate.py",
@@ -349,8 +349,8 @@
     },
     {
       "path": "skills/client-challenge-background-check/scripts/client_challenge_v3.py",
-      "bytes": 28961,
-      "sha256": "a704b6e38c119afa88088b194f45d0761148d0be7275d9eedb90e20e35f7e82d"
+      "bytes": 31593,
+      "sha256": "d3da6b75a30846c5f9f777c7f4c931609adb83d83b6e854debb59a978925f399"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/contextual_followup.py",
@@ -369,8 +369,8 @@
     },
     {
       "path": "skills/client-challenge-background-check/scripts/test_client_challenge_v3.py",
-      "bytes": 14963,
-      "sha256": "c5613bbd8948eae2c0e24545fdce6584944ada0796fdfe6defb17cf9f96bbd5a"
+      "bytes": 17328,
+      "sha256": "7a36f545d740dbb5c701fa0be64f338083f704a25e3b2da9cac7333c5c065780"
     },
     {
       "path": "skills/client-challenge-background-check/scripts/test_contextual_followup.py",
@@ -384,8 +384,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/SKILL.md",
-      "bytes": 28965,
-      "sha256": "9a27a2e3a2f836461156067aba3cb588f62cc793e8d6590dba33dca1e009496d"
+      "bytes": 28183,
+      "sha256": "5c3a9c7aea6fd0532f409446b42885cc57de44c4c2f435db97392c076cf62cb6"
     },
     {
       "path": "skills/deliver-feishu-background-check/agents/openai.yaml",
@@ -399,8 +399,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/references/feishu-style-guide.md",
-      "bytes": 19654,
-      "sha256": "b8d49447dae1ee7c7c5795afe29e12a7e96b7c638c1a5e0572db9af6762d26cd"
+      "bytes": 19908,
+      "sha256": "d1f086aec4047ec3db61ff7a97f5cc54b534af0a38bc6f8ce6c4afeb705dfbf4"
     },
     {
       "path": "skills/deliver-feishu-background-check/references/handoff-contract.md",
@@ -414,8 +414,8 @@
     },
     {
       "path": "skills/deliver-feishu-background-check/references/platform-format.md",
-      "bytes": 53049,
-      "sha256": "60926132dfd584ca009d7bb41e19add0c617b8b32171937d21edbccb50cbb9e7"
+      "bytes": 53438,
+      "sha256": "c9cc077baee9fa592ced52858c5ae2a8f8e6ceb7a4ee3f03533c09a2dcfbe5a3"
     },
     {
       "path": "skills/deliver-feishu-background-check/scripts/review_proofs.py",
@@ -459,8 +459,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/SKILL.md",
-      "bytes": 22338,
-      "sha256": "a95938a4f0141564b2f2f6f3ab175165a814094a5a9438d1bf3dbc10a626bd37"
+      "bytes": 22689,
+      "sha256": "eee6068b8ebc38f835d52949aaeaf140740597a8e3101f8753a6fe88bb5b31b1"
     },
     {
       "path": "skills/review-feishu-background-check/agents/openai.yaml",
@@ -469,18 +469,18 @@
     },
     {
       "path": "skills/review-feishu-background-check/references/review-checklist.md",
-      "bytes": 9983,
-      "sha256": "d1d589dc5ad22f218dcead5fff0a0c91eb9b8955d22b0f84e90b1ab235f0ee6f"
+      "bytes": 10008,
+      "sha256": "b70d805323d617d29904e2c39603219349d6041e6a05fc1f48eb983ac94db8e9"
     },
     {
       "path": "skills/review-feishu-background-check/references/review-context-schema.md",
-      "bytes": 23820,
-      "sha256": "973a8116727604ebd179af1614eff6cfa039595d3db3567415a239f12e61fdb0"
+      "bytes": 24699,
+      "sha256": "da5bc5529fa530167a32c9fbc776a2e77d1a19a46a73945ebb216f7aaca891e7"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/audit_feishu_snapshot.py",
-      "bytes": 233227,
-      "sha256": "3b629e3ce546be76838bae2302f1258fa014a4b52ca066631e54a9615738b690"
+      "bytes": 240500,
+      "sha256": "aac0e4778856048aba62bbb2e879432ebaa44a5e80c9c063500a489a1898afb1"
     },
     {
       "path": "skills/review-feishu-background-check/scripts/business_risk_gate.py",
@@ -509,8 +509,8 @@
     },
     {
       "path": "skills/review-feishu-background-check/scripts/test_standard_final.py",
-      "bytes": 2391,
-      "sha256": "36308694dbfd3ef60fc394bde6ae3c4cec33715f099fbd5b58c3e46f255767cc"
+      "bytes": 3998,
+      "sha256": "70bb0118aa03dd9eb106889417a3f9eb17f9ab1948f0933f45dcf5498f7b2519"
     },
     {
       "path": "skills/source-artifact-stabilizer/SKILL.md",

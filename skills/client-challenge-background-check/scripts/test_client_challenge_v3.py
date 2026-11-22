@@ -77,9 +77,48 @@ class CurrentChallengeTests(unittest.TestCase):
         self.review['inclusions'] = []
         self.failure('INCLUSION_COVERAGE')
 
-    def test_example_quota_cannot_hide_second_alert_post(self):
+    def test_omitting_second_alert_post_without_same_category_binding_fails(self):
         self.review['inclusions'][0]['occurrences'].pop()
         self.failure('INCLUSION_COVERAGE')
+
+    def omit_second_as_same_category(self):
+        omitted=self.review['inclusions'][0]['occurrences'].pop()
+        # Remove the unselected public case and URL; the first case remains.
+        removed={omitted['platform']['block_id'],omitted['link']['block_id']}
+        self.items[:] = [b for b in self.items if b['block_id'] not in removed]
+        self.review['same_category_omissions'] = [{'id':'n1',
+            'occurrences':[{'batch_id':'A','item_index':1}], 'risk_group_index':0,
+            'summary':binding(self.items[0]), 'platform':binding(self.items[1]),
+            'reviewer_id':self.discovery['primary_agent_id'],
+            'basis':'Both original posts complain about repeated advertisements; the first is already represented.'}]
+        for holder in (self.final,self.final['receipt']):
+            holder['document_sha256']=document_sha256(self.items)
+            holder['risk_locations']=[{'risk_group_index':0,'summary_location':binding(self.items[0]),
+                                      'platform_location':binding(self.items[1])}]
+        write_json(Path(self.review['current_final_review']),self.final)
+
+    def test_same_category_warning_can_stay_internal_with_only_one_public_case(self):
+        self.omit_second_as_same_category()
+        result=self.audit()
+        self.assertEqual(result['verdict'],'PASS',result)
+        self.assertEqual(result['ever_alert_ids'],['n1'])
+
+    def test_same_category_omission_needs_an_actual_audited_representative(self):
+        self.omit_second_as_same_category()
+        self.review['same_category_omissions'][0]['risk_group_index']=99
+        self.failure('SAME_CATEGORY')
+
+    def test_same_category_omission_cannot_leave_the_extra_link_in_public(self):
+        self.omit_second_as_same_category()
+        self.items.append({'block_id':'extra-link','block_type':2,'text':{'elements':[{'text_run':{'content':'https://example.invalid/post/2'}}]}})
+        for holder in (self.final,self.final['receipt']):holder['document_sha256']=document_sha256(self.items)
+        write_json(Path(self.review['current_final_review']),self.final)
+        self.failure('SAME_CATEGORY_PUBLIC')
+
+    def test_same_category_omission_does_not_skip_actual_reassessment(self):
+        self.omit_second_as_same_category()
+        self.review['rounds'].pop()
+        self.failure('REASSESSMENT')
 
     def test_history_cannot_be_reset_to_empty(self):
         self.review['ever_alert_ids'] = []

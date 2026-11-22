@@ -1,4 +1,4 @@
 interface:
   display_name: "背调研究"
   short_description: "阅读公开主页与十四平台，完成画像补查和名词质询后成稿终审"
-  default_prompt: "使用 $background-check-research 完成指定范围的公开调查和画像补查，提取完整名词表交虚拟甲方快速表态及必要复评，曾警惕原帖永久入稿，成稿后完成最终审阅；不开展前置全量逐词查询。"
+  default_prompt: "使用 $background-check-research 完成指定范围的公开调查和画像补查，提取完整名词表交虚拟甲方快速表态及必要复评；同类风险最多4例，曾警惕内容已有同类风险入稿时可不重复记录，超额内容仅留内部，成稿后完成最终审阅；不开展前置全量逐词查询。"

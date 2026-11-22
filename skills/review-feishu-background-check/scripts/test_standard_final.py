@@ -46,5 +46,36 @@ class StandardFinalTests(unittest.TestCase):
     def test_standard_fixture_has_no_new_format_errors(self):
         self.assertFalse(self.codes() & {'NONSTANDARD_TOP_BLOCK','NONSTANDARD_BASIC_BLOCK','NONSTANDARD_PLATFORM_BLOCK','FINAL_UNFINISHED_TEXT'})
 
+    def set_public_cases(self, count, image_count=1):
+        self.s['review_context']['platforms']['微博']['risk_items']=[
+            {'group_index':1,'fact_text':f'案例{i}的已核实行为。','image_count':image_count,
+             'url':f'https://weibo.com/1234567/{i}','include_in_top':False} for i in range(count)]
+
+    def test_four_selected_cases_do_not_exceed_the_limit(self):
+        self.set_public_cases(4)
+        self.assertNotIn('RISK_CASE_LIMIT',self.codes())
+
+    def test_fifth_same_category_public_case_is_rejected(self):
+        self.set_public_cases(5)
+        self.assertIn('RISK_CASE_LIMIT',self.codes())
+
+    def test_splitting_group_titles_does_not_reset_same_business_category_limit(self):
+        self.set_public_cases(5)
+        rows=self.s['review_context']['platforms']['微博']['risk_items']
+        for i,row in enumerate(rows):row['group_index']=i+1
+        self.s['review_context'].setdefault('business_risk_review',{})['confirmed_hits']=[
+            {'business_item':'同一风险类别','verified_fact':row['fact_text']} for row in rows]
+        self.assertIn('RISK_CASE_LIMIT',self.codes())
+
+    def test_two_facts_from_same_post_do_not_count_as_two_cases(self):
+        self.set_public_cases(5)
+        rows=self.s['review_context']['platforms']['微博']['risk_items']
+        rows[-1]['url']=rows[0]['url']
+        self.assertNotIn('RISK_CASE_LIMIT',self.codes())
+
+    def test_excluding_case_from_top_does_not_allow_image_free_public_prose(self):
+        self.set_public_cases(1,image_count=0)
+        self.assertIn('RISK_ITEM_IMAGE_REQUIRED',self.codes())
+
 if __name__ == '__main__':
     unittest.main()

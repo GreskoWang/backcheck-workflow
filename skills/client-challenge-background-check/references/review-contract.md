@@ -29,15 +29,17 @@ client_challenge_review = {
 
 ## 终稿映射
 
-`inclusions` 只包含已闭环、未被用户明确删除的曾警惕事项，`kind="risk"`。每个须公开的原始位置 `(batch_id,item_index)` 都有经终审的 `summary/platform` 和来源链接；最终仍疑问不得使用 `unresolved_doubt` 写入正文。
+`inclusions` 只包含已闭环且实际入选的曾警惕事项，`kind="risk"`。每个入选原始位置 `(batch_id,item_index)` 都有经终审的 `summary/platform` 和来源链接；最终仍疑问不得使用 `unresolved_doubt` 写入正文。
+
+同类风险已有案例入稿时，可使用 `same_category_omissions:[{id,occurrences:[{batch_id,item_index}],risk_group_index,summary:{block_id,text},platform:{block_id,text},reviewer_id,basis}]`，仅在内部记录未选内容。`summary/platform/risk_group_index` 必须指向当前终审实际通过的同类风险代表案例，`reviewer_id` 为主调查者，`basis` 简述核对原帖后为何属于同一实质风险类别。可以在同类仅有1例时去重，不要求凑满4例；无真实代表案例、分类不符或仍把被排除原帖链接放在正文时不能通过。原始态度和必要事实复评不因此省略，不另建全量证明包。
 
 `unresolved_items:[{id,known_facts,unknown,source_refs,disposition:"internal_only"}]` 精确记录最终仍疑问的 ID、已知事实、具体未知及原始来源，保留实际态度。不得据此将未完成调查范围改为已查无问题；可继续执行的范围仍须推进。内部未闭环记录不要求公开位置。
 
 `unresolved_items` 非空本身不影响 PASS：约定调查及必要复评完成、记录齐全且疑问未进入终稿，即可继续交付，不要求未知数量清零。此状态表示该疑问已按内部处理规则结项，不表示未知事实已查明；真实执行缺口另行判断。
 
-用户明确删改使用 `user_directed_exclusions:[{id,occurrences:[{batch_id,item_index}],instruction,authorization_ref}]`，逐项绑定本任务实际原始位置、用户原文和真实消息定位；不能由助手自行编造或借此一般化删除已核实风险。历史 `ever_alert_ids/triggered_term_ids` 仍由真实轮次重算，不篡改态度；公开覆盖集合扣除最终疑问和有效用户删改。
+用户明确删改使用 `user_directed_exclusions:[{id,occurrences:[{batch_id,item_index}],instruction,authorization_ref}]`，逐项绑定本任务实际原始位置、用户原文和真实消息定位；不能由助手自行编造。历史 `ever_alert_ids/triggered_term_ids` 仍由真实轮次重算，不篡改态度；公开覆盖集合扣除最终疑问、有效同类去重和用户删改。
 
-`source_url` 来自实际采集条目，`link` 位置包含完整可见 URL 或真实超链接；`platform` 写清所指对象与具体事实，不以空标题、仅有 URL 或无关履历代替。各别名共用同一实体出现映射；不同实体不能借同名合并。合并与截图额度不免除公开覆盖。
+`source_url` 来自实际采集条目，`link` 位置包含完整可见 URL 或真实超链接；`platform` 写清所指对象与具体事实，不以空标题、仅有 URL 或无关履历代替。各别名共用同一实体出现映射；不同实体不能借同名合并。每个平台每类最多4个入选案例；其余同类内容不得以简述或链接追加到正文，按下述同类去重记录内部去向。
 
 `current_final_review` 直接使用原有终审完整输出。根与 receipt 的 PASS、文档 token/revision、完整文档摘要、当前调查及风险表绑定必须一致；终审时间在最后实际复评和成稿之后。不需要 `initial_final_review`。
 
