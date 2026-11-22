@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Whole-document disclaimer gate shared by ordinary and strict Feishu review.
 
-Patterns reject known forms. A current, complete semantic review is separately
-required: a pattern miss is never evidence that the prose is acceptable.
+Patterns locate assistant prose and explicitly attributed source quotations
+separately. Current whole-document semantic review verifies their context.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import unicodedata
 from datetime import datetime
 from typing import Any
 
-DISCLAIMER_POLICY_VERSION = "1.0.0"
+DISCLAIMER_POLICY_VERSION = "1.1.0"
 
 # Match explanatory disclaimers, not bare negative findings such as 未找到版权方.
 # There is deliberately no whole-block whitelist for legitimate findings.
@@ -26,6 +26,61 @@ _PATTERNS = (
 )
 _COMPILED = [(name, re.compile(pattern, re.IGNORECASE)) for name, pattern in _PATTERNS]
 _URL = re.compile(r"https?://[^\s<>\"，。；]+", re.IGNORECASE)
+_SOURCE_CUE = re.compile(
+    r"(?:对象原帖|主体原帖|原帖内容|原帖|原文|截图文字|图片文字|第三方评论)\s*[：:]\s*"
+    r"|(?:对象原帖|主体原帖|原帖作者|原帖|原文|贴主|帖主|作者|对象|主体|"
+    r"第三方|评论者|上传者|公告|截图文字|截图|图片文字|他|她)\s*"
+    r"(?:写道|写明|写着|表示|回复|评论|称|提到|标注|显示|注明)\s*[：:]\s*"
+    r"|\b(?:the\s+)?(?:original\s+poster|post\s+author|poster|source|author)\s+"
+    r"(?:wrote|said|stated|replied)\s*:\s*", re.IGNORECASE,
+)
+_REPORT_SELF = re.compile(r"本报告|本次调查|本次背调|调查结果|本助手|本说明|this\s+report|our\s+report", re.IGNORECASE)
+_QUOTE_PAIRS = {"“": "”", "「": "」", "『": "』", "‘": "’", '"': '"', "'": "'"}
+
+
+def _source_quotes(text: str) -> list[tuple[int, int, str]]:
+    """Locate bounded quotes with a source cue; semantic review checks attribution.
+
+    Parse before normalization so an unquoted source statement ends at its own
+    sentence or line, rather than absorbing the following report paragraph.
+    """
+    spans: list[tuple[int, int, str]] = []
+    for cue in _SOURCE_CUE.finditer(text):
+        if spans and cue.start() < spans[-1][1]:
+            continue
+        prefix = re.split(r"[。！？!?\r\n；;]", text[:cue.start()])[-1]
+        if _REPORT_SELF.search(prefix):
+            continue
+        start = cue.end()
+        if start >= len(text):
+            continue
+        opener = text[start]
+        if opener in _QUOTE_PAIRS:
+            closer = _QUOTE_PAIRS[opener]
+            depth = 1
+            end = start + 1
+            while end < len(text):
+                char = text[end]
+                if char == closer:
+                    depth -= 1
+                    if depth == 0:
+                        end += 1
+                        break
+                elif char == opener:
+                    depth += 1
+                end += 1
+            if depth:
+                continue
+        else:
+            tail = text[start:]
+            boundary = re.search(r"[。！？!?\r\n；;]|\.(?=\s|$)", tail)
+            end = start + boundary.start() if boundary else len(text)
+            own_prose = _REPORT_SELF.search(text[start:end])
+            if own_prose:
+                end = start + own_prose.start()
+        if end > start:
+            spans.append((start, end, cue.group().strip()))
+    return spans
 
 
 def _normalized(text: str) -> str:
@@ -37,14 +92,31 @@ def _normalized(text: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-def scan_disclaimers(text: str) -> list[dict[str, str]]:
+def _scan_prose(text: str) -> list[dict[str, str]]:
     value = _normalized(text)
     found = []
     for name, pattern in _COMPILED:
-        match = pattern.search(value)
-        if match:
+        for match in pattern.finditer(value):
             found.append({"code": "DISCLAIMER_TEXT", "excerpt": value[max(0, match.start() - 35):match.end() + 70], "reason": name})
     return found
+
+
+def scan_disclaimer_context(text: str) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Return prose findings and source quotes for the existing semantic review."""
+    findings: list[dict[str, str]] = []
+    quotes: list[dict[str, str]] = []
+    cursor = 0
+    for start, end, attribution in _source_quotes(text):
+        findings.extend(_scan_prose(text[cursor:start]))
+        for finding in _scan_prose(text[start:end]):
+            quotes.append({**finding, "code": "SOURCE_QUOTE", "attribution": attribution})
+        cursor = end
+    findings.extend(_scan_prose(text[cursor:]))
+    return findings, quotes
+
+
+def scan_disclaimers(text: str) -> list[dict[str, str]]:
+    return scan_disclaimer_context(text)[0]
 
 
 def _visible_text(value: Any, parent: str = "") -> list[str]:
@@ -118,13 +190,16 @@ def audit_disclaimer_review(document: dict, items: list[dict], raw_content: Any,
         key = (location, str(actual))
         if key not in seen:
             seen.add(key)
-            errors.append({"code": "DISCLAIMER_TEXT", "location": location, "actual": str(actual), "expected": f"删除免责表述，按来源保留直接事实或调查结论；{reason}"})
+            errors.append({"code": "DISCLAIMER_TEXT", "location": location, "actual": str(actual), "expected": f"将助手附加说明改为具体事实记录，来源引文核对归属与语境；{reason}"})
 
     def block(code: str, actual: Any, expected: str) -> None:
         blocked.append({"code": code, "location": "review_context.disclaimer_review", "actual": str(actual), "expected": expected})
 
     for record in records:
-        for finding in scan_disclaimers(record["text"]):
+        findings, quotes = scan_disclaimer_context(record["text"])
+        for quote in quotes:
+            info.append(f"SOURCE_QUOTE: {record['location']}: {quote['attribution']} {quote['excerpt']}；纳入当前全文来源与语境核对")
+        for finding in findings:
             error(record["location"], finding["excerpt"], finding["reason"])
     # Split sentences in adjacent blocks cannot evade the deterministic check.
     block_records = [record for record in records if record["location"] not in {"document.title", "raw_content"}]
@@ -147,7 +222,7 @@ def audit_disclaimer_review(document: dict, items: list[dict], raw_content: Any,
                 else:
                     error("document", finding, "semantic disclaimer")
         else:
-            block("DISCLAIMER_REVIEW_FINDINGS", findings, "findings 数组；发现任何形式免责即 FAIL")
+            block("DISCLAIMER_REVIEW_FINDINGS", findings, "findings 数组，记录需修正的助手附加说明或来源归属问题")
         if review.get("status") == "FAIL" and not findings:
             error("document", "semantic review FAIL", "全文语义审阅发现免责")
         elif review.get("status") not in {"PASS", "FAIL"}:

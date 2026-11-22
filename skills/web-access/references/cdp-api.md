@@ -1,5 +1,7 @@
 # Edge CDP Broker API
 
+> 适用范围：本文件保留非背调项目的旧 Edge 接口和历史方法。当前背调取材按 [ego 统一规则](../../background-check-research/references/ego-browser-policy.md)执行，使用本任务 ego 页面及其实际可用能力。
+
 ## 元素文字完整性（2026-10-24）
 
 `/health.capabilities` 含 `element-text-completeness-v1` 时，elements 查询中每个请求了 text 的元素额外返回 `text_truncated`。每项仍最多 1000 字符、200 个文本节点，任何一项截断都会传播到外层 `truncated=true`。这是完整性修复，不是解除大小限制。需全文时先用 elements 定位，再对唯一明确的公开内容节点使用 kind=text，检查其独立截断标记；不得把短卡片摘要当全文。旧运行实例没有该能力时，外层 `truncated=false` 不能证明各元素的文字完整。该变更也适用于已批准的开放 shadow 与同源可见 iframe 中的元素查询。
@@ -86,7 +88,7 @@ pwsh -NoProfile -File $request -Method GET -Path '/targets' -Owner $owner
 
 `scroll-selector-v1`实现持久客户端已文档化的可选`selector`：`/scroll?...&selector=main`经现有安全CSS校验，必须恰好匹配一个可见、非敏感的普通主页面DOM元素；只从它向祖先寻找可滚区域（可使用其可滚的文档祖先），不扫描子frame。无匹配、多匹配、隐藏或不可滚明确失败，不回落视口中心，也不产生iframe wheel或接受坐标；省略selector保持原有中心pane逻辑。用相同选择器先做小范围公开elements核对实际文字和唯一性，页面结构改变后重新核对。2026-10-17离线补实现及回归，不代表当前运行实例已加载或抖音原失败场景已恢复；须由root统一盘点、必要加载后实际验收。
 
-`iframe-center-wheel-v1` 表示当前实例已加载可见iframe的窄补充：主页面无内部滚动pane、外层window无可滚距、视口中心实际命中可见iframe且原DOM滚动未移动时，同一 `/scroll` 仅对该固定中心发送一次原生mouseWheel。只允许up/down与1—800px，不接受客户端坐标，不进入子frame DOM或读取其存储，不新增CDP方法或权限；普通窗口、内部pane及末尾不换pane的原路径不变。返回 `position.target="iframe"`、`wheelDispatched=true`、`motionConfirmed=false`，`x/y/moved/atStart/atEnd` 为null，表示框内运动未知。必须实际查看新的截图或新卡片确认滚动，不能把事件发送成功称为moved或终点；截图超时仍保留具体缺口。wheel结果未知沿原隔离与不重放规则处理。磁盘更新和本地自测不表示运行broker已生效；本批只有root核对全部owner并保护其他任务后才能受控加载与现场复验。
+`iframe-center-wheel-v1` 表示当前实例已加载可见iframe的窄补充：主页面无内部滚动pane、外层window无可滚距、视口中心实际命中可见iframe且原DOM滚动未移动时，同一 `/scroll` 仅对该固定中心发送一次原生mouseWheel。只允许up/down与1—800px，不接受客户端坐标，不进入子frame DOM或读取其存储，不新增CDP方法或权限；普通窗口、内部pane及末尾不换pane的原路径不变。返回 `position.target="iframe"`、`wheelDispatched=true`、`motionConfirmed=false`，`x/y/moved/atStart/atEnd` 为null，表示框内运动未知。必须实际查看新的截图或新卡片确认滚动，不能把事件发送成功称为moved或终点；截图超时仍保留具体缺口。wheel结果未知沿原隔离与不重放规则处理。磁盘更新和本地自测不表示运行broker已生效；需要加载该旧接口时，由本次维护执行者核对实际页面归属和其他任务占用，再按当前授权验证。
 
 后台页停留在加载占位或无限列表暂底时，可先使用`POST /activate?target=ID`激活同一任务页，再核对内容并做一次增量滚动。需要`/health.capabilities`含`leased-page-activate-v1`；服务端沿用租约、串行队列及短超时，只有固定的`Page.bringToFront`调用，不提供任意CDP入口。`activated=true`只表示切换操作完成，不证明续载恢复；以实际新内容为准。不要为激活已有页面新建同网址页面或刷新列表。
 
@@ -190,7 +192,7 @@ try {
 
 示例：`{"kind":"elements","frameSelector":"iframe#g_iframe","selector":"a[href]","visibility":"rendered","limit":30,"fields":["text","href"]}`。这不是任意脚本接口，不扩大 CDP 方法白名单。
 
-本地 frame、click、shadow 和 proxy 回归通过，但当前任务的服务重载被自动审批拒绝，尚未完成原网易云页面点击验收。运行实例未出现该 capability 前不得调用或宣称修复成功。
+历史记录（2026-10-24）：当时本地 frame、click、shadow 和 proxy 回归通过，该次会话的服务重载被自动审批拒绝，原网易云页面点击尚未验收。本次能力与权限以当前工具返回和实际页面验证为准。
 
 ## 可选开放 Shadow DOM 定位（接口正文）
 

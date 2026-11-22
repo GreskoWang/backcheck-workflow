@@ -646,5 +646,78 @@ class ClientChallengeTests(unittest.TestCase):
         self.assert_failure("LEDGER")
 
 
+class EmptyChallengeTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def prepare(self, terminal_kind=None):
+        # Reuse the real acquisition/semantic/independent-review source fixture.
+        scripts = Path(__file__).resolve().parents[2] / "background-check-research/scripts"
+        sys.path.insert(0, str(scripts))
+        self.addCleanup(lambda: sys.path.remove(str(scripts)))
+        from test_discovery_gate import empty_terms_fixture
+        self.review, _, _, self.policy = fixture(self.root)
+        source_root = self.root / "empty-source"
+        source_root.mkdir(exist_ok=True)
+        self.discovery = empty_terms_fixture(source_root, [] if terminal_kind else None, terminal_kind)
+        self.items = [block("empty", "No established issue in the reviewed material.")]
+        self.review.update(version=2, task_id=self.discovery["task_id"], source_revision=self.discovery["source_revision"],
+                           triggered_term_ids=[], ever_alert_ids=[])
+        self.review.pop("inclusion")
+        self.review["nouns"] = write_json(self.root / "nouns.json", [])
+        self.review["first_input"] = write_json(self.root / "first-input.json", [])
+        binding = {"task_id": self.discovery["task_id"], "source_revision": self.discovery["source_revision"],
+                   "discovery_sha256": discovery_sha256(self.discovery)}
+        for key in ("initial_final_review", "current_final_review"):
+            ref = self.review[key]
+            audit = json.loads(Path(ref["path"]).read_text(encoding="utf-8"))
+            for obj in (audit, audit["receipt"]):
+                obj.update(discovery_binding=binding, risk_locations=[], document_sha256=document_sha256(self.items))
+            self.review[key] = write_json(Path(ref["path"]), audit)
+        child = self.review["child"]
+        common = {"task_id": self.review["task_id"], "source_revision": self.review["source_revision"], "agent_id": child["agent_id"]}
+        child["proof"] = write_json(self.root / "spawn-proof.json", {**common, "fork_turns": "none",
+            "spawn_ref": child["spawn_ref"], "spawned_at": child["spawned_at"],
+            "first_input_sha256": self.review["first_input"]["sha256"], "policy_sha256": self.review["policy"]["sha256"]})
+        first = self.review["rounds"][0]
+        first["response"] = write_json(self.root / "response-1.json", [])
+        first["answer"] = write_json(self.root / "answer-1.json", [])
+        first["proof"] = write_json(self.root / "result-proof-1.json", {**common, "index": 1,
+            "result_ref": first["result_ref"], "responded_at": first["responded_at"],
+            "response_sha256": first["response"]["sha256"], "input_sha256": self.review["first_input"]["sha256"]})
+        self.review["rounds"] = [first]
+        self.review["task_ledger"] = write_json(self.root / "task-ledger.json", {"version": 2,
+            "task_id": common["task_id"], "source_revision": common["source_revision"], "created_agent_ids": [common["agent_id"]],
+            "rounds": [{"index": 1, "agent_id": common["agent_id"], "result_ref": first["result_ref"],
+                        "response_sha256": first["response"]["sha256"], "answer_sha256": first["answer"]["sha256"]}],
+            "triggered_term_ids": [], "ever_alert_ids": []})
+        self.review["followup"] = write_json(self.root / "followup.json", {"categories": [], "terms": []})
+
+    def audit(self):
+        return audit_client_challenge(self.review, discovery_review=self.discovery, items=self.items,
+            document_token="synthetic-doc", revision_id=2, required_policy_path=self.policy, historical_v1=True)
+
+    def test_complete_source_review_and_real_empty_challenge_round_pass(self):
+        self.prepare()
+        self.assertEqual(self.audit()["verdict"], "PASS", self.audit())
+
+    def test_evidenced_zero_material_and_unknown_access_count_pass_across_stages(self):
+        for kind in ("no_results", "objective_unavailable"):
+            with self.subTest(kind=kind):
+                self.prepare(kind)
+                self.assertEqual(self.audit()["verdict"], "PASS", self.audit())
+
+    def test_empty_table_cannot_remove_actual_research_or_challenge_review(self):
+        for broken in ("semantic", "challenge_child", "rounds", "stale_source"):
+            self.prepare()
+            if broken == "semantic": self.discovery["semantic_review"]["items"] = []
+            elif broken == "challenge_child": self.review["child"]["agent_id"] = self.discovery["subagent_review"]["agent_id"]
+            elif broken == "rounds": self.review["rounds"] = []
+            else: Path(self.discovery["semantic_review"]["source_batches"][0]["path"]).write_text('{"items": []}', encoding="utf-8")
+            self.assertEqual(self.audit()["verdict"], "FAIL", broken)
+
+
 if __name__ == "__main__":
     unittest.main()

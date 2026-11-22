@@ -20,6 +20,10 @@
 
 必需步骤为 `source_collection,semantic_analysis,term_extraction,reverse_review`。校验实际批次、语义覆盖、完整名词与来源对应、反查结果及已经核实的应记事实。原有采集文件指纹可复用，不为质询每轮再生成哈希或重复证明文件。
 
+全范围没有特殊名词时，`reverse_pass` 保留具体 `no_special_terms_reason` 和当前 `source_refs`；不要求查询子代理。声明 `truncated`、`text_truncated` 或 `needs_expansion` 的已采集正文仍须补齐，空名词表不能消除未读材料。
+
+既有 v2 审计记录中的空采集批次须对应真实的零结果或客观不可访问观察。复用 `terminal_outcome` 的 `status:"complete"`、`kind:"no_results"` 或 `"objective_unavailable"`、实际原因、`evidence_refs` 及 `evidence:{path,sha256}`。证据 JSON 绑定当前 `source_ref`、带时区 `checked_at` 和 `access_outcome`；零结果须有 `collection_complete:true,result_count:0,observed_text`，客观不可访问须有明确的 `access_reason,access_message,content_obtained:false,result_count:null`。访问原因及业务结论遵循[当前访问规则](access-policy.md)。哈希失配、其他账号证据、加载中或超时不能结项；既有已核实事实也不会因此被删除。这是现有审计记录的校验合同，不新增普通交付的取证包要求。
+
 ```powershell
 python "$env:BACKCHECK_SKILLS_ROOT/background-check-research/scripts/discovery_gate.py" --state <当前任务状态JSON>
 ```

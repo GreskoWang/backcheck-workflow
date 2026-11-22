@@ -387,9 +387,10 @@ async function runJob(job) {
           specialIntakeReasons: prepared.reasons });
         return;
       }
+      // Derived text and hashed attachment keys remain in specialIntake;
+      // the original request identity and intake fingerprint stay immutable.
       store.updateJob(job.requestId, { specialIntake: prepared.specialIntake || prepared,
-        specialOwnership: prepared.specialOwnership, sourceMediaKeys: prepared.sourceMediaKeys,
-        requestText: prepared.requestText || job.requestText,
+        specialOwnership: prepared.specialOwnership,
         pricingStatus: prepared.pricing?.status || 'pending_pricing',
         preflightModelUsed: prepared.preflightModelUsed });
       job = store.getJob(job.requestId);

@@ -14,7 +14,7 @@ from typing import Any, Iterable
 
 BUSINESS_RISK_SCOPE = "current_business_risk_policy_and_full_document"
 CURRENT_BUSINESS_RISK_POLICY = (Path(os.environ["BACKGROUND_CHECK_WORKSPACE"]) / "背调风险提示.md")
-RESULT_LEVELS = {"建议谨慎评估", "建议评估", "无合作风险"}
+RESULT_LEVELS = {"建议谨慎评估", "建议评估", "低合作风险"}
 TEXT_KEYS = (
     "text",
     "heading1",
@@ -495,7 +495,7 @@ def audit_business_risk_review(
                     )
                 )
             result_level = hit.get("result_level")
-            allowed_results = RESULT_LEVELS - {"无合作风险"} if expected_group_indices else RESULT_LEVELS
+            allowed_results = RESULT_LEVELS - {"低合作风险"} if expected_group_indices else RESULT_LEVELS
             if isinstance(result_level, str) and result_level not in allowed_results:
                 errors.append(
                     _finding(

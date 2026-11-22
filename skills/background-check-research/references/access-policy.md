@@ -1,6 +1,6 @@
 # 访问与工具规则
 
-本文件只规定浏览器、登录、公开 API、临时工具和故障止损。调查范围看 [十四平台规程](platform-runbook.md)，判断方法看 [调查方法](methods.md)。
+本文件是浏览器、登录、公开 API、临时工具和故障止损的统一规则；[Ego 入口](ego-browser-policy.md)只负责导航，不另设限制。调查范围看 [十四平台规程](platform-runbook.md)，判断方法看 [调查方法](methods.md)。
 
 ## 客观不可访问项按无问题结项
 

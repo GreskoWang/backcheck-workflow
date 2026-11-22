@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from discovery_gate import MANDATORY_STAGES, audit_discovery_review
+from discovery_gate import MANDATORY_STAGES, audit_discovery_review, terminal_evidence_error
 
 
 def write_json(path, value):
@@ -81,6 +81,26 @@ class DiscoveryGateTests(unittest.TestCase):
         self.review["entities"][0]["terminal_outcome"] = {"kind":"objective_unavailable"}
         self.assert_failure("DISCOVERY_REPORT_OMISSION", facts=[])
 
+    def test_unavailable_term_uses_actual_access_receipt_without_inventing_query_results(self):
+        url = "https://example.invalid/festival"
+        path = self.root / "term-access.json"
+        digest = write_json(path, {"source_ref": url, "checked_at": "2026-11-11T00:00:00Z",
+            "access_outcome": "objective_unavailable", "access_reason": "deleted",
+            "access_message": "This page has been deleted.", "content_obtained": False, "result_count": None})
+        terminal = {"status": "complete", "kind": "objective_unavailable", "conclusion": "无问题",
+            "reason": "The referenced page is deleted.", "evidence_refs": [url],
+            "evidence": {"path": str(path), "sha256": digest}}
+        self.review["entities"][1].update(background_refs=[url], terminal_outcome=terminal)
+        self.mutate_receipt(lambda receipt: receipt["reviews"][1].update(queries=[], terminal_outcome=terminal))
+        self.assertEqual(self.audit()["verdict"], "PASS", self.audit())
+        self.assert_failure("DISCOVERY_REPORT_OMISSION", facts=[])
+        # Access proof is checked only where closure is claimed; noun queries
+        # and a query child are no longer a discovery prerequisite.
+        self.assertIsNone(terminal_evidence_error(terminal, expected_source_refs=[url]))
+        self.assertIsNotNone(terminal_evidence_error(terminal, expected_source_refs=["https://example.invalid/unrelated-page"]))
+        path.write_text("{}", encoding="utf-8")
+        self.assertIsNotNone(terminal_evidence_error(terminal, expected_source_refs=[url]))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -124,6 +144,8 @@ class DiscoveryGateTests(unittest.TestCase):
     def test_genuinely_nameless_material_can_have_empty_noun_table(self):
         self.review["entities"] = []
         self.review["reverse_pass"]["names"] = []
+        self.review["reverse_pass"].update(no_special_terms_reason="Source-first review found no special nouns in this fixture.",
+                                          source_refs=self.review["source_refs"][:])
         for item in self.review["semantic_review"]["items"]:
             item.update(names=[], no_special_terms_reason="Only ordinary descriptions in this offline nameless-input test.")
         self.assertEqual(self.audit(facts=[])["verdict"], "PASS")
@@ -328,6 +350,150 @@ class DiscoveryGateTests(unittest.TestCase):
             run = subprocess.run([sys.executable, str(Path(__file__).with_name("discovery_gate.py")), "--state", str(path)], capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(run.returncode, code, run.stderr + run.stdout)
             self.assertEqual(json.loads(run.stdout)["verdict"], "PASS" if code == 0 else "FAIL")
+
+
+def empty_terms_fixture(root, rows=None, terminal_kind=None):
+    """Real source bytes and two source-bound empty-term review records."""
+    root = Path(root)
+    review = fixture(root)
+    rows = [{"source_ref": "https://example.invalid/post/weather", "text": "It rained all morning."}] if rows is None else rows
+    review["entities"] = []
+    review["semantic_review"]["items"] = [
+        {"batch_id": "batch-A", "item_index": i, "status": "complete", "summary": "An ordinary weather observation.",
+         "names": [], "no_special_terms_reason": "Only ordinary weather and time words occur."} for i in range(len(rows))]
+    review["reverse_pass"] = {"status": "complete", "names": [],
+        "no_special_terms_reason": "The acquired material and access records contain no special nouns.",
+        "source_refs": review["source_refs"][:]}
+    source = {"items": rows}
+    if terminal_kind:
+        evidence = {"source_ref": "https://example.invalid/account", "checked_at": "2026-11-11T00:00:00Z",
+                    "access_outcome": terminal_kind, "result_count": None if terminal_kind == "objective_unavailable" else 0}
+        source["source_ref"] = evidence["source_ref"]
+        if terminal_kind == "objective_unavailable":
+            evidence.update(access_reason="private", access_message="Only approved followers can view this account.", content_obtained=False)
+        else:
+            evidence.update(collection_complete=True, observed_text="No matching posts in this requested time range.")
+        evidence_path = root / "access.json"
+        evidence_hash = write_json(evidence_path, evidence)
+        source["terminal_outcome"] = {"status": "complete", "kind": terminal_kind,
+            "conclusion": "无问题" if terminal_kind == "objective_unavailable" else "无相关结果",
+            "reason": "Observed private account restriction." if terminal_kind == "objective_unavailable" else "Completed query returned no posts.",
+            "evidence_refs": [evidence["source_ref"]], "evidence": {"path": str(evidence_path), "sha256": evidence_hash}}
+    batch = review["semantic_review"]["source_batches"][0]
+    batch["sha256"] = write_json(Path(batch["path"]), source)
+    manifest_path = Path(review["acquisition_manifest"]["path"])
+    manifest = {"task_id": review["task_id"], "source_revision": review["source_revision"],
+                "source_batches": review["semantic_review"]["source_batches"]}
+    review["acquisition_manifest"]["sha256"] = write_json(manifest_path, manifest)
+    receipt_path = Path(review["subagent_review"]["receipt_path"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt.update(reviews=[], acquisition_sha256=review["acquisition_manifest"]["sha256"],
+                   no_special_terms_reason="Independently reviewed the exact source material; no special nouns are present.",
+                   source_refs=review["source_refs"][:])
+    write_json(receipt_path, receipt)
+    return review
+
+
+class DiscoveryEmptyAndAccessTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def audit(self, review):
+        return audit_discovery_review(review, reported_facts=[])
+
+    def rewrite_source(self, review, change):
+        batch = review["semantic_review"]["source_batches"][0]
+        source = json.loads(Path(batch["path"]).read_text(encoding="utf-8"))
+        change(source)
+        batch["sha256"] = write_json(Path(batch["path"]), source)
+        manifest_path = Path(review["acquisition_manifest"]["path"])
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["source_batches"] = review["semantic_review"]["source_batches"]
+        review["acquisition_manifest"]["sha256"] = write_json(manifest_path, manifest)
+        receipt_path = Path(review["subagent_review"]["receipt_path"])
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["acquisition_sha256"] = review["acquisition_manifest"]["sha256"]
+        write_json(receipt_path, receipt)
+
+    def test_complete_real_sources_without_special_terms_pass(self):
+        result = self.audit(empty_terms_fixture(self.root))
+        self.assertEqual(result["verdict"], "PASS", result)
+
+    def test_real_empty_query_and_objective_unavailable_unknown_count_pass(self):
+        for kind in ("no_results", "objective_unavailable"):
+            with self.subTest(kind=kind):
+                review = empty_terms_fixture(self.root, [], kind)
+                result = self.audit(review)
+                self.assertEqual(result["verdict"], "PASS", result)
+
+    def test_empty_source_without_evidenced_completion_fails(self):
+        result = self.audit(empty_terms_fixture(self.root, []))
+        self.assertEqual(result["verdict"], "FAIL", result)
+
+    def test_empty_source_cannot_borrow_another_accounts_access_proof(self):
+        review = empty_terms_fixture(self.root, [], "objective_unavailable")
+        self.rewrite_source(review, lambda s: s.update(source_ref="https://example.invalid/another-account"))
+        self.assertEqual(self.audit(review)["verdict"], "FAIL")
+        self.rewrite_source(review, lambda s: s.pop("source_ref"))
+        self.assertEqual(self.audit(review)["verdict"], "FAIL")
+        self.rewrite_source(review, lambda s: s.update(job={"target_url": "https://example.invalid/account"}))
+        self.assertEqual(self.audit(review)["verdict"], "PASS")
+
+    def test_empty_terms_do_not_excuse_skipped_reading_or_source_reverse_review(self):
+        for target in ("semantic", "reverse"):
+            review = empty_terms_fixture(self.root)
+            if target == "semantic": review["semantic_review"]["items"] = []
+            else: review["reverse_pass"].pop("no_special_terms_reason")
+            self.assertEqual(self.audit(review)["verdict"], "FAIL", target)
+
+    def test_empty_source_review_requires_no_query_child(self):
+        review = empty_terms_fixture(self.root)
+        review.pop("subagent_review")
+        self.assertEqual(self.audit(review)["verdict"], "PASS")
+
+    def test_omitted_terms_cannot_hide_behind_empty_entities(self):
+        review = empty_terms_fixture(self.root)
+        review["semantic_review"]["items"][0]["names"] = ["Real Extracted Name"]
+        self.assertEqual(self.audit(review)["verdict"], "FAIL")
+
+    def test_unavailable_requires_real_hash_and_objective_access_observation(self):
+        for mutation in ("missing", "stale_hash", "timeout", "loading", "tool_error", "invented_zero", "no_message", "pretend_read"):
+            review = empty_terms_fixture(self.root, [], "objective_unavailable")
+            path = self.root / "access.json"
+            evidence = json.loads(path.read_text(encoding="utf-8"))
+            if mutation == "missing": path.unlink()
+            elif mutation == "stale_hash": path.write_text("{}", encoding="utf-8")
+            else:
+                if mutation in ("timeout", "loading", "tool_error"):
+                    evidence.update(access_reason=mutation, access_message="No completed page access observation")
+                elif mutation == "invented_zero": evidence["result_count"] = 0
+                elif mutation == "no_message": evidence["access_message"] = ""
+                else: evidence["content_obtained"] = True
+                digest = write_json(path, evidence)
+                self.rewrite_source(review, lambda s: s["terminal_outcome"]["evidence"].update(sha256=digest))
+            self.assertEqual(self.audit(review)["verdict"], "FAIL", mutation)
+
+    def test_zero_result_requires_actual_completed_search_and_known_zero(self):
+        for mutation in ({"collection_complete": False}, {"result_count": None}, {"result_count": 1},
+                         {"result_count": False}, {"observed_text": ""}, {"needs_expansion": True}):
+            review = empty_terms_fixture(self.root, [], "no_results")
+            path = self.root / "access.json"
+            evidence = json.loads(path.read_text(encoding="utf-8"))
+            evidence.update(mutation)
+            digest = write_json(path, evidence)
+            self.rewrite_source(review, lambda s: s["terminal_outcome"]["evidence"].update(sha256=digest))
+            self.assertEqual(self.audit(review)["verdict"], "FAIL", mutation)
+
+    def test_runtime_incomplete_flags_fail_until_full_source_is_obtained(self):
+        for key in ("text_truncated", "needs_expansion", "truncated"):
+            review = empty_terms_fixture(self.root)
+            self.rewrite_source(review, lambda s: s["items"][0].update({key: True}))
+            result = self.audit(review)
+            self.assertIn("DISCOVERY_INCOMPLETE_SOURCE", {r["code"] for r in result["errors"]}, result)
+            self.rewrite_source(review, lambda s: s["items"][0].update({key: False, "text": "It rained all morning and cleared by noon."}))
+            self.assertEqual(self.audit(review)["verdict"], "PASS")
 
 
 if __name__ == "__main__":
