@@ -488,7 +488,7 @@ class TargetedPayloadTests(unittest.TestCase):
         clean["risk_summary_order"] = []
         clean["verdict"] = {
             "has_risk": False,
-            "result_level": "无合作风险",
+            "result_level": "低合作风险",
             "overall_conclusion": "在约定的三小时定向范围内未发现合作风险。",
         }
         clean_lead = clean["coverage"]["user_risk_leads"][0]

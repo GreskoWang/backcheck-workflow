@@ -27,9 +27,16 @@ export async function applyResolvedIntake({ job, scope, metadata, policy, store,
       } catch {
         store.updateJob(job.requestId, { accountingStatus: 'pending_pricing', pricingRegistryPending: true });
       }
+    } else if (policy?.accountingEnabled === false) {
+      const current = store.getJob(job.requestId);
+      assertAccountingConfirmed(current, policy);
+      if (current.accountingStatus !== 'recorded') {
+        store.updateJob(job.requestId, { accountingStatus: 'disabled',
+          accountingCheckedAt: new Date().toISOString() });
+      }
     } else {
       try {
-        if (!policy.accountingEnabled) throw new Error('accounting is not authorized for source group');
+        if (policy?.accountingEnabled !== true) throw new Error('accounting is not authorized for source group');
         const accounting = await recordAccounting({ job, scope });
         store.updateJob(job.requestId, { accountingStatus: accounting.status,
           accountingRecorded: accounting.recorded, accountingBlocked: accounting.blocked || [],
@@ -49,7 +56,7 @@ export async function applyResolvedIntake({ job, scope, metadata, policy, store,
   }
   // Preserve the existing duplicate/accounting hold for watched assignments.
   // Receipt-only dispatches have no authorized ledger items and skip it.
-  if (scope.decision === 'execute' && scope.requestMode === 'team_dispatch') assertAccountingConfirmed(store.getJob(job.requestId));
+  if (scope.decision === 'execute' && scope.requestMode === 'team_dispatch') assertAccountingConfirmed(store.getJob(job.requestId), policy);
   const receipt = await sendAcceptanceReceiptOnce({ store, requestId: job.requestId, scope,
     enabled: policy.acceptanceRepliesEnabled, policy, acceptanceFromMs, maxChars, send, readback,
     formatText: (resolvedScope, requestId) => resolvedScope.requestMode === 'special_dispatch'

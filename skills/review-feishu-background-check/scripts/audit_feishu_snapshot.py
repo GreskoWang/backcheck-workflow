@@ -20,6 +20,8 @@ from disclaimer_gate import (DISCLAIMER_POLICY_VERSION, audit_disclaimer_review,
                              review_document_token, review_text_fingerprint)
 from business_risk_gate import (audit_business_risk_review, block_location,
                                 policy_source)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "background-check-research" / "scripts"))
+from discovery_gate import terminal_evidence_error
 
 PLATFORMS = [
     "微博",
@@ -735,6 +737,11 @@ def _is_profile_or_home_url(platform: str, value: str) -> bool:
         return False
     host, path, query, _ = parts
     lower_path = path.casefold()
+    # Bluesky uses /profile/<actor>/post/<rkey> for actual individual posts.
+    # A profile prefix alone must not reject a verified native post route.
+    if (platform == "境外其他网站" and host == "bsky.app"
+            and re.fullmatch(r"/profile/[^/]+/post/[a-z0-9]+", lower_path)):
+        return False
     if lower_path == "/":
         return True
     if platform == "微博":
@@ -920,6 +927,39 @@ def audit_internal_jump(items: list[dict[str, Any]], token: str, source_block_id
     return issues
 
 
+def _objective_unavailable_issue(evidence: dict[str, Any], module_text: str,
+                                 count_key: str, platform: str) -> str | None:
+    """Use the acquisition proof, never an inferred zero or the final document."""
+    outcome = evidence.get("terminal_outcome")
+    issue = terminal_evidence_error(outcome)
+    if issue:
+        return issue
+    if outcome.get("kind") != "objective_unavailable":
+        return "objective_unavailable requires a matching access outcome"
+    # The shared gate has checked the file bytes and hash; bind it to this module.
+    try:
+        proof = json.loads(Path(outcome["evidence"]["path"]).read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        return f"cannot reread access evidence: {exc}"
+    if URL_RE.findall(module_text) != [proof["source_ref"]]:
+        return "access evidence must identify this module's single visible URL"
+    if evidence.get("source_locator") not in (outcome["evidence"]["path"], proof["source_ref"]):
+        return "source_locator must identify the verified access evidence"
+    if evidence.get("checked_at") != proof["checked_at"]:
+        return "checked_at must match the verified access evidence"
+    if count_key not in evidence or evidence[count_key] is not None:
+        return f"unknown access count requires explicit {count_key}=null"
+    if any(key.startswith("related_result_count_") for key in evidence):
+        return "unknown access count cannot be mixed with a verified-minimum count claim"
+    if platform == "B站" and count_key == "related_result_count":
+        for record in (evidence, proof):
+            surfaces = record.get("checked_surfaces")
+            if (not isinstance(surfaces, list) or not all(isinstance(s, str) for s in surfaces)
+                    or not {"video", "article"}.issubset(surfaces)):
+                return "Bilibili access evidence must cover video and article"
+    return None
+
+
 def _search_result_count_issue(evidence: dict[str, Any], status: str) -> tuple[str, str] | None:
     """只校验当前查询模块的零/有相关分支；其他路线内容不并入该查询计数。"""
     minimum_keys = (
@@ -1028,6 +1068,77 @@ def _verified_user_waived_search(module: dict[str, Any], payload: dict[str, Any]
         elif isinstance(item, list):
             pending.extend(item)
     return False
+
+
+def _validated_link_page_content(platform: str, risk_item: dict[str, Any], modules: list[dict[str, Any]]) -> bool:
+    """A Linktree link page is itself authored content, with no individual post URL."""
+    if platform != "境外其他网站" or risk_item.get("source_kind") != "link_page_content":
+        return False
+    url = risk_item.get("url", "")
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or parsed.hostname != "linktr.ee" or parsed.port not in (None, 443)
+                or parsed.username or parsed.password or parsed.query or parsed.fragment
+                or re.fullmatch(r"/[A-Za-z0-9._-]+", parsed.path or "") is None):
+            return False
+        proof = risk_item.get("link_page_evidence") or {}
+        record_path = _restricted_local_file(proof.get("record_path"), {".json"}, 2 * 1024 * 1024)
+        screenshot = _restricted_local_file(proof.get("screenshot_path"), {".png", ".jpg", ".webp"}, 10 * 1024 * 1024)
+        if _file_sha256(record_path) != proof.get("record_sha256") or _file_sha256(screenshot) != proof.get("screenshot_sha256"):
+            return False
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        if (not isinstance(record, dict) or record.get("url") != url or record.get("browser") != "ego"
+                or record.get("report_summary") != risk_item.get("fact_text")
+                or not record.get("author") or record["author"] not in record.get("text", "")
+                or datetime.fromisoformat(record.get("checked_at", "")).tzinfo is None):
+            return False
+        labels = record.get("visible_labels")
+        if not isinstance(labels, list) or not labels or any(not isinstance(x, str) or not x or x not in record.get("text", "") for x in labels):
+            return False
+        locators = [m.get("fact_evidence", {}).get("source_locator") for m in modules]
+        return str(record_path) in locators
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def _verified_user_closed_unavailable(module: dict[str, Any], payload: dict[str, Any]) -> bool:
+    """An observed unavailable page may close only with a same-request user exception."""
+    if module.get("status") != "unavailable_closed":
+        return False
+    value = module.get("text", "")
+    urls = URL_RE.findall(value)
+    if len(urls) != 1 or not value.endswith("公开页面不可用。"):
+        return False
+    evidence = module.get("fact_evidence") or {}
+    if evidence.get("source_type") != "research_record":
+        return False
+    try:
+        waiver, waiver_root = _read_index_json_locator(evidence.get("closure_instruction_locator"))
+        observed, observed_root = _read_index_json_locator(evidence.get("source_locator"))
+    except (OSError, ValueError, KeyError, IndexError, TypeError, RecursionError):
+        return False
+    request_id = payload.get("requestId")
+    if (not request_id or waiver_root.get("requestId") != request_id
+            or observed_root.get("requestId") != request_id
+            or not isinstance(waiver, dict) or not isinstance(observed, dict)):
+        return False
+    url = urls[0].rstrip("/")
+    if (waiver.get("answer") != "保留不可用说明并结案"
+            or url not in {str(x).rstrip("/") for x in waiver.get("urls", [])}
+            or str(observed.get("url", "")).rstrip("/") != url
+            or observed.get("browser") != "ego"
+            or observed.get("available") is not False):
+        return False
+    message = observed.get("terminal_message")
+    supported = {"内容暂时无法显示", "This Page Does Not Exist",
+                 "抱歉。您恐怕得搭乘时光机才有办法找回那个内容了。"}
+    if message not in supported or message not in str(observed.get("text", "")):
+        return False
+    try:
+        checked_at = datetime.fromisoformat(str(observed.get("checked_at", "")).replace("Z", "+00:00"))
+        return checked_at.tzinfo is not None
+    except ValueError:
+        return False
 
 
 def audit(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1560,14 +1671,14 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     elif len(field_runs) == 2:
                         result_value = str(field_runs[1].get("content", ""))
                         result_color = field_runs[1].get("text_element_style", {}).get("text_color")
-                        expected_result_colors = {"无合作风险": None, "建议评估": 2, "建议谨慎评估": 1}
+                        expected_result_colors = {"低合作风险": None, "建议评估": 2, "建议谨慎评估": 1}
                         if result_value not in expected_result_colors:
                             fail("RESULT_VALUE", children[0].get("block_id", ""), result_value, ", ".join(expected_result_colors))
                         else:
                             expected_color = expected_result_colors[result_value]
                             if expected_color is None:
                                 if result_color not in (None, 0):
-                                    fail("RESULT_COLOR", children[0].get("block_id", ""), result_color, "default color for 无合作风险")
+                                    fail("RESULT_COLOR", children[0].get("block_id", ""), result_color, "default color for 低合作风险")
                             elif result_color != expected_color:
                                 fail("RESULT_COLOR", children[0].get("block_id", ""), result_color, str(expected_color))
                 elif not field_runs or not all(r.get("text_element_style", {}).get("bold") is True for r in field_runs):
@@ -1654,7 +1765,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 mark_blocked("MODULE_CONTEXT_COUNT", f"review_context.platforms.{platform}.modules", len(context_modules), str(expected_module_count))
             if platform in {"境内其他内容", "境外其他网站"} and len(context_modules) < 1:
                 mark_blocked("MODULE_CONTEXT_COUNT", f"review_context.platforms.{platform}.modules", len(context_modules), "at least the mandatory Baidu/Google module")
-            allowed_statuses = {"no_result", "checked_clean", "risk", "incomplete", "not_applicable"}
+            allowed_statuses = {"no_result", "checked_clean", "risk", "incomplete", "not_applicable", "unavailable_closed", "objective_unavailable"}
             for module_index, module in enumerate(context_modules):
                 if module.get("status") not in allowed_statuses or not isinstance(module.get("text"), str):
                     mark_blocked("MODULE_STATUS", f"review_context.platforms.{platform}.modules[{module_index}]", module, f"string text and status in {sorted(allowed_statuses)}")
@@ -1775,6 +1886,10 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     if not review_ok:
                         fail("RISK_REVIEW_ENTRY_EVIDENCE", location, review_reason, "content-bound public review entry evidence")
                     continue
+                if risk_item.get("source_kind") == "link_page_content":
+                    if not _validated_link_page_content(platform, risk_item, context_modules):
+                        fail("LINK_PAGE_CONTENT_EVIDENCE", location, risk_item, "content-bound authored Linktree page and actually reviewed screenshot")
+                    continue
                 route_key = _url_route_key(risk_url)
                 if route_key in module_urls or _is_search_url(risk_url) or _is_profile_or_home_url(platform, risk_url):
                     fail("RISK_URL_HOME_OR_SEARCH", location, risk_url, "the independent direct URL of the evidenced post or dynamic, not a homepage or search-results route")
@@ -1791,11 +1906,15 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     if forbidden in module_text:
                         fail("SUBJECT_LABEL", platform, module_text, f"{subject_type}-appropriate homepage and subject wording")
 
+            closed_module_texts: set[str] = set()
             for module_index, module in enumerate(context_modules):
                 if not isinstance(module, dict) or not isinstance(module.get("text"), str):
                     continue
                 module_text = module["text"]
                 status = module.get("status")
+                if status == "unavailable_closed" and not _verified_user_closed_unavailable(module, payload):
+                    fail("UNAVAILABLE_CLOSURE_EVIDENCE", f"{platform} module {module_index + 1}",
+                         module, "same-request explicit user closure and actual ego terminal-page evidence")
                 # 仅按实际文案分类：明确关键词搜索优先，module_kind 不绕过合同。
                 is_search = "关键词搜索：" in module_text
                 is_home = ("主页" in module_text or "音乐人页" in module_text) and not is_search
@@ -1845,7 +1964,22 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(evidence.get("checked_at"), str) or not re.match(r"^\d{4}-\d{2}-\d{2}T", evidence.get("checked_at", "")):
                     mark_blocked("FACT_EVIDENCE_TIME", f"{evidence_location}.checked_at", evidence.get("checked_at"), "ISO-8601 timestamp")
 
-                if is_search_result and status in {"no_result", "checked_clean", "risk"}:
+                access_closed = False
+                if status == "objective_unavailable" or (status == "risk" and "terminal_outcome" in evidence):
+                    count_key = ("related_result_count" if is_search_result else
+                                 "confirmed_homepage_count" if is_home else "related_topic_count")
+                    access_issue = _objective_unavailable_issue(evidence, module_text, count_key, platform)
+                    if access_issue:
+                        mark_blocked("OBJECTIVE_UNAVAILABLE_EVIDENCE", evidence_location, evidence, access_issue)
+                    else:
+                        access_closed = True
+                        if status == "objective_unavailable":
+                            if not re.search(r"https?://\S+ 无问题$", module_text):
+                                fail("OBJECTIVE_UNAVAILABLE_TEXT", evidence_location, module_text, "source URL followed by 无问题")
+                            else:
+                                closed_module_texts.add(module_text)
+
+                if is_search_result and status in {"no_result", "checked_clean", "risk"} and not access_closed:
                     count_issue = _search_result_count_issue(evidence, status)
                     if count_issue is not None:
                         issue_code, requirement = count_issue
@@ -1860,7 +1994,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         checked_surfaces = evidence.get("checked_surfaces")
                         if not isinstance(checked_surfaces, list) or not {"video", "article"}.issubset(set(checked_surfaces)):
                             mark_blocked("BILIBILI_SURFACES", f"{evidence_location}.checked_surfaces", checked_surfaces, "list covering both video and article")
-                if is_home and status in {"no_result", "checked_clean", "risk"}:
+                if is_home and status in {"no_result", "checked_clean", "risk"} and not access_closed:
                     confirmed_count = evidence.get("confirmed_homepage_count")
                     suspected_count = evidence.get("suspected_homepage_count")
                     if not isinstance(confirmed_count, int) or confirmed_count < 0:
@@ -1892,7 +2026,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                             {"status": status, "confirmed_homepage_count": confirmed_count, "suspected_homepage_count": suspected_count},
                             "explicit suspected-homepage label requires suspected_homepage_count>=1",
                         )
-                if is_topic and status in {"no_result", "checked_clean", "risk"}:
+                if is_topic and status in {"no_result", "checked_clean", "risk"} and not access_closed:
                     related_topic_count = evidence.get("related_topic_count")
                     if not isinstance(related_topic_count, int) or related_topic_count < 0:
                         mark_blocked("TOPIC_RESULT_COUNT", f"{evidence_location}.related_topic_count", related_topic_count, "integer >= 0")
@@ -1985,7 +2119,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         expected = NO_HOME_EXACT[platform]
                         if home_text != expected:
                             fail("NO_HOME_TEXT", platform, home_text, expected)
-                    elif not context_risk_items:
+                    elif not context_risk_items and home_text not in closed_module_texts and not (context_modules and _verified_user_closed_unavailable(context_modules[0], payload)):
                         home_endings = ("相关内容无问题",) if platform == "豆瓣" else ("无问题",)
                         if "http" in home_text and not home_text.endswith(home_endings):
                             fail("HOME_CONCLUSION", platform, home_text, "homepage URL followed by platform-specific no-risk phrase")
@@ -1996,7 +2130,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                         allowed_endings = SEARCH_ENDINGS.get(platform)
                         if allowed_endings is None:
                             fail("SEARCH_MODULE_FORBIDDEN", platform, search_text, "no keyword-search module under the current platform contract")
-                        elif not search_text.endswith(allowed_endings):
+                        elif search_text not in closed_module_texts and not search_text.endswith(allowed_endings):
                             fail("SEARCH_CONCLUSION", platform, search_text, "one exact clean conclusion from platform-format.md")
 
                 if platform == "微博" and len(numbered) >= 3 and "无超话/话题" in numbered[2][1] and numbered[2][1] != "（3）无超话/话题；":
@@ -2015,7 +2149,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     no_home = re.match(r"^（1）无(?:个人|官方|项目)主页；$", home_text) is not None
                     if no_home and time_lines:
                         fail("X_TIME_WITHOUT_HOME", platform, time_lines, "no back-check time when no homepage")
-                    if confirmed_home and not time_lines:
+                    if confirmed_home and not time_lines and home_text not in closed_module_texts:
                         fail("X_TIME_REQUIRED", platform, "missing", "exactly one line such as 背调时间：2019年2月—至今")
                     if len(time_lines) > 1:
                         fail("X_TIME_COUNT", platform, time_lines, "exactly one back-check time line")
@@ -2036,7 +2170,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     fail("OTHER_NUMBER", platform, nums, "fullwidth numbering from 1 without gaps")
                 if not values or not values[0].startswith("（1）百度关键词搜索："):
                     fail("DOMESTIC_FIRST", platform, values[:1], "（1）百度关键词搜索：…")
-                elif not context_risk_items and not values[0].endswith(SEARCH_ENDINGS[platform]):
+                elif not context_risk_items and values[0] not in closed_module_texts and not values[0].endswith(SEARCH_ENDINGS[platform]):
                     fail("DOMESTIC_BAIDU", platform, values[0], "Baidu URL followed by 无相关内容 or 相关内容无问题")
                 if not nonblank or text_of(nonblank[-1]) != DOMESTIC_TAIL:
                     fail("DOMESTIC_TAIL", platform, text_of(nonblank[-1]) if nonblank else "", DOMESTIC_TAIL)
@@ -2047,7 +2181,7 @@ def audit(payload: dict[str, Any]) -> dict[str, Any]:
                     fail("OTHER_NUMBER", platform, nums, "fullwidth numbering from 1 without gaps")
                 if not values or not values[0].startswith("（1）谷歌关键词搜索："):
                     fail("FOREIGN_FIRST", platform, values[:1], "（1）谷歌关键词搜索：…")
-                elif not context_risk_items and not values[0].endswith(SEARCH_ENDINGS[platform]):
+                elif not context_risk_items and values[0] not in closed_module_texts and not values[0].endswith(SEARCH_ENDINGS[platform]):
                     fail("FOREIGN_GOOGLE", platform, values[0], "Google URL followed by 无相关内容 or 相关内容无问题")
                 if not nonblank or text_of(nonblank[-1]) != FOREIGN_TAIL:
                     fail("FOREIGN_TAIL", platform, text_of(nonblank[-1]) if nonblank else "", FOREIGN_TAIL)

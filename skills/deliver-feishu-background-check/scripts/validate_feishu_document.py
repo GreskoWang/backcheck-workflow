@@ -67,7 +67,7 @@ CURRENT_BUSINESS_RISK_POLICY = (
 )
 PLATFORM_ORDER = tuple(PLATFORM_DISPLAY[key] for key in PLATFORMS)
 OTHER_TAILS = tuple(OTHER_TAIL_STATEMENTS.values())
-VERDICT_COLORS = {"建议谨慎评估": 1, "建议评估": 2, "无合作风险": None}
+VERDICT_COLORS = {"建议谨慎评估": 1, "建议评估": 2, "低合作风险": None}
 
 TEXT_KEYS = {
     1: "page",

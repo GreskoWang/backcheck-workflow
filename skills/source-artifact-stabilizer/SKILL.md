@@ -5,7 +5,7 @@ description: Stabilize messy source artifacts before analysis, writing, extracti
 
 ## 配置与模板
 
-先在工作区执行 `Setup-Backcheck.ps1`，再加载 `recovery-session-env.ps1`。本机路径与账号配置分别位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`，不得复制另一台机器的凭证或运行状态。跨机器安装步骤见工作区 `docs/INSTALL.md`。
+首次部署或迁移机器时按工作区 `docs/INSTALL.md` 执行 `Setup-Backcheck.ps1`。日常背调加载 `recovery-session-env.ps1` 并复用现有配置；仅处理本次实际缺失的环境项。本机路径与账号配置位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`。本地文件读取与修订按实际所需工具直接执行。
 
 业务与写作方法保留在本 Skill 的 references 中。正式云模板由当前配置的 `template_document_token` 指定，在当前账号下只读核验后使用。`SYNTHETICDOC`、合成主体和内置 fixture 只用于离线回归，不是线上模板或真实调查记录。随包的 DOCX 保留既有版式参考，不代替当前飞书 API 模板核验。
 

@@ -1,5 +1,7 @@
 # 可恢复的批量阅读缓存
 
+> 适用范围：本文件保留非背调项目的旧 Edge 接口和历史方法。当前背调取材按 [ego 统一规则](../../background-check-research/references/ego-browser-policy.md)执行，使用本任务 ego 页面及其实际可用能力。
+
 ## 2026-10-24 采集完整性修复
 
 运行 broker 的 `/health.capabilities` 出现 `research-dom-window-v2` 才表示已加载新的 B 站动态配方。它只读取视口及上下各一屏重叠内的卡片，不再对保留在 DOM 中的全部旧卡片反复读全文。每卡限额为 50000 节点/1000000 字符，整次快照保留 200000 节点/4000000 字符上限；超限明确返回 `extraction_truncated` 和 `truncation_reason`，不会为尚未访问的卡片制造空记录。端点及加载提示须在当前视口，离屏页尾不证明已到终点。

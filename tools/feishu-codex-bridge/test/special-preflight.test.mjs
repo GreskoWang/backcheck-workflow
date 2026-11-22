@@ -6,8 +6,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import test from 'node:test';
+import vm from 'node:vm';
 import { prepareSpecialIncoming, validateSpecialResearchJob, SPECIAL_EXTRACTION_SCHEMA } from '../src/special-preflight.mjs';
-import { buildExecutionPrompt, runBackgroundCheck } from '../src/codex-runner.mjs';
+import { buildExecutionPrompt, runBackgroundCheck, isThreadRecoveryError } from '../src/codex-runner.mjs';
+import { BridgeStore } from '../src/store.mjs';
+import { enqueueSpecialRequest } from '../src/workflow-runtime.mjs';
+import { createSpecialPricingRegistry } from '../src/special-pricing.mjs';
+import { applyResolvedIntake } from '../src/dispatch-intake-effects.mjs';
+import { getGroupPolicy, acceptsGroupMessage } from '../src/group-policy.mjs';
+import { recordScopePreflightFailure } from '../src/preflight-failure.mjs';
 
 const chatId = 'oc_19936593f3ad5a63b1e86ee0f8c44fc8';
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3]);
@@ -48,6 +55,105 @@ function makeJob(prepared, message) {
     specialOwnership: prepared.specialOwnership, pricing: prepared.pricing,
     codexThreadId: null, codexThreadRequestId: 'RQ-SPECIAL-TEST' };
 }
+
+function productionEntry(f) {
+  const store = new BridgeStore(f.root);
+  const policy = { ...f.groupPolicy, accountingEnabled: false, acceptanceRepliesEnabled: false };
+  const pricingRegistry = createSpecialPricingRegistry({ stateDir: f.root });
+  const queued = enqueueSpecialRequest({ message: f.message, policy, store, pricingRegistry,
+    idFactory: () => 'RQ-SPECIAL-PRODUCTION' });
+  assert.equal(queued.status, 'queued');
+  const original = structuredClone(queued.job);
+  const calls = { dispatches: 0, messages: 0, accounting: 0, prompt: null };
+  // Run the actual bridge entry without starting its listener, matching the
+  // existing repair integration tests' production-source VM harness.
+  const source = fs.readFileSync(new URL('../src/bridge.mjs', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+  const start = source.indexOf('async function runJob(job) {');
+  const end = source.indexOf('\nasync function shutdown(', start);
+  assert.ok(start >= 0 && end > start);
+  const run = vm.runInNewContext(`(${source.slice(start, end)})`, {
+    store, getGroupPolicy, acceptsGroupMessage, prepareSpecialIncoming, applyResolvedIntake,
+    pricingRegistry, recordScopePreflightFailure, isThreadRecoveryError,
+    groupPolicies: [policy], config: { stateDir: f.root, workspace: f.root, codexDispatchMode: 'desktop_native_v1' },
+    reviewClient: f.client, createLocalCodex: f.createCodex, activePreflightModel: 'test-structured-model',
+    acceptanceFromMs: 1000, logger: { info() {}, warn() {}, error() {} }, safeError: error => error.message,
+    queueUserAlert() {}, accountingClient: () => ({}), alertAppId: 'synthetic', channel: {},
+    recordDispatchAccounting: async () => { calls.accounting += 1; throw new Error('unexpected accounting'); },
+    sendTextReplyIdempotent: async () => { calls.messages += 1; throw new Error('unexpected group message'); },
+    runBackgroundCheck: (job, config, hooks) => runBackgroundCheck(job, config, { ...hooks,
+      desktopDispatcher: {
+        dispatch: async ({ instructionPath }) => {
+          calls.dispatches += 1;
+          calls.prompt = fs.readFileSync(instructionPath, 'utf8');
+          return { threadId: 'synthetic-special-thread', sessionPath: path.join(f.root, 'synthetic-session.jsonl') };
+        },
+        // Stop at the external completion boundary; do not manufacture a
+        // finished investigation or final-review PASS to test startup.
+        waitForCompletion: async () => { throw new Error('offline fixture stops after execution entry'); },
+      },
+    }),
+  });
+  return { store, original, calls, run: () => run(queued.job),
+    enqueueAgain: () => enqueueSpecialRequest({ message: f.message, policy, store, pricingRegistry }) };
+}
+
+function assertOriginalIdentity(saved, original) {
+  for (const field of ['requestId', 'sourceMessageId', 'chatId', 'requestText', 'sourceMediaKeys',
+    'sourceMessage', 'sourceMessageCreatedAtMs', 'canonicalSourceMessageId', 'sourceOriginVerified',
+    'sourceAliases', 'intakeFingerprint', 'codexThreadRequestId']) {
+    assert.deepEqual(saved[field], original[field], field);
+  }
+}
+
+test('production ready preflight preserves original identity and consumes derived text, scope and attachments', async () => fixture(async (f) => {
+  const rawText = '富文本补充要求：逐个视频核对事实与时间点。';
+  f.message.raw = { message_id: f.message.messageId, chat_id: f.message.chatId,
+    content: { content: [[{ tag: 'text', text: rawText }]] } };
+  const entry = productionEntry(f);
+  await entry.run();
+  const saved = new BridgeStore(f.root).getJob(entry.original.requestId);
+  assert.equal(entry.calls.dispatches, 1, saved.errorSummary);
+  assert.equal(entry.calls.accounting, 0);
+  assert.equal(entry.calls.messages, 0);
+  assertOriginalIdentity(saved, entry.original);
+  assert.equal(saved.codexThreadId, 'synthetic-special-thread');
+  assert.equal(saved.status, 'recovery_required');
+  assert.match(saved.recoveryReason, /Codex Desktop completion monitoring failed/u);
+  assert.equal(saved.recoveryFromStage, 'executing');
+  assert.equal(saved.specialIntake.status, 'ready');
+  assert.ok(saved.specialIntake.structuredRequest.sourceText.includes(rawText));
+  assert.ok(saved.specialIntake.sourceMediaKeys.every(key => key.startsWith('sha256:')));
+  assert.notDeepEqual(saved.specialIntake.sourceMediaKeys, saved.sourceMediaKeys);
+  const validated = validateSpecialResearchJob(saved, { stateDir: f.root, groupPolicies: [f.groupPolicy] });
+  assert.deepEqual(saved.dispatchScope, validated.scope);
+  const dataMatch = entry.calls.prompt.match(/\n(\{\n  "requestId":[\s\S]*?\n\})\n\n将成果与来源映射/u);
+  assert.ok(dataMatch, 'special execution prompt must retain structured intake data');
+  const promptData = JSON.parse(dataMatch[1]);
+  assert.equal(promptData.sourceText, saved.specialIntake.structuredRequest.sourceText);
+  assert.deepEqual(promptData.requirements, extraction().requirements);
+  assert.deepEqual(promptData.verifiedScope, validated.scope);
+  assert.deepEqual(promptData.images, saved.specialIntake.attachments.map(({ localPath, sha256 }) => ({ localPath, sha256 })));
+  assert.equal(entry.enqueueAgain().status, 'duplicate');
+  assert.equal(entry.store.listJobs().length, 1);
+  assert.throws(() => entry.store.updateJob(saved.requestId, { requestText: 'changed' }), /protected field requestText/u);
+  assert.throws(() => entry.store.updateJob(saved.requestId, { sourceMediaKeys: [] }), /protected field sourceMediaKeys/u);
+}));
+
+test('production non-ready special preflight stays held without a research thread', async () => fixture(async (f) => {
+  f.createCodex = () => ({ startThread: () => ({ run: async () => ({
+    finalResponse: JSON.stringify({ ...extraction(), unreadableImageIndexes: [1] }), items: [],
+  }) }) });
+  const entry = productionEntry(f);
+  await entry.run();
+  const saved = new BridgeStore(f.root).getJob(entry.original.requestId);
+  assert.equal(saved.status, 'intake_held');
+  assert.equal(saved.stage, 'special_intake_hold');
+  assert.equal(saved.specialIntakeReasons[0].code, 'special_scope_needs_clarification');
+  assert.equal(saved.specialIntake, undefined);
+  assert.equal(saved.codexThreadId, null);
+  assert.deepEqual(entry.calls, { dispatches: 0, messages: 0, accounting: 0, prompt: null });
+  assertOriginalIdentity(saved, entry.original);
+}));
 
 test('reads every actual image through the original message resource endpoint and submits local_image inputs', async () => fixture(async (f) => {
   const result = await prepareSpecialIncoming(f.args);

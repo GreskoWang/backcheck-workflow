@@ -1,13 +1,17 @@
 ---
 name: web-access
-description: Use when Codex needs robust web research, source verification, webpage extraction, dynamic or logged-in browsing through the user's persistent desktop Microsoft Edge via a local CDP broker, local Chrome/Edge bookmarks or history lookup, social-media or site investigation, or reusable site-pattern notes. This workflow keeps Edge visible and logged in while avoiding fragile extension-owned debugger handles.
+description: Background-check investigation must route to ego-browser; Feishu delivery and review keep their API/MCP workflows. The Edge and standalone research paths below apply only outside background-check investigation. Use when Codex needs robust web research, source verification, webpage extraction, dynamic or logged-in browsing through the user's persistent desktop Microsoft Edge via a local CDP broker, local Chrome/Edge bookmarks or history lookup, social-media or site investigation, or reusable site-pattern notes. This workflow keeps Edge visible and logged in while avoiding fragile extension-owned debugger handles.
 ---
+
+## 背调联网入口（2026-10-31）
+
+背调浏览器操作默认使用 ego，复用或恢复 Agent 自有 TaskSpace；遵循[当前访问规则](../background-check-research/references/access-policy.md)及 `ego-browser` 技能。Edge 和本技能的 CDP 入口不用于背调调查、截图或交付实显；获准的公开搜索、公开 API、导出和本地材料可以配合 Ego 使用。空间恢复不授权绕过登录、验证码、权限或安全拒绝。飞书交付、API 回读和终审继续按 OpenAPI／MCP 技能执行。
 
 ## 配置与模板
 
 本节的背调初始化与飞书模板要求仅适用于背调项目；其他项目的网页访问直接使用下文对应入口。
 
-先在工作区执行 `Setup-Backcheck.ps1`，再加载 `recovery-session-env.ps1`。本机路径与账号配置分别位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`，不得复制另一台机器的凭证或运行状态。跨机器安装步骤见工作区 `docs/INSTALL.md`。
+首次部署或迁移机器时按工作区 `docs/INSTALL.md` 执行 `Setup-Backcheck.ps1`。日常背调加载 `recovery-session-env.ps1` 并复用现有配置；仅处理本次实际缺失的环境项。本机路径与账号配置位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`。本地文件读取与修订按实际所需工具直接执行。
 
 业务与写作方法保留在本 Skill 的 references 中。正式云模板由当前配置的 `template_document_token` 指定，在当前账号下只读核验后使用。`SYNTHETICDOC`、合成主体和内置 fixture 只用于离线回归，不是线上模板或真实调查记录。随包的 DOCX 保留既有版式参考，不代替当前飞书 API 模板核验。
 
@@ -62,7 +66,7 @@ and fall back to a working `node` on PATH. This avoids the WindowsApps `node.exe
 
 ## CDP Mode
 
-普通背调、特殊背调、专项网页调查及其配套工具修复默认只使用获准的本节 CDP 入口，不调用 Windows Computer Use／CUA 检查或操作 Edge，包括查看连接弹窗、确认窗口状态和截图，也不把它作为交付或 Goal 推进的前置条件。`scripts/cdp-session.ps1` 由获准的 PowerShell shell 运行，不依赖 Computer Use、Browser 或 Node REPL 是否列在 `ALL_TOOLS` 中。原生控制器未修复不构成所有 CDP 调查的前置阻塞。
+本节仅用于非背调任务或用户另行明确授权的旧工具专项维护。背调调查部分不得启动此 CDP 入口，必须转到 ego-browser；下述 Edge broker 的连接、授权和恢复要求不适用于当前背调。
 
 把故障限定在实际失败的控制器、页面或材料，不把单条路线的失败计数直接当作整个 Goal 的阻塞计数。普通技术故障沿用原断点和既有恢复计数，按有界恢复规则处理；仍失败时采用获准且不涉及安全拒绝的替代来源，将原路线记为具体缺口。明确的安全／权限拒绝须保留原文并遵守实际停止范围，不自行宣布只限制一次调用，不以另一入口重试被拒绝动作，也不把新回合或提示词修改当成拒绝解除。仍有不涉及该拒绝的可读缓存、其他获准来源、分析或交付工作时继续推进，所有剩余工作确实无法推进时才按 Goal 规则判定 blocked。
 

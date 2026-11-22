@@ -6,11 +6,20 @@ The caller still supplies the real latest final audit and complete document bloc
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from source_excerpt_review import check_excerpt, source_triplets
+
+# Delivery loads this module by file path, so sibling imports cannot rely on
+# the caller's current directory or sys.path.
+_excerpt_spec = importlib.util.spec_from_file_location(
+    "_challenge_source_excerpt_review", Path(__file__).with_name("source_excerpt_review.py"))
+_excerpt_module = importlib.util.module_from_spec(_excerpt_spec)
+_excerpt_spec.loader.exec_module(_excerpt_module)
+check_excerpt = _excerpt_module.check_excerpt
+source_triplets = _excerpt_module.source_triplets
 
 LABELS = {"放松", "疑问", "警惕"}
 REJECTION = "包含不合规的表述，拒绝接受"

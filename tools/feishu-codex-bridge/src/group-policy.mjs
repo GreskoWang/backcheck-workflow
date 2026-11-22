@@ -4,6 +4,8 @@ export const LEGACY_DISPATCH_CHAT_ID = 'oc_6589cfd31f18a0298c93602b6592ed04';
 export const GROUP_ROLES = Object.freeze(['regular_dispatch', 'special_dispatch', 'regular_delivery']);
 const validChatId = (value) => /^oc_[A-Za-z0-9]+$/u.test(String(value || ''));
 const positiveMs = (value) => Number.isSafeInteger(value) && value > 0;
+// Missing or malformed configuration must not authorize the explicit-off path.
+const accountingPermission = (value) => typeof value === 'boolean' ? value : null;
 
 // This is deliberately a pure resolver. It never migrates bindings, invents a
 // cutover time, enables a group, or imports the primary group's permissions.
@@ -52,7 +54,7 @@ export function resolveGroupPolicies({ localConfig = {}, binding, runtime = {} }
       activationFromMs,
       acceptanceFromMs,
       acceptanceRepliesEnabled: dispatch && entry.acceptanceRepliesEnabled === true,
-      accountingEnabled: dispatch && entry.accountingEnabled === true,
+      accountingEnabled: dispatch ? accountingPermission(entry.accountingEnabled) : false,
       researchEnabled: dispatch && entry.researchEnabled === true,
     });
   });
@@ -67,7 +69,7 @@ export function resolveGroupPolicies({ localConfig = {}, binding, runtime = {} }
       activationFromMs: runtime.acceptNewMessagesFromMs,
       acceptanceFromMs: runtime.acceptanceRepliesFromMs,
       acceptanceRepliesEnabled: legacyChatId === LEGACY_DISPATCH_CHAT_ID && localConfig.acceptance_replies_enabled === true,
-      accountingEnabled: localConfig.accounting?.enabled === true,
+      accountingEnabled: accountingPermission(localConfig.accounting?.enabled),
       researchEnabled: true,
       authorizationRef: 'existing-primary-binding',
     }));

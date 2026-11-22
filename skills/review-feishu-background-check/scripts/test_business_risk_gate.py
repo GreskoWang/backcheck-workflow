@@ -82,15 +82,15 @@ class BusinessRiskGateTests(unittest.TestCase):
                 self.assertEqual(self.audit()['verdict'], 'PASS')
 
     def test_no_risk_grade_cannot_hide_confirmed_hits(self):
-        self.items[2] = text_block('result', '背调结果：无合作风险')
+        self.items[2] = text_block('result', '背调结果：低合作风险')
         self.review['confirmed_hits'][0].update(
-            result_level='无合作风险', result_location=gate.block_location(self.items[2]))
+            result_level='低合作风险', result_location=gate.block_location(self.items[2]))
         self.assertIn('BUSINESS_RISK_RESULT_LEVEL',
                       {x['code'] for x in self.audit()['errors']})
 
     def test_counts_cannot_replace_final_grade_even_with_old_mode(self):
         for mode in ('risk_grade', 'record_only'):
-            for level in ('已记录1类风险库命中', '未发现风险库命中'):
+            for level in ('已记录1类风险库命中', '未发现风险库命中', '无合作风险'):
                 with self.subTest(mode=mode, level=level):
                     self.review['result_mode'] = mode
                     self.items[2] = text_block('result', '背调结果：' + level)
@@ -192,7 +192,7 @@ class BusinessRiskGateTests(unittest.TestCase):
 
     def test_result_level_must_match_exact_result_block(self):
         review = copy.deepcopy(self.review)
-        review["confirmed_hits"][0]["result_level"] = "无合作风险"
+        review["confirmed_hits"][0]["result_level"] = "低合作风险"
         result = self.audit(review)
         self.assertEqual(result["verdict"], "FAIL")
         self.assertIn("BUSINESS_RISK_RESULT_BINDING", {item["code"] for item in result["errors"]})

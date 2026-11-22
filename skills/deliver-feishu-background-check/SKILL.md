@@ -5,7 +5,7 @@ description: 把当前任务中已经完成的背调结论快速写入飞书云�
 
 ## 配置与模板
 
-先在工作区执行 `Setup-Backcheck.ps1`，再加载 `recovery-session-env.ps1`。本机路径与账号配置分别位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`，不得复制另一台机器的凭证或运行状态。跨机器安装步骤见工作区 `docs/INSTALL.md`。
+首次部署或迁移机器时按工作区 `docs/INSTALL.md` 执行 `Setup-Backcheck.ps1`。日常背调加载 `recovery-session-env.ps1` 并复用现有配置；仅处理本次实际缺失的环境项。本机路径与账号配置位于 `config/runtime-paths.json` 和 `config/backcheck-local.json`，不得复制其他机器的凭证或运行状态。
 
 业务与写作方法保留在本 Skill 的 references 中。正式云模板由当前配置的 `template_document_token` 指定，在当前账号下只读核验后使用。`SYNTHETICDOC`、合成主体和内置 fixture 只用于离线回归，不是线上模板或真实调查记录。随包的 DOCX 保留既有版式参考，不代替当前飞书 API 模板核验。
 
@@ -88,6 +88,10 @@ pwsh -NoProfile -File "$env:BACKGROUND_CHECK_WORKSPACE\external\feishu-mcp\scrip
 普通模式不要读取 `handoff-contract.md`、`handoff-targeted-contract.md` 或 validator 脚本。
 
 `platform-format.md` 是十四个平台的固定写作合同。同一目标文档首次写入前必须完整读取一次，逐个平台照其中的模块、顺序、编号、链接位置、截图位置、缺省句和特殊字段执行；后续增量写入复用该合同，只重读当前平台主管节和全局规则。不得把十四个平台抽象成一个通用模板，不得凭相似平台补写、改写或统一措辞。`feishu-style-guide.md` 中的风险摘要、举例和基本信息结构同样必须逐项保留。
+
+## 来源引文与助手文案
+
+**助手附加的免责说明、证据边界套话及其变体仍为 `FAIL`。** 有明确来源归属的原帖引文和截图原文交由当前全文语义审阅核对，不能仅因来源原话命中关键词就删除证据。引用不能包裹或豁免助手文案，也不能伪造来源；发现归属错误、助手免责或其他实质文字问题仍为 `FAIL`。未闭环疑问只留内部，不进入终稿；必要来源归属与已核实事实保留。
 
 ## 强制成品审阅门槛
 

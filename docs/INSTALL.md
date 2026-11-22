@@ -2,7 +2,7 @@
 
 ## 环境
 
-Windows 10/11、PowerShell 7.2+、Node.js 22+（含 npm）、Python 3.10+、Git for Windows、可见 Microsoft Edge，以及已登录的 Codex Desktop。当前回归环境为 Node 24.16.0、Python 3.12.14、Pillow 12.3.0。支持版本下限属于代码要求，并非每个组合都已实测。
+Windows 10/11、PowerShell 7.2+、Node.js 22+（含 npm）、Python 3.10+、Git for Windows、ego 浏览器及其匹配的 `ego-browser` CLI/技能，以及已登录的 Codex Desktop。ego 是单独安装的依赖，不随本包分发；旧 Edge 工具只用于非背调任务或另行授权的维护。当前回归环境为 Node 24.16.0、Python 3.12.14、Pillow 12.3.0。支持版本下限属于代码要求，并非每个组合都已实测。
 
 将仓库放在自己的业务目录。在 PowerShell 7 中：
 
@@ -34,7 +34,7 @@ App Secret 交互输入后由当前 Windows 用户 DPAPI 加密。新机器必�
 
 2026-10-27 修复增加 `--group repair` 专项回归，详见 [修复发布说明](REPAIRS-2026-10-27.md)。表格渲染需要 requirements.txt 中的 openpyxl/Pillow 以及相应字体；Windows 默认读取 `WINDIR`/`SystemRoot` 下的 Fonts，也可显式设置 `BACKCHECK_FONTS_DIR`。缺少指定字体会报告不可渲染，不用替代字体伪造通过。
 
-加载环境后，执行 `skills/web-access/scripts/check-deps.ps1`。沿用可见 Edge 的既有账号；实际出现的浏览器安全授权、密码、验证码、首次 OAuth 或新增权限由用户确认，普通打开、点击、滚动和截图由工具执行。单页面失败不重启共享连接，先检查该页与其他页面的独立状态。
+调查前读取当前安装的 `ego-browser` 技能并运行 `ego-browser skill`，读取至指南结束标记。命令或技能缺失时按该产品对应版本的安装指南补齐，不回退 Edge。任务工作区按已有授权自行创建、授权或领取，保留实际 spaceId、页面和断点；只有实际遇到用户专属密码、验证码或二次验证时才报告对应阻碍。具体规则见 [ego 访问规则](../skills/background-check-research/references/ego-browser-policy.md)。飞书 API/MCP 使用原有账号权限，不复制其他机器的凭据。
 
 ```powershell
 & $env:RESEARCH_PYTHON ./scripts/run-regression.py --node $env:CODEX_NODE --pwsh (Get-Command pwsh).Source

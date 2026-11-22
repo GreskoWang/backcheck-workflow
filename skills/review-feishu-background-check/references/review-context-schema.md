@@ -82,13 +82,13 @@
 
 ## 全文免责语义复核
 
-任何形式的免责文本均打回。每个当前 revision 读取整篇区块与 raw content，检查正文、摘要、卡片、表格、图注、脚注、来源标签、引用及人工审核章节；典型措辞由 `scripts/disclaimer_gate.py` 扫描，其余同义变体由实际语义审阅发现。零关键词命中不能自动补出以下 PASS：
+逐项区分来源材料与助手说明。原帖引文、截图文字和第三方原话核对来源与语境；需要精简的助手免责或泛化解释记入 `findings`。`scripts/disclaimer_gate.py` 定位候选句并提示明确来源引文，当前全文语义结论与扫描结果共同参与验收：
 
 ```json
 {
   "status": "PASS",
   "scope": "full_document",
-  "policy_version": "1.0.0",
+  "policy_version": "1.1.0",
   "token": "目标文档token",
   "revision_id": 42,
   "text_sha256": "review_text_fingerprint(document, items, raw_content)计算值",
@@ -131,7 +131,7 @@
 ```
 
 - `subject_type`：`person`、`organization` 或 `project`。
-- `modules`：全部模块的精确成品文字；`status` 为 `no_result`、`checked_clean`、`risk`、`incomplete` 或 `not_applicable`。
+- `modules`：全部模块的精确成品文字；`status` 为 `no_result`、`checked_clean`、`risk`、`incomplete`、`not_applicable` 或下述有真实访问证据的 `objective_unavailable`，以及同一请求有用户明确例外的 `unavailable_closed`。
 - 仅`境内其他内容`和`境外其他网站`的具名疑似主页可使用`（N）平台名疑似主页：URL`。该模块须以`platform_name`登记研究事实中的实际平台名，例如`"platform_name":"SoundCloud"`，并与正文标签精确相同；缺失或不匹配为BLOCKED。它仍须提供`confirmed_homepage_count:0`和大于零的`suspected_homepage_count`，不能把候选改成确认主页或无主页。该分支不放宽其他十二个平台的固定主页标签、关键词搜索或零结果要求。
 - `fact_evidence`：沿用当前调查记录，必须有 `source_type`、`source_locator`、`checked_at`、`summary`。搜索模块带 `related_result_count`，主页带 `confirmed_homepage_count`，超话／主题贴吧带 `related_topic_count`；B站搜索另带 `checked_surfaces:["video","article"]`。
 - `expected_blocks`：平台主管标题之后、唯一尾随空白块之前的完整顺序；类型为 `text`、`url`、`image`。
@@ -150,6 +150,14 @@
 ### 公开评价条目只有稳定评论页 URL
 
 仅当 Facebook Page 的公开 reviews 页面已实际定位到一条具名、具日、可见全文的评价，但平台不给出可保留的单条公开 URL 时，风险项可设置 `source_kind:"platform_review_entry"`。成品仍显示精确 reviews 页面 URL；`review_entry_evidence` 必须绑定任务目录内的 JSON 记录和真实页面截图，记录含 `page_url`、`author`、`published_at`、逐字 `text`、`screenshot_path`、`screenshot_sha256`。证据对象另含记录／截图的 SHA-256、当前 `reviewer_id` 与带时区 `checked_at`，且该记录路径必须由实际 Facebook 模块 `fact_evidence.source_locator` 或 `source_locators[].locator` 声明。校验器实际读取文件、核对哈希、页面 URL、日期和正文风险事实，不接受主页、搜索页、空白截图或只填非空字段。该分支不能用于普通帖子、可取得单帖链接的评价或其他平台。
+
+### 已确认的客观不可访问
+
+`objective_unavailable` 只用于已确认删除、封禁、关闭、私密、权限限制、明确不存在或媒体失效的来源；规则及实际访问证据格式沿用[发现合同](../../background-check-research/references/discovery-check.md)。模块 `fact_evidence.terminal_outcome` 必须含 `status:"complete"`、`kind:"objective_unavailable"`、`conclusion:"无问题"`、真实 `reason`、`evidence_refs` 和 `evidence:{path,sha256}`。校验器实际读取 JSON 文件并核对字节指纹、明确的访问原因和页面提示、带时区时间、`content_obtained:false`、`result_count:null`，不能用声明或空回执代替。
+
+实际证据 `source_ref` 必须是当前模块可见 URL，`fact_evidence.source_locator` 指向该证据文件或同一 URL，`checked_at` 与原记录一致。当前模块对应的数量字段显式保留 `null`，不填零、不混用已核下限，不宣称已阅读全文。B站搜索仍须在来源记录和 `fact_evidence` 中同时保留视频、专栏的实际访问核查 `checked_surfaces:["video","article"]`。正文沿用模块标签，只记完整 URL 与“无问题”；不可访问的 X 主页不要求补造最早已读月份。十四平台、范围、最新 revision、全文及视觉审阅等其余验收不变。
+
+已有风险保留 `risk` 及原风险证据；可附同一严格访问证明解释当前未知数量，不得用不可访问改成无风险或删除既有风险。未加载、超时、工具故障、未执行查询、可访问未读、证据不匹配均不能使用此分支。旧 `checked_clean` 或缺数量记录不自动升级；必须提交当前核查证据并重新通过各阶段检查。
 
 ### 已存在但当前空内容的微博超话
 
@@ -266,6 +274,18 @@ snapshot["review_context"]["visual_check"]["jump_checks"] = [record]
 
 ## Revision 与回执
 
+### 用户明确结案的不可用页面（2026-10-31）
+
+只有用户明确允许保留不可用结论并结案时，使用模块状态 `unavailable_closed`，正文链接后写 `公开页面不可用。`，不能改写为“无问题”或“无个人主页”。这不是恢复访问、完成内容阅读或零结果的证明。
+
+`fact_evidence.source_type` 为 `research_record`，`source_locator` 指向同一 `requestId` 的实际 ego 观察 JSON 节点，包含 `url`、`browser:"ego"`、`available:false`、`terminal_message`、完整 `text`、带时区 `checked_at`。`closure_instruction_locator` 指向同一请求用户指令节点，包含用户实际回答 `answer:"保留不可用说明并结案"` 和逐项获准的 `urls`。校验器核对当前模块 URL、页面终态原文、请求归属和用户原话，不接受登录框、加载中、无记录的失败或一般历史授权。其他未完成模块仍按原规则阻止 PASS。
+
+Bluesky 的原生 `/profile/<actor>/post/<rkey>` 是单条帖子路径，不能因含 `/profile/` 而误判为主页。普通主页和不带 `/post/<rkey>` 的路径继续被拒绝为风险原帖来源。
+
+### 本人编排的 Linktree 链接页内容
+
+Linktree 的正文就是本人编排的链接清单，没有独立帖子路径。仅此域名的单账号页可使用 `source_kind:"link_page_content"`，保留 `事实 → 截图 → 完整页面 URL`。`link_page_evidence` 含工作区内 `record_path`、`record_sha256`、`screenshot_path`、`screenshot_sha256`；实际 ego 记录包含 `url`、`browser:"ego"`、`author`、完整 `text`、`visible_labels`、带时区 `checked_at` 和与事实逐字相同的 `report_summary`。该记录路径须由真实 Linktree 模块的 `fact_evidence.source_locator` 声明。校验器核对域名和单账号路径、原文标签、账号、哈希及事实绑定，不适用于普通社媒主页、搜索页、可取得原帖直链的内容或仅有链接标题却未经读取的页面。
+
 `document.revision_id`、`before_revision`、`after_revision` 必须一致。末尾 revision 变化时只允许再抓一次最新完整快照：布局指纹不变就重跑确定性检查并复用视觉；布局变化才更新视觉检查。持续变化则 `BLOCKED`。
 
 PASS 回执绑定 token、revision、layout_fingerprint、reviewer_id、script_version、免责规则版本、全文指纹和 UTC 时间。任何后续写入均重跑确定性检查，并将语义复核绑定当前全文；只有 layout_fingerprint 变化才使视觉基线失效，风险跳转另按各自 jump_fingerprint 判断是否重查。
@@ -282,3 +302,7 @@ PASS 回执绑定 token、revision、layout_fingerprint、reviewer_id、script_v
 ```
 
 四个定位必须彼此不同，均由该实际百度模块 `fact_evidence.source_locator` 或 `source_locators[].locator` 明确声明，且解析为存在的绝对 JSON 文件及严格 JSON Pointer。校验器实际读取：原生 `ok:true` 摘要节点与逐字摘录；正确 `wd` 查询对应的 `title/cards` 及原观察的百度跳转链接；独立闭环记录中的确切 `indexedShop`、已核原生索引及 private 边界、未声称商品详情；未截断原页的 `Currently, this shop is private.` 正文。非空字符串或元数据布尔值不能独自满足条件；这项支持不生成业务、全文语义、图片实看或跳转 PASS。
+
+### 来源原话的审阅
+
+**助手附加的免责说明、证据边界套话及其变体仍为 `FAIL`。** 有明确来源归属的原帖引文和截图原文交由当前全文语义审阅核对，不能仅因来源原话命中关键词就删除证据。引用不能包裹或豁免助手文案，也不能伪造来源；发现归属错误、助手免责或其他实质文字问题仍为 `FAIL`。未闭环疑问只留内部，不进入终稿；必要来源归属与已核实事实保留。

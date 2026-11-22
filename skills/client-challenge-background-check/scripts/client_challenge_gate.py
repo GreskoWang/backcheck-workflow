@@ -46,6 +46,14 @@ def _name(value: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
 
 
+def _discovery_gate():
+    path = Path(__file__).resolve().parents[2] / "background-check-research/scripts/discovery_gate.py"
+    spec = importlib.util.spec_from_file_location("challenge_discovery_gate", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _url(value: Any) -> bool:
     if not _text(value):
         return False
@@ -291,8 +299,17 @@ def _audit_client_challenge(review: Any, *, discovery_review: Any, items: Any,
     nouns = artifact(review.get("nouns"), ".nouns")
     first_input = artifact(review.get("first_input"), ".first_input")
     entities = discovery.get("entities")
-    if not isinstance(entities, list) or not entities:
-        issue("NOUN_EXPORT", ".discovery_review.entities", entities, "current nonempty discovery entities")
+    empty_export = isinstance(entities, list) and not entities
+    if empty_export:
+        # A genuinely empty table still has the independent research review and
+        # the real challenge child/round proofs below. Recheck source files here
+        # rather than trusting a self-reported empty list or an old PASS label.
+        discovery_result = _discovery_gate().audit_discovery_review(discovery, reported_facts=[], base_dir=base)
+        if discovery_result["verdict"] != "PASS":
+            issue("EMPTY_DISCOVERY", ".discovery_review", discovery_result,
+                  "current evidence-backed full discovery PASS before exporting an empty noun table")
+    if not isinstance(entities, list):
+        issue("NOUN_EXPORT", ".discovery_review.entities", entities, "current discovery entities reconciled with actual source review")
         entities = []
     expected_names: set[str] = set()
     name_entities: dict[str, int] = {}
@@ -308,8 +325,8 @@ def _audit_client_challenge(review: Any, *, discovery_review: Any, items: Any,
             name_entities[normalized] = index
     term_entities: dict[str, int] = {}
     names_seen: set[str] = set()
-    if not isinstance(nouns, list) or not nouns:
-        issue("NOUN_EXPORT", ".nouns", nouns, "full nonempty exact {id,name} list")
+    if not isinstance(nouns, list) or (not nouns and not empty_export):
+        issue("NOUN_EXPORT", ".nouns", nouns, "full exact {id,name} list, empty only after evidenced source review")
         nouns = []
     for index, row in enumerate(nouns):
         if not isinstance(row, dict) or set(row) != {"id", "name"} or not _text(row.get("id")) or not _text(row.get("name")):
@@ -364,7 +381,7 @@ def _audit_client_challenge(review: Any, *, discovery_review: Any, items: Any,
                 issue("NOUN_EXPORT", ".discovery_review.semantic_review.items.names", name, "resolved noun export; reopen upstream")
             else:
                 occurrences[entity_index].add(pair)
-    if semantic_seen != set(source_rows) or not source_rows:
+    if semantic_seen != set(source_rows) or (not source_rows and not empty_export):
         issue("OCCURRENCES", ".discovery_review.semantic_review.items", sorted(semantic_seen), "semantic rows for all current sources")
     for term_id, entity_index in term_entities.items():
         if not occurrences.get(entity_index):

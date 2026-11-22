@@ -56,3 +56,14 @@ test('rejects malformed, duplicate and unauthorized group entries', () => {
   assert.throws(() => resolve([{ ...row, activationFromMs: cutoff, acceptanceRepliesEnabled: true, acceptanceFromMs: cutoff - 1 }]), /precede/u);
   assert.throws(() => resolve([{ chatId: LEGACY_DISPATCH_CHAT_ID, role: 'regular_delivery' }]), /retain its role/u);
 });
+
+test('accounting permission distinguishes explicit off from missing or malformed configuration', () => {
+  for (const value of [true, false, undefined, 'false', null]) {
+    const localConfig = { ...config, accounting: value === undefined ? undefined : { enabled: value } };
+    const [legacy] = resolveGroupPolicies({ localConfig, binding: { chatId: LEGACY_DISPATCH_CHAT_ID }, runtime: legacyRuntime });
+    assert.equal(legacy.accountingEnabled, typeof value === 'boolean' ? value : null);
+    const policy = getGroupPolicy(resolve([{ chatId: special, role: 'special_dispatch', authorizationRef: 'user-request',
+      accountingEnabled: value }]), special);
+    assert.equal(policy.accountingEnabled, typeof value === 'boolean' ? value : null);
+  }
+});
