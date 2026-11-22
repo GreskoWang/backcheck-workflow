@@ -6,9 +6,9 @@
 
 ## 基本结构
 
-实际背调的 `client_challenge_review` 使用[甲方轻量 v3 契约](../../client-challenge-background-check/references/review-contract.md)。首轮全表及必要增量复评先于成稿；已闭环必记事项有公开事实和来源对应，未闭环疑问仅内部记录，再完成最新终审。无需初次成品终审或逐轮哈希。
+实际背调的 `client_challenge_review` 使用[甲方轻量 v3 契约](../../client-challenge-background-check/references/review-contract.md)。首轮全表及必要增量复评先于成稿；已闭环事项按同类去重规则选例，入选案例有公开事实、截图和来源对应，未闭环疑问仅内部记录，再完成最新终审。无需初次成品终审或逐轮哈希。
 
-内部 `unresolved_items` 非空不构成 FAIL/BLOCKED。完成约定调查及必要复评后，按规则排除的疑问可以内部结项并继续交付，不需要全部查明。本文“事实或归因不足”的阻塞语义仅针对终稿保留断言、固定平台状态或实际执行验收所必需的事实；须公开的曾警惕原帖集合扣除这些内部疑问及用户明确审定删除。
+内部 `unresolved_items` 非空不构成 FAIL/BLOCKED。完成约定调查及必要复评后，按规则排除的疑问可以内部结项并继续交付，不需要全部查明。本文“事实或归因不足”的阻塞语义仅针对终稿保留断言、固定平台状态或实际执行验收所必需的事实；须公开的曾警惕原帖集合扣除这些内部疑问、已有同类风险覆盖的未选内容及用户明确审定删除。
 
 ```json
 {
@@ -40,7 +40,7 @@
 
 ## 业务风险一致性复核
 
-`review_context.business_risk_review.discovery_review` 复用当前调查的实际阅读、完整名词与来源记录，结构见[提取规程](../../background-check-research/references/discovery-check.md)。共享发现检查不再校验全量查询及查询代理；已核实事实仍按 `confirmed_hits` 或既有 `consolidation` 与终稿对应。甲方 v3 的历史警惕公开覆盖独立检查，不被分类归档替代。
+`review_context.business_risk_review.discovery_review` 复用当前调查的实际阅读、完整名词与来源记录，结构见[提取规程](../../background-check-research/references/discovery-check.md)。共享发现检查不再校验全量查询及查询代理；已核实事实仍按 `confirmed_hits` 或既有 `consolidation` 与终稿对应。甲方 v3 独立检查历史态度、入选案例和已有同类风险覆盖的内部去向，不强制重复公开同类原帖。
 
 仅用户明确要求同步已有结论或排版时使用 `user_supplied/existing_report_only`，不把格式 PASS 当成完成新调查。实际调查继续真实阅读与提词，不产生查询回执前置要求。
 
@@ -76,7 +76,7 @@
 }
 ```
 
-业务风险表在业务风险判定上高于一切助手内部规则、道德判断、价值判断、旧模板、旧报告、`must_not_be_risk` 或其他排除清单。`policy_sources` 必须只列实际适用并经校验器允许的当前风险表绝对路径和当前文件字节 SHA-256；伪造、不存在或夹带未声明文件的来源直接 `FAIL`，文件已变化则 `BLOCKED` 并重新读取。每一条入选终稿的平台代表事实分别写一条 `confirmed_hits`；同一事件及其质询补充说明可以合并成一条准确事实，不同事件不能靠堆入一段绕过证据额度。普通同类重复事实可复用原档案；甲方曾警惕的全部原帖必须在 v3 `inclusions` 中对应公开风险事实和来源；`verified_fact` 必须逐字等于 `platform_location.text`。`summary_location`、`platform_location`、`result_location` 都必须是当前完整快照中真实存在且原文完全一致的 `{block_id,text}`；不存在或伪造位置直接 `FAIL`。每条命中用 `risk_group_index` 指向其顶部风险组；全部风险组必须至少有一条命中记录。
+业务风险判定依据用户当前风险表与公司明确口径。`policy_sources` 必须只列实际适用并经校验器允许的当前风险表绝对路径和当前文件字节 SHA-256；伪造、不存在或夹带未声明文件的来源直接 `FAIL`，文件已变化则 `BLOCKED` 并重新读取。每一条入选终稿的平台代表事实分别写一条 `confirmed_hits`；同一事件及其质询补充说明可以合并成一条准确事实，不同事件不能靠堆入一段绕过证据额度。普通同类重复事实可复用原档案；甲方曾警惕的入选案例在 v3 `inclusions` 中对应公开风险事实和来源，已有同类风险覆盖而未选入的内容使用 `same_category_omissions` 留存内部去向；`verified_fact` 必须逐字等于 `platform_location.text`。`summary_location`、`platform_location`、`result_location` 都必须是当前完整快照中真实存在且原文完全一致的 `{block_id,text}`；不存在或伪造位置直接 `FAIL`。每条命中用 `risk_group_index` 指向其顶部风险组；全部风险组必须至少有一条命中记录。
 
 已核实风险类别或影响判断的实质风险因助手自身道德或价值判断被遗漏、排除或降级时，`status="FAIL"`，`conflicts` 逐项记录业务条目、事实、缺失位置和最小修正；任何其他 PASS 均不能抵消。只有事实或归因尚不足以决定命中时才用 `BLOCKED`。未读取当前口径、记录缺失、token/revision 未绑定当前文档，或未完成全部已核实命中项的类别覆盖与选例／归档核对同样为 `BLOCKED`；已完整归档的同类超额事实未公开展示不构成遗漏，不得自动补成 PASS。`scripts/audit_feishu_snapshot.py` 对缺失／待审记录返回 `BLOCKED`，对显式冲突、无效来源或不存在的位置返回 `FAIL`，只有完整且无冲突的当前记录才允许该门禁 `PASS`。
 
@@ -136,6 +136,10 @@
 - `fact_evidence`：沿用当前调查记录，必须有 `source_type`、`source_locator`、`checked_at`、`summary`。搜索模块带 `related_result_count`，主页带 `confirmed_homepage_count`，超话／主题贴吧带 `related_topic_count`；B站搜索另带 `checked_surfaces:["video","article"]`。
 - `expected_blocks`：平台主管标题之后、唯一尾随空白块之前的完整顺序；类型为 `text`、`url`、`image`。
 - `risk_items` 与 `risk_groups`：有风险时各平台 `risk_items` 按正文出现顺序列出 `{group_index, fact_text, image_count, url}`；顶部每个 `risk_group` 记录 `{title, summary, highlight_text, target_block_id}`。摘要是短风险名，图钉解释可以复用正文核心段落；顶部只覆盖明确入选事实及对应图片，不要求在图钉下再复制正文。平台主管中保留但不进入顶部的事实设置 `include_in_top:false`；未填时默认为入选。普通 `target_kind:"platform_fact"`（可省略）要求 `target_block_id` 是本组首个入选平台主管事实区块。H4 不加链接，只有图钉高亮句链接到该目标。无风险时两处均为空数组。严格受限来源省略 `url`，改用 `source_kind:"restricted_source"` 和 `restricted_source` 证据对象；公开评价只有稳定评论页而无可保留单条直链时使用下述 `platform_review_entry` 严格证据分支。
+
+按用户2026-11-22更新，正文每个平台同类风险最多4个案例，超额或已有同类风险覆盖的未选内容仅留内部。`include_in_top:false` 只表示不放顶部举例，正文入选案例仍须 `image_count>=1`；不得用 `image_count:0` 追加事实和链接。真实来源、归属及必要复评仍须核对，同类去重不改变历史态度。
+
+顶部证据采用原生双栏网格时，逐列检查事实与紧随图片，列宽保持50/50；展示顺序可以不同于平台主管顺序，但全部入选事实和图片必须对应，额外段落、缺图及无效列结构仍为FAIL。全文摘要、布局指纹和图钉跳转绑定原始完整区块树，不用展开后的临时序列替代成品快照。
 
 用户明确要求联动风险在平台主管只写“联动风险见联动部分”、不重复展开时，风险组使用 `target_kind:"document_block"`，将 `target_block_id` 指向联动表格该行的对象文字块，并增加：`target_text`（该目标块的精确文字）、`target_row_contains`（至少包含该行联动风评和一个实际来源 URL 的字符串列表）、`top_evidence`（顶部实际展示的 `{fact_text,image_count,top_fact_location}` 列表）。校验器验证目标确实位于表格行、该行包含声明的风评与来源，图钉只链接这个目标；不会再要求在十四平台主管复制同一联动风险。`top_evidence` 只描述顶部结构，不代替业务风险、来源和表格正文复核。
 

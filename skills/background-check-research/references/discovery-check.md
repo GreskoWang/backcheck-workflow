@@ -32,4 +32,4 @@ python "$env:BACKCHECK_SKILLS_ROOT/background-check-research/scripts/discovery_g
 
 完成调查和必要画像补查 → 完整名词表交给一个新建、无调查缓存的甲方代理 → 简短事实说明与增量复评 → 按态度整理终稿 → 最新成品终审 → 提交检查。甲方质询不再以前置成品终审为启动条件。
 
-质询角色、三态、六项事实、最多五轮和“任一轮曾警惕永久入稿”以[甲方质询技能](../../client-challenge-background-check/SKILL.md)为唯一规则来源；[分类合并](risk-consolidation.md)只控制重复呈现，不能取消必记原帖。
+质询角色、三态、六项事实、最多五轮和曾警惕事项的同类去重与选例收录以[甲方质询技能](../../client-challenge-background-check/SKILL.md)为唯一规则来源；[分类合并](risk-consolidation.md)控制正文选例上限；已有同类风险入稿时，曾警惕内容可只留内部记录。
